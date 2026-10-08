@@ -1,0 +1,7 @@
+<class_libraries>
+  <library path="rl_nav2_controller">
+    <class type="rl_nav2_controller::RlController" base_class_type="nav2_core::Controller">
+      <description>TD3 actor local controller for Nav2</description>
+    </class>
+  </library>
+</class_libraries>

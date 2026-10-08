@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Raise CycloneDDS auto participant limit for Nav2 multi-process bringup. -->
+<CycloneDDS>
+  <Domain id="any">
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

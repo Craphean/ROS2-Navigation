@@ -1,0 +1,17 @@
+# explore_lite params for Nav2 + slam_toolbox (TB3 / TB4 sim).
+# Uses /map from SLAM so frontiers update as the map grows.
+/**:
+  ros__parameters:
+    robot_base_frame: base_link
+    return_to_init: false
+    costmap_topic: map
+    costmap_updates_topic: map_updates
+    visualize: true
+    planner_frequency: 0.25
+    progress_timeout: 60.0
+    potential_scale: 3.0
+    orientation_scale: 0.0
+    gain_scale: 1.0
+    transform_tolerance: 0.3
+    # Smaller so early SLAM blobs still yield reachable frontiers
+    min_frontier_size: 0.35
