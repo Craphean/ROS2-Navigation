@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 set +u
 source /opt/ros/lyrical/setup.bash
-source /home/qing/ros2_navigation/install/setup.bash
+source "${ROOT_DIR}/install/setup.bash"
 set -e
 
 echo "=== lifecycle ==="
@@ -12,7 +13,7 @@ timeout 3 ros2 lifecycle get /collision_monitor || true
 echo "=== restart relay ==="
 pkill -f rl_cmd_vel_relay.py 2>/dev/null || true
 sleep 1
-setsid python3 /home/qing/ros2_navigation/scripts/rl_cmd_vel_relay.py --ros-args -p use_sim_time:=true \
+setsid python3 "${ROOT_DIR}/scripts/rl_cmd_vel_relay.py" --ros-args -p use_sim_time:=true \
   </dev/null >/tmp/rl_cmd_vel_relay.log 2>&1 &
 sleep 2
 tail -5 /tmp/rl_cmd_vel_relay.log || true

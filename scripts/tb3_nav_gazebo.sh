@@ -48,13 +48,17 @@ if [[ "${LIBGL_ALWAYS_SOFTWARE:-0}" == "1" ]]; then
   echo "[tb3_nav_gazebo] Using software OpenGL (LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}, MESA_GL_VERSION_OVERRIDE=${MESA_GL_VERSION_OVERRIDE:-unset})"
 fi
 
-# Map YAML: MAP=~/tb3_map.yaml ./scripts/tb3_nav_gazebo.sh
-# or: ./scripts/tb3_nav_gazebo.sh /path/to/map.yaml
+# Map YAML: defaults to built-in ${ROOT_DIR}/maps/tb3_map.yaml.
+# Override via: MAP=~/tb3_map.yaml ./scripts/tb3_nav_gazebo.sh
+#           or: ./scripts/tb3_nav_gazebo.sh /path/to/map.yaml
 if [[ $# -ge 1 && ( "${1}" == *.yaml || "${1}" == *.yml ) ]]; then
   MAP="${1}"
   shift
 fi
-MAP="${MAP:-${HOME}/tb3_map.yaml}"
+MAP="${MAP:-${ROOT_DIR}/maps/tb3_map.yaml}"
+if [[ ! -f "${MAP}" && -f "${HOME}/tb3_map.yaml" ]]; then
+  MAP="${HOME}/tb3_map.yaml"
+fi
 
 if [[ ! -f "${MAP}" ]]; then
   echo "[tb3_nav_gazebo] Map not found: ${MAP}" >&2

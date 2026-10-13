@@ -11,6 +11,10 @@ source /opt/ros/lyrical/setup.bash
 if [[ -f "${ROOT_DIR}/install/setup.bash" ]]; then
   # shellcheck disable=SC1091
   source "${ROOT_DIR}/install/setup.bash"
+else
+  echo "[tb3_nav_rl_gazebo] Missing ${ROOT_DIR}/install — build first:" >&2
+  echo "  cd ${ROOT_DIR} && colcon build --symlink-install --packages-select rl_nav2_controller" >&2
+  exit 1
 fi
 
 # Prefer CycloneDDS (same as explore / tb4 nav scripts) to avoid FastDDS SHM locks.
@@ -57,14 +61,17 @@ if [[ "${LIBGL_ALWAYS_SOFTWARE:-0}" == "1" ]]; then
   echo "[tb3_nav_rl_gazebo] Using software OpenGL (LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}, MESA_GL_VERSION_OVERRIDE=${MESA_GL_VERSION_OVERRIDE:-unset})"
 fi
 
-# Map YAML: MAP=~/tb3_map.yaml ./scripts/tb3_nav_rl_gazebo.sh
-# or: ./scripts/tb3_nav_rl_gazebo.sh /path/to/map.yaml
+# Map YAML: defaults to built-in ${ROOT_DIR}/maps/tb3_map.yaml.
+# Override via: MAP=~/tb3_map.yaml ./scripts/tb3_nav_rl_gazebo.sh
+#           or: ./scripts/tb3_nav_rl_gazebo.sh /path/to/map.yaml
 if [[ $# -ge 1 && ( "${1}" == *.yaml || "${1}" == *.yml ) ]]; then
   MAP="${1}"
   shift
 fi
-MAP="${MAP:-${HOME}/tb3_map.yaml}"
-# Desktop copy is a common fallback for this workspace.
+MAP="${MAP:-${ROOT_DIR}/maps/tb3_map.yaml}"
+if [[ ! -f "${MAP}" && -f "${HOME}/tb3_map.yaml" ]]; then
+  MAP="${HOME}/tb3_map.yaml"
+fi
 if [[ ! -f "${MAP}" && -f "${HOME}/桌面/tb3_map.yaml" ]]; then
   MAP="${HOME}/桌面/tb3_map.yaml"
 fi

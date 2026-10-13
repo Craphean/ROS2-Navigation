@@ -1,13 +1,43 @@
 # ros2_navigation
 
-在 ROS 2 Lyrical 上跑 Nav2 仿真：TurtleBot3 / TurtleBot4 的 Gazebo 建图、已知地图导航，以及用 TD3 策略替换 Nav2 局部控制器。全局规划仍用 Navfn。
+在 ROS 2 Lyrical 上跑 Nav2 仿真：TurtleBot3 / TurtleBot4 的 Gazebo 建图、已知地图导航、自主前沿探索（Frontier Exploration），以及用 TD3 策略替换 Nav2 局部控制器（全局规划仍用 Navfn）。
 
-脚本会自己 `source /opt/ros/lyrical/setup.bash`。在虚拟机里检测到 VMware 时，默认关掉 Gazebo 三维窗口、关闭 Nav2 composition，并用软件 OpenGL，保证激光能做射线检测。
+脚本会自动 `source /opt/ros/lyrical/setup.bash`（以及本工作空间的 `install/setup.bash`）。在虚拟机里检测到 VMware 时，默认关掉 Gazebo 三维窗口（`HEADLESS=True`）、关闭 Nav2 组合节点（`USE_COMPOSITION=False`），并启用 Mesa 软件 OpenGL（`LIBGL_ALWAYS_SOFTWARE=1`），保证激光雷达在无独显环境下能正常进行射线检测。
 
-## 环境
+## 环境要求与依赖安装 (Prerequisites)
 
-- ROS 2 Lyrical，以及其中的 Nav2、`nav2_minimal_tb3_sim`、`nav2_minimal_tb4_sim`
-- 本工作空间需要自行编译的包：`rl_nav2_controller`、`explore_lite`、`explore_lite_msgs`
+- **操作系统**：Ubuntu 26.04 LTS (Resolute)
+- **ROS 版本**：ROS 2 Lyrical（默认安装路径 `/opt/ros/lyrical`）
+- **仿真器**：Gazebo (`gz-sim`，随 Nav2 最小仿真包自动安装)
+
+在运行或编译本仓库前，请先安装所需的 ROS 2 功能包、CycloneDDS 中间件及系统工具：
+
+```bash
+sudo apt update && sudo apt install -y \
+  ros-lyrical-navigation2 \
+  ros-lyrical-nav2-bringup \
+  ros-lyrical-slam-toolbox \
+  ros-lyrical-nav2-minimal-tb3-sim \
+  ros-lyrical-nav2-minimal-tb4-sim \
+  ros-lyrical-rmw-cyclonedds-cpp \
+  python3-colcon-common-extensions \
+  python3-rosdep \
+  pciutils
+```
+
+## 快速开始 (Getting Started)
+
+### 1. 克隆仓库
+
+```bash
+git clone https://github.com/Craphean/ROS2-Navigation.git ~/ros2_navigation
+cd ~/ros2_navigation
+chmod +x scripts/*.sh
+```
+
+### 2. 编译工作空间
+
+本工作空间包含需要编译的源码包：`rl_nav2_controller`（TD3 局部控制器插件）、`explore_lite_msgs` 与 `explore_lite`（自主探索节点）。
 
 ```bash
 cd ~/ros2_navigation
@@ -16,30 +46,52 @@ colcon build --symlink-install --packages-select rl_nav2_controller explore_lite
 source install/setup.bash
 ```
 
-换一套仿真前先停掉残留进程：
+### 3. 一键启动仿真
+
+仓库已在 `maps/` 目录下内置了建好的 TurtleBot3 `sandbox` 默认地图（`maps/tb3_map.yaml`），编译完成后可直接运行任意脚本：
 
 ```bash
+# 直接运行 TurtleBot3 已知地图导航（默认加载 maps/tb3_map.yaml，MPPI 控制器）
+./scripts/tb3_nav_gazebo.sh
+
+# 或使用 TD3 强化学习局部控制器导航
+./scripts/tb3_nav_rl_gazebo.sh
+
+# 换一套仿真前先停掉残留进程并清理 DDS 共享内存：
 ./scripts/kill_nav2_sim.sh
 ```
 
-## 脚本
+## 脚本一览
 
 | 脚本 | 作用 |
 | --- | --- |
-| `scripts/tb3_slam_gazebo.sh` | TurtleBot3 + Gazebo + SLAM |
-| `scripts/tb3_nav_gazebo.sh` | TurtleBot3 已知地图导航（MPPI 局部控制器） |
-| `scripts/tb3_nav_rl_gazebo.sh` | 同上，局部控制器换成 TD3 |
+| `scripts/tb3_slam_gazebo.sh` | TurtleBot3 + Gazebo + SLAM 手动建图 |
+| `scripts/tb3_nav_gazebo.sh` | TurtleBot3 已知地图导航（MPPI 局部控制器，默认使用 `maps/tb3_map.yaml`） |
+| `scripts/tb3_nav_rl_gazebo.sh` | 同上，局部控制器换成 TD3（`rl_nav2_controller::RlController`） |
 | `scripts/tb3_explore_slam.sh` | TurtleBot3 自主前沿探索并建图 |
-| `scripts/tb4_slam_gazebo.sh` | TurtleBot4 + Gazebo + SLAM（warehouse / depot） |
+| `scripts/tb4_slam_gazebo.sh` | TurtleBot4 + Gazebo + SLAM（`warehouse` / `depot`） |
 | `scripts/tb4_nav_gazebo.sh` | TurtleBot4 使用 Nav2 自带地图导航 |
 | `scripts/tb4_explore_slam.sh` | TurtleBot4 自主探索并建图 |
 | `scripts/kill_nav2_sim.sh` | 结束 Gazebo、Nav2、RViz，并清理 DDS 共享内存 |
 
 世界可用环境变量切换。TurtleBot3 默认 `sandbox`，也可 `WORLD=empty`。TurtleBot4 默认 `warehouse`，也可 `WORLD=depot`。VMware 上若要打开 Gazebo 窗口：`HEADLESS=False ./scripts/...`。
 
-## TurtleBot3：建图再导航
+## TurtleBot3：建图与已知地图导航
 
-先建图。在 RViz 里用键盘或 Nav2 把车开一遍沙盒，然后保存地图（需要另开一个已经 source 过的终端）：
+### 直接使用内置地图导航
+
+如果不传参数，导航脚本默认加载仓库自带的 `maps/tb3_map.yaml`：
+
+```bash
+./scripts/kill_nav2_sim.sh
+./scripts/tb3_nav_gazebo.sh          # MPPI 局部控制器
+# 或
+./scripts/tb3_nav_rl_gazebo.sh       # TD3 局部控制器
+```
+
+### 从头建图再导航
+
+也可以自己跑一遍 SLAM 并保存新地图（需要另开一个终端保存地图）：
 
 ```bash
 ./scripts/tb3_slam_gazebo.sh
@@ -48,17 +100,12 @@ source /opt/ros/lyrical/setup.bash
 ros2 run nav2_map_server map_saver_cli -f ~/tb3_map
 ```
 
-用 MPPI 在这张图上导航：
+随后将自定义地图路径作为参数传入：
 
 ```bash
 ./scripts/kill_nav2_sim.sh
 ./scripts/tb3_nav_gazebo.sh ~/tb3_map.yaml
-```
-
-用 TD3 局部控制器：
-
-```bash
-./scripts/kill_nav2_sim.sh
+# 或使用 TD3 局部控制器：
 ./scripts/tb3_nav_rl_gazebo.sh ~/tb3_map.yaml
 ```
 
@@ -76,7 +123,7 @@ RViz 里用 **Nav2 Goal** 点目标。导航和定位都显示 active 后再发�
 
 ## TurtleBot4
 
-首次启动 warehouse / depot 会从 Fuel 下载模型，需要网络。这两张图是 Nav2 自带的、与 Gazebo 世界坐标对齐的地图，初始位姿就是出生点，不要套用 TurtleBot3 那张 SLAM 图的偏移。
+首次启动 `warehouse` / `depot` 会从 Fuel 下载模型，需要网络。这两张图是 Nav2 自带的、与 Gazebo 世界坐标对齐的地图，初始位姿就是出生点，不要套用 TurtleBot3 那张 SLAM 图的偏移。
 
 ```bash
 ./scripts/tb4_slam_gazebo.sh
@@ -104,9 +151,10 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 ## 目录
 
-- `scripts/`：启动和清理
+- `scripts/`：启动和清理脚本
+- `maps/`：内置的 TurtleBot3 默认仿真地图（`tb3_map.yaml` / `tb3_map.pgm`）
 - `config/nav2_params_rl.yaml`：TD3 导航参数
 - `config/nav2_params_vmware.yaml`：TurtleBot4 / MPPI 在虚拟机上的参数
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁
 - `src/rl_nav2_controller/`：TD3 局部控制器
-- `src/m-explore-ros2/`：前沿探索
+- `src/m-explore-ros2/`：前沿探索 (`explore_lite` / `explore_lite_msgs`)
