@@ -1,0 +1,21 @@
+# Parameters for multi-robot auction exploration coordinator
+multi_robot_coordinator:
+  ros__parameters:
+    use_sim_time: true
+    # Frequency of coordination / auction cycle (Hz)
+    rate_hz: 0.5
+    # Minimum number of frontier cells to form a valid cluster
+    min_frontier_size: 5
+    # Utility weights: Utility = gain_scale * size - potential_scale * dist - orientation_scale * angle
+    gain_scale: 1.0
+    potential_scale: 2.0
+    orientation_scale: 0.5
+    # Minimum distance (meters) between two robots' targets to avoid conflict
+    exclusion_radius: 1.5
+    # Maximum time (seconds) allowed for a single navigation goal before cancelling
+    goal_timeout: 60.0
+    # Number of failures before an unreachable frontier is permanently blacklisted
+    blacklist_retry_limit: 2
+    # Radius around a blacklisted point to ignore (meters)
+    blacklist_radius: 0.4
+

@@ -146,14 +146,17 @@ WORLD=depot ./scripts/tb4_nav_gazebo.sh
 双车 TurtleBot3 实时 SLAM 探索 + `multirobot_map_merge` 地图合并（默认 `HEADLESS=True`，合并后的全局地图发布在 `/map`，坐标系为 `world`）：
 
 ```bash
-# 默认无头模式运行双车自主探索与实时地图合并（默认 sandbox 世界）
+# 默认模式：共享全局合并地图 + 竞拍协商机制 (multi_robot_coordinator)
 ./scripts/tb3_multi_explore_slam.sh
+
+# 切换回旧版各自独立的 explore_lite 盲探索模式
+EXPLORATION_MODE=legacy ./scripts/tb3_multi_explore_slam.sh
 
 # 切换到 TurtleBot4 的 warehouse 或 depot 大型地图（自动匹配走廊双车初始位姿）
 WORLD=warehouse ./scripts/tb3_multi_explore_slam.sh
 WORLD=depot ./scripts/tb3_multi_explore_slam.sh
 
-# 同时打开 RViz 实时查看合并后的全局地图 /map
+# 同时打开 RViz 实时查看合并后的全局地图 /map 与前沿竞标标记 /exploration/markers
 USE_RVIZ=True WORLD=warehouse ./scripts/tb3_multi_explore_slam.sh
 
 # 保存合并后的全局地图
@@ -183,8 +186,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 ## TODO
 
-1. robot1订阅/robot1/map, robot2订阅/robot2/map，虽然后台有 map_merge 在把它们俩的地图拼成全局大地图 /map，但它们各自的决策大脑并没有看这张合并后的总图。且两车没有任何通信协商机制，即可能重复探索，效率低下。
-方案：共享合并地图+竞拍协商机制
+1. [x] **共享合并地图 + 竞拍协商机制（已完成）**：实现 `scripts/multi_robot_coordinator.py`，统一订阅全局合并大地图 `/map`，基于边际效益（前沿增益减去距离/航向代价）进行多车竞拍协商调度，并通过 TF / 初始位姿矩阵逆变换下发 Nav2 导航目标，消除重复探索与航向冲突。详细配置见 `config/coordinator_params.yaml`。
 
 2. TurtleBot3 搭载的是单线激光雷达（2D LiDAR）（在实物上是 LDS-01/02，在 Gazebo 仿真里是单层激光扫描插件）。但是项目的最终目标是构建出有高度、立体的 3D 地图，需要升级传感器和建图算法。只需要考虑已知初始位姿的情况。
 

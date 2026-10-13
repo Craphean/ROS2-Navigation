@@ -66,6 +66,7 @@ HEADLESS="${HEADLESS:-True}"
 USE_COMPOSITION="${USE_COMPOSITION:-False}"
 USE_RVIZ="${USE_RVIZ:-False}"
 KNOWN_INIT_POSES="${KNOWN_INIT_POSES:-true}"
+EXPLORATION_MODE="${EXPLORATION_MODE:-auction}"
 
 SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb3_sim)/share/nav2_minimal_tb3_sim"
 TB4_SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb4_sim 2>/dev/null)/share/nav2_minimal_tb4_sim" || true
@@ -115,10 +116,11 @@ ROBOT2_YAW="${ROBOT2_YAW:-${DEFAULT_R2_YAW}}"
 
 PARAMS_FILE="${PARAMS_FILE:-${ROOT_DIR}/config/nav2_multirobot_slam_params.yaml}"
 EXPLORE_PARAMS="${EXPLORE_PARAMS:-${ROOT_DIR}/config/explore_params.yaml}"
+COORDINATOR_PARAMS="${COORDINATOR_PARAMS:-${ROOT_DIR}/config/coordinator_params.yaml}"
 MAP_MERGE_PARAMS="${MAP_MERGE_PARAMS:-${ROOT_DIR}/src/m-explore-ros2/map_merge/config/params.yaml}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_merge.rviz}"
 
-echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} known_init_poses=${KNOWN_INIT_POSES}"
+echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} known_init_poses=${KNOWN_INIT_POSES}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
 
 ROBOT1_LOG="/tmp/tb3_multi_robot1_bringup.log"
@@ -126,6 +128,7 @@ ROBOT2_LOG="/tmp/tb3_multi_robot2_bringup.log"
 MERGE_LOG="/tmp/tb3_multi_map_merge.log"
 EXPLORE1_LOG="/tmp/tb3_multi_explore1.log"
 EXPLORE2_LOG="/tmp/tb3_multi_explore2.log"
+COORDINATOR_LOG="/tmp/tb3_multi_coordinator.log"
 
 # 1. Launch Gazebo server + robot1 (Nav2 + slam_toolbox in /robot1)
 setsid bash -c "
@@ -224,11 +227,12 @@ echo "[tb3_multi_explore_slam] Launched robot2 (PID=${R2_PID}, log=${ROBOT2_LOG}
 MERGE_PID=""
 EXP1_PID=""
 EXP2_PID=""
+COORD_PID=""
 RVIZ_PID=""
 
 cleanup() {
   echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & map merge..."
-  for pid in "${EXP1_PID}" "${EXP2_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${R2_PID}" "${R1_PID}"; do
+  for pid in "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${R2_PID}" "${R1_PID}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
     fi
@@ -304,31 +308,49 @@ if [[ "${USE_RVIZ,,}" == "true" ]]; then
   RVIZ_PID=$!
 fi
 
-# 4. Start explore_lite for robot1 and robot2
-echo "[tb3_multi_explore_slam] Starting explore_lite for /robot1 and /robot2 ..."
-ros2 run explore_lite explore --ros-args \
-  -r __ns:=/robot1 \
-  --params-file "${EXPLORE_PARAMS}" \
-  -p use_sim_time:=true \
-  -r /tf:=tf \
-  -r /tf_static:=tf_static \
-  >"${EXPLORE1_LOG}" 2>&1 &
-EXP1_PID=$!
+# 4. Start Exploration Decision Layer (Auction Coordinator or Legacy explore_lite)
+if [[ "${EXPLORATION_MODE,,}" == "auction" ]]; then
+  echo "[tb3_multi_explore_slam] Starting multi_robot_coordinator (Auction Coordination on /map) ..."
+  python3 "${ROOT_DIR}/scripts/multi_robot_coordinator.py" --ros-args \
+    --params-file "${COORDINATOR_PARAMS}" \
+    -p use_sim_time:=true \
+    -p robot_namespaces:="['robot1', 'robot2']" \
+    -p robot1_init_pose:="[${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}]" \
+    -p robot2_init_pose:="[${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW}]" \
+    >"${COORDINATOR_LOG}" 2>&1 &
+  COORD_PID=$!
 
-ros2 run explore_lite explore --ros-args \
-  -r __ns:=/robot2 \
-  --params-file "${EXPLORE_PARAMS}" \
-  -p use_sim_time:=true \
-  -r /tf:=tf \
-  -r /tf_static:=tf_static \
-  >"${EXPLORE2_LOG}" 2>&1 &
-EXP2_PID=$!
+  echo "[tb3_multi_explore_slam] Dual-robot auction exploration running!"
+  echo "  - Coordinator log:    ${COORDINATOR_LOG}"
+  echo "  - Merged map topic:   /map (frame_id: world)"
+  echo "  - Markers topic:      /exploration/markers"
+  echo "  - map_merge log:      ${MERGE_LOG}"
+else
+  echo "[tb3_multi_explore_slam] Starting legacy explore_lite for /robot1 and /robot2 ..."
+  ros2 run explore_lite explore --ros-args \
+    -r __ns:=/robot1 \
+    --params-file "${EXPLORE_PARAMS}" \
+    -p use_sim_time:=true \
+    -r /tf:=tf \
+    -r /tf_static:=tf_static \
+    >"${EXPLORE1_LOG}" 2>&1 &
+  EXP1_PID=$!
 
-echo "[tb3_multi_explore_slam] Dual exploration running!"
-echo "  - robot1 explore log: ${EXPLORE1_LOG}"
-echo "  - robot2 explore log: ${EXPLORE2_LOG}"
-echo "  - map_merge log:      ${MERGE_LOG}"
-echo "  - Merged map topic:   /map (frame_id: world)"
+  ros2 run explore_lite explore --ros-args \
+    -r __ns:=/robot2 \
+    --params-file "${EXPLORE_PARAMS}" \
+    -p use_sim_time:=true \
+    -r /tf:=tf \
+    -r /tf_static:=tf_static \
+    >"${EXPLORE2_LOG}" 2>&1 &
+  EXP2_PID=$!
+
+  echo "[tb3_multi_explore_slam] Legacy dual exploration running!"
+  echo "  - robot1 explore log: ${EXPLORE1_LOG}"
+  echo "  - robot2 explore log: ${EXPLORE2_LOG}"
+  echo "  - map_merge log:      ${MERGE_LOG}"
+  echo "  - Merged map topic:   /map (frame_id: world)"
+fi
 echo "Press Ctrl-C to stop."
 
 wait "${MERGE_PID}"
