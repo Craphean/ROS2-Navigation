@@ -46,9 +46,13 @@
 
 #include <combine_grids/merging_pipeline.h>
 #include <geometry_msgs/msg/transform.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <map_msgs/msg/occupancy_grid_update.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <tf2_msgs/msg/tf_message.hpp>
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include <boost/thread.hpp>
 
@@ -67,6 +71,8 @@ struct MapSubscription {
   // ros::Subscriber map_updates_sub;
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub;
   rclcpp::Subscription<map_msgs::msg::OccupancyGridUpdate>::SharedPtr map_updates_sub;
+  rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf_sub;
+  rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf_static_sub;
 };
 
 class MapMerge : public rclcpp::Node
@@ -85,6 +91,8 @@ private:
 
   // publishing
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr merged_map_publisher_;
+  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_broadcaster_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> dynamic_tf_broadcaster_;
   // maps robots namespaces to maps. does not own
   std::unordered_map<std::string, MapSubscription*> robots_;
   // owns maps -- iterator safe

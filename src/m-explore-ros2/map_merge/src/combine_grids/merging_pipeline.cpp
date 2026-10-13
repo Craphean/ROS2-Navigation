@@ -145,6 +145,7 @@ bool MergingPipeline::estimateTransforms(rclcpp::Logger logger,
   RCLCPP_DEBUG(logger, "[estimateTransforms] calculating transforms in global reference frame");
   // note: currently used estimator never fails
   if (!(*estimator)(image_features, pairwise_matches, transforms)) {
+    transforms_.assign(images_.size(), cv::Mat());
     return false;
   }
 
@@ -157,9 +158,18 @@ bool MergingPipeline::estimateTransforms(rclcpp::Logger logger,
   adjuster->setConfThresh(confidence);
   if (!(*adjuster)(image_features, pairwise_matches, transforms)) {
     RCLCPP_WARN(logger, "[estimateTransforms] Bundle adjusting failed. Could not estimate transforms.");
+    // Fallback to first non-empty grid so composeGrids does not crash on size mismatch
+    transforms_.assign(images_.size(), cv::Mat());
+    for (size_t i = 0; i < images_.size(); ++i) {
+      if (!images_[i].empty()) {
+        transforms_[i] = cv::Mat::eye(3, 3, CV_64F);
+        break;
+      }
+    }
     return false;
   }
 
+  use_world_origin_ = false;
   transforms_.clear();
   transforms_.resize(images_.size());
   size_t i = 0;
@@ -184,9 +194,9 @@ static inline bool isIdentity(const cv::Mat& matrix)
 
 nav_msgs::msg::OccupancyGrid::SharedPtr MergingPipeline::composeGrids(rclcpp::Logger logger)
 {
-  // for checking states. Throws a rcpputils::IllegalStateException if the condition fails.
-  rcpputils::check_true(images_.size() == transforms_.size());
-  rcpputils::check_true(images_.size() == grids_.size());
+  if (images_.size() != transforms_.size() || images_.size() != grids_.size()) {
+    return nullptr;
+  }
 
   if (images_.empty()) {
     return nullptr;
@@ -222,7 +232,7 @@ nav_msgs::msg::OccupancyGrid::SharedPtr MergingPipeline::composeGrids(rclcpp::Lo
   float any_resolution = 0.0;
   for (size_t i = 0; i < transforms_.size(); ++i) {
     // check if this transform is the reference frame
-    if (isIdentity(transforms_[i])) {
+    if (isIdentity(transforms_[i]) && grids_[i]) {
       result->info.resolution = grids_[i]->info.resolution;
       break;
     }
@@ -234,12 +244,30 @@ nav_msgs::msg::OccupancyGrid::SharedPtr MergingPipeline::composeGrids(rclcpp::Lo
     result->info.resolution = any_resolution;
   }
 
-  // set grid origin to its centre
-  result->info.origin.position.x =
-      -(result->info.width / 2.0) * double(result->info.resolution);
-  result->info.origin.position.y =
-      -(result->info.height / 2.0) * double(result->info.resolution);
-  result->info.origin.orientation.w = 1.0;
+  if (use_world_origin_) {
+    std::vector<cv::Point> corners;
+    corners.reserve(rois.size());
+    std::vector<cv::Size> sizes;
+    sizes.reserve(rois.size());
+    for (const auto& roi : rois) {
+      corners.push_back(roi.tl());
+      sizes.push_back(roi.size());
+    }
+    cv::Rect dst_roi = cv::detail::resultRoi(corners, sizes);
+    result->info.origin.position.x =
+        static_cast<double>(dst_roi.tl().x) * static_cast<double>(result->info.resolution);
+    result->info.origin.position.y =
+        static_cast<double>(dst_roi.tl().y) * static_cast<double>(result->info.resolution);
+    result->info.origin.position.z = 0.0;
+    result->info.origin.orientation.w = 1.0;
+  } else {
+    // set grid origin to its centre
+    result->info.origin.position.x =
+        -(result->info.width / 2.0) * double(result->info.resolution);
+    result->info.origin.position.y =
+        -(result->info.height / 2.0) * double(result->info.resolution);
+    result->info.origin.orientation.w = 1.0;
+  }
 
   return result;
 }

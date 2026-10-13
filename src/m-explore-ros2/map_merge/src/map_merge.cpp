@@ -56,7 +56,7 @@ logger_(this->get_logger())
   std::string merged_map_topic;
 
   if (!this->has_parameter("merging_rate")) this->declare_parameter<double>("merging_rate", 4.0);
-  if (!this->has_parameter("discovery_rate")) this->declare_parameter<double>("discovery_rate", 0.05);
+  if (!this->has_parameter("discovery_rate")) this->declare_parameter<double>("discovery_rate", 0.5);
   if (!this->has_parameter("estimation_rate")) this->declare_parameter<double>("estimation_rate", 0.5);
   if (!this->has_parameter("known_init_poses")) this->declare_parameter<bool>("known_init_poses", true);
   if (!this->has_parameter("estimation_confidence")) this->declare_parameter<double>("estimation_confidence", 1.0);
@@ -84,15 +84,26 @@ logger_(this->get_logger())
       this->create_publisher<nav_msgs::msg::OccupancyGrid>(merged_map_topic,
       rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable());
 
+  tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+  dynamic_tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+  if (world_frame_ != "map") {
+    geometry_msgs::msg::TransformStamped world_to_map;
+    world_to_map.header.stamp = this->now();
+    world_to_map.header.frame_id = world_frame_;
+    world_to_map.child_frame_id = "map";
+    world_to_map.transform.rotation.w = 1.0;
+    tf_broadcaster_->sendTransform(world_to_map);
+  }
+
   // Timers
   map_merging_timer_ = this->create_wall_timer(
-    std::chrono::milliseconds((uint16_t)(1000.0 / merging_rate_)),
+    std::chrono::milliseconds(static_cast<int64_t>(1000.0 / merging_rate_)),
     [this]() { mapMerging(); });
   // execute right away to simulate the ros1 first while loop on a thread
   mapMerging();
 
   topic_subscribing_timer_ = this->create_wall_timer(
-    std::chrono::milliseconds((uint16_t)(1000.0 / discovery_rate_)),
+    std::chrono::milliseconds(static_cast<int64_t>(1000.0 / discovery_rate_)),
     [this]() { topicSubscribing(); });
 
   // For topicSubscribing() we need to spin briefly for the discovery to happen
@@ -107,7 +118,7 @@ logger_(this->get_logger())
 
   if (!have_initial_poses_){
     pose_estimation_timer_ = this->create_wall_timer(
-      std::chrono::milliseconds((uint16_t)(1000.0 / estimation_rate_)),
+      std::chrono::milliseconds(static_cast<int64_t>(1000.0 / estimation_rate_)),
       [this]() { poseEstimation(); });
     // execute right away to simulate the ros1 first while loop on a thread
     poseEstimation();
@@ -172,6 +183,73 @@ void MapMerge::topicSubscribing()
       robots_.insert({robot_name, &subscription});
       subscription.initial_pose = init_pose;
 
+      std::string clean_robot = robot_name;
+      while (!clean_robot.empty() && clean_robot.front() == '/') {
+        clean_robot.erase(0, 1);
+      }
+
+      if (have_initial_poses_ && tf_broadcaster_) {
+        geometry_msgs::msg::TransformStamped tf_msg;
+        tf_msg.header.stamp = this->now();
+        tf_msg.header.frame_id = world_frame_;
+        tf_msg.child_frame_id = clean_robot.empty() ? "robot_map" : (clean_robot + "/map");
+        tf_msg.transform = init_pose;
+        tf_broadcaster_->sendTransform(tf_msg);
+      }
+
+      if (!clean_robot.empty()) {
+        auto prefix_frame = [clean_robot](const std::string& f) -> std::string {
+          std::string clean_f = f;
+          while (!clean_f.empty() && clean_f.front() == '/') {
+            clean_f.erase(0, 1);
+          }
+          if (clean_f.rfind(clean_robot + "/", 0) == 0) {
+            return clean_f;
+          }
+          return clean_robot + "/" + clean_f;
+        };
+
+        std::string robot_tf_topic = ros1_names::append(robot_name, "tf");
+        std::string robot_tf_static_topic = ros1_names::append(robot_name, "tf_static");
+
+        subscription.tf_sub = this->create_subscription<tf2_msgs::msg::TFMessage>(
+            robot_tf_topic, rclcpp::QoS(rclcpp::KeepLast(100)),
+            [this, prefix_frame](const tf2_msgs::msg::TFMessage::SharedPtr msg) {
+              if (!dynamic_tf_broadcaster_) {
+                return;
+              }
+              std::vector<geometry_msgs::msg::TransformStamped> out;
+              out.reserve(msg->transforms.size());
+              for (auto t : msg->transforms) {
+                t.header.frame_id = prefix_frame(t.header.frame_id);
+                t.child_frame_id = prefix_frame(t.child_frame_id);
+                out.push_back(std::move(t));
+              }
+              if (!out.empty()) {
+                dynamic_tf_broadcaster_->sendTransform(out);
+              }
+            });
+
+        subscription.tf_static_sub = this->create_subscription<tf2_msgs::msg::TFMessage>(
+            robot_tf_static_topic,
+            rclcpp::QoS(rclcpp::KeepLast(100)).transient_local().reliable(),
+            [this, prefix_frame](const tf2_msgs::msg::TFMessage::SharedPtr msg) {
+              if (!tf_broadcaster_) {
+                return;
+              }
+              std::vector<geometry_msgs::msg::TransformStamped> out;
+              out.reserve(msg->transforms.size());
+              for (auto t : msg->transforms) {
+                t.header.frame_id = prefix_frame(t.header.frame_id);
+                t.child_frame_id = prefix_frame(t.child_frame_id);
+                out.push_back(std::move(t));
+              }
+              if (!out.empty()) {
+                tf_broadcaster_->sendTransform(out);
+              }
+            });
+      }
+
       /* subscribe callbacks */
       map_topic = ros1_names::append(robot_name, robot_map_topic_);
       map_updates_topic =
@@ -205,8 +283,6 @@ void MapMerge::mapMerging()
   RCLCPP_INFO_ONCE(logger_, "Map merging started.");
 
   if (have_initial_poses_) {
-    // TODO: attempt fix for SLAM toolbox: add method for padding grids to same size
-
     std::vector<nav_msgs::msg::OccupancyGrid::ConstSharedPtr> grids;
     std::vector<geometry_msgs::msg::Transform> transforms;
     grids.reserve(subscriptions_size_);
@@ -221,11 +297,10 @@ void MapMerge::mapMerging()
       }
     }
 
-
     // we don't need to lock here, because when have_initial_poses_ is true we
     // will not run concurrently on the pipeline
     pipeline_.feed(grids.begin(), grids.end());
-    pipeline_.setTransforms(transforms.begin(), transforms.end());
+    pipeline_.setTransforms(transforms.begin(), transforms.end(), true);
   }
 
   // nav_msgs::OccupancyGridPtr merged_map;
@@ -429,8 +504,21 @@ bool MapMerge::getInitPose(const std::string& name,
       this->get_parameter(ros1_names::append(merging_namespace, "init_pose_yaw"),
                       yaw);
 
+  if (!success && !merging_namespace.empty() && merging_namespace.front() == '/') {
+    std::string rel_ns = merging_namespace.substr(1);
+    success =
+        this->get_parameter(ros1_names::append(rel_ns, "init_pose_x"),
+                        pose.translation.x) &&
+        this->get_parameter(ros1_names::append(rel_ns, "init_pose_y"),
+                        pose.translation.y) &&
+        this->get_parameter(ros1_names::append(rel_ns, "init_pose_z"),
+                        pose.translation.z) &&
+        this->get_parameter(ros1_names::append(rel_ns, "init_pose_yaw"),
+                        yaw);
+  }
+
   tf2::Quaternion q;
-  q.setEuler(0., 0., yaw);
+  q.setRPY(0., 0., yaw);
   pose.rotation = toMsg(q);
 
   return success;

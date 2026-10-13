@@ -42,6 +42,7 @@ kill_matching TERM \
   'image_bridge' \
   '/lib/robot_state_publisher/robot_state_publisher' \
   '/lib/explore_lite/explore' \
+  '/lib/multirobot_map_merge/map_merge' \
   'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
 sleep 1
@@ -51,6 +52,7 @@ kill_matching KILL \
   'tb3_simulation_launch' \
   'tb4_simulation_launch' \
   '/lib/rviz2/rviz2' \
+  '/lib/multirobot_map_merge/map_merge' \
   'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
 
@@ -58,6 +60,7 @@ kill_matching KILL \
 kill_other_wrappers() {
   local pat pid
   for pat in \
+      'scripts/tb3_multi_explore_slam.sh' \
       'scripts/tb3_explore_slam.sh' \
       'scripts/tb4_explore_slam.sh' \
       'scripts/tb3_slam_gazebo.sh' \
@@ -80,7 +83,7 @@ while read -r pid; do
   [[ -z "${pid}" ]] && continue
   [[ "${pid}" == "${SELF_PID}" || "${pid}" == "${PARENT_PID}" ]] && continue
   kill -9 "${pid}" 2>/dev/null
-done < <(pgrep -f 'scripts/tb[34]_(explore_slam|slam_gazebo|nav_gazebo|nav_rl_gazebo)\.sh' 2>/dev/null)
+done < <(pgrep -f 'scripts/tb[34]_(multi_explore_slam|explore_slam|slam_gazebo|nav_gazebo|nav_rl_gazebo)\.sh' 2>/dev/null)
 
 echo "[kill_nav2_sim] Clearing DDS shared memory ..."
 rm -f /dev/shm/cyclonedds* /dev/shm/fastrtps_* /dev/shm/fastdds* /dev/shm/sem.fastdds* /dev/shm/sem.fastrtps* 2>/dev/null

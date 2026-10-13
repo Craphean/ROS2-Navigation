@@ -67,13 +67,15 @@ public:
 
   std::vector<geometry_msgs::msg::Transform> getTransforms() const;
   template <typename InputIt>
-  bool setTransforms(InputIt transforms_begin, InputIt transforms_end);
+  bool setTransforms(InputIt transforms_begin, InputIt transforms_end,
+                     bool metric_with_origins = false);
 
 private:
   std::vector<nav_msgs::msg::OccupancyGrid::ConstSharedPtr> grids_;
   std::vector<cv::Mat> images_;
   std::vector<cv::Mat> transforms_;
   double max_confidence_achieved_ = 0.0;
+  bool use_world_origin_ = false;
 };
 
 template <typename InputIt>
@@ -104,7 +106,8 @@ void MergingPipeline::feed(InputIt grids_begin, InputIt grids_end)
 
 template <typename InputIt>
 bool MergingPipeline::setTransforms(InputIt transforms_begin,
-                                    InputIt transforms_end)
+                                    InputIt transforms_end,
+                                    bool metric_with_origins)
 {
   static_assert(std::is_assignable<geometry_msgs::msg::Transform&,
                                    decltype(*transforms_begin)>::value,
@@ -112,32 +115,77 @@ bool MergingPipeline::setTransforms(InputIt transforms_begin,
                 "data");
 
   decltype(transforms_) transforms_buf;
-  for (InputIt it = transforms_begin; it != transforms_end; ++it) {
+  size_t idx = 0;
+  for (InputIt it = transforms_begin; it != transforms_end; ++it, ++idx) {
     const geometry_msgs::msg::Quaternion& q = it->rotation;
-    if ((q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w) <
-        std::numeric_limits<double>::epsilon()) {
+    double norm_sq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+    if (norm_sq < std::numeric_limits<double>::epsilon()) {
       // represents invalid transform
       transforms_buf.emplace_back();
       continue;
     }
-    double s = 2.0 / (q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
-    double a = 1 - q.y * q.y * s - q.z * q.z * s;
+    double s = 2.0 / norm_sq;
+    double a = 1.0 - q.y * q.y * s - q.z * q.z * s;
     double b = q.x * q.y * s + q.z * q.w * s;
     double tx = it->translation.x;
     double ty = it->translation.y;
-    cv::Mat transform = cv::Mat::eye(3, 3, CV_64F);
-    transform.at<double>(0, 0) = transform.at<double>(1, 1) = a;
-    transform.at<double>(1, 0) = b;
-    transform.at<double>(0, 1) = -b;
-    transform.at<double>(0, 2) = tx;
-    transform.at<double>(1, 2) = ty;
 
-    transforms_buf.emplace_back(std::move(transform));
+    if (metric_with_origins) {
+      if (idx >= grids_.size() || !grids_[idx] ||
+          grids_[idx]->info.resolution <= 0.f) {
+        transforms_buf.emplace_back();
+        continue;
+      }
+      const double res = static_cast<double>(grids_[idx]->info.resolution);
+      const double ox = grids_[idx]->info.origin.position.x;
+      const double oy = grids_[idx]->info.origin.position.y;
+      const auto& qo = grids_[idx]->info.origin.orientation;
+      double norm_qo = qo.x * qo.x + qo.y * qo.y + qo.z * qo.z + qo.w * qo.w;
+      double co = 1.0;
+      double so = 0.0;
+      if (norm_qo >= std::numeric_limits<double>::epsilon()) {
+        double so_scale = 2.0 / norm_qo;
+        co = 1.0 - qo.y * qo.y * so_scale - qo.z * qo.z * so_scale;
+        so = qo.x * qo.y * so_scale + qo.z * qo.w * so_scale;
+      }
+
+      // Forward rotation from grid_i to world: R_total = R_init * R_origin
+      double c_total = a * co - b * so;
+      double s_total = b * co + a * so;
+
+      // Metric position in world of grid_i cell (0, 0): t_world = R_init * o + t_init
+      double tx_world = a * ox - b * oy + tx;
+      double ty_world = b * ox + a * oy + ty;
+
+      // Pixel offset in global canvas (resolution-scaled)
+      double tx_pix = tx_world / res;
+      double ty_pix = ty_world / res;
+
+      // GridWarper::warp inverts transform.rowRange(0, 2) to obtain the forward
+      // affine map H_i. Store H_i^{-1} so GridWarper::warp recovers H_i.
+      cv::Mat transform = cv::Mat::eye(3, 3, CV_64F);
+      transform.at<double>(0, 0) = c_total;
+      transform.at<double>(0, 1) = s_total;
+      transform.at<double>(1, 0) = -s_total;
+      transform.at<double>(1, 1) = c_total;
+      transform.at<double>(0, 2) = -(c_total * tx_pix + s_total * ty_pix);
+      transform.at<double>(1, 2) = s_total * tx_pix - c_total * ty_pix;
+      transforms_buf.emplace_back(std::move(transform));
+    } else {
+      cv::Mat transform = cv::Mat::eye(3, 3, CV_64F);
+      transform.at<double>(0, 0) = transform.at<double>(1, 1) = a;
+      transform.at<double>(1, 0) = b;
+      transform.at<double>(0, 1) = -b;
+      transform.at<double>(0, 2) = tx;
+      transform.at<double>(1, 2) = ty;
+      transforms_buf.emplace_back(std::move(transform));
+    }
   }
 
   if (transforms_buf.size() != images_.size()) {
     return false;
   }
+  use_world_origin_ = metric_with_origins;
   std::swap(transforms_, transforms_buf);
 
   return true;

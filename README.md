@@ -37,12 +37,12 @@ chmod +x scripts/*.sh
 
 ### 2. 编译工作空间
 
-本工作空间包含需要编译的源码包：`rl_nav2_controller`（TD3 局部控制器插件）、`explore_lite_msgs` 与 `explore_lite`（自主探索节点）。
+本工作空间包含需要编译的源码包：`rl_nav2_controller`（TD3 局部控制器插件）、`explore_lite_msgs` 与 `explore_lite`（自主探索节点）以及 `multirobot_map_merge`（多机器人地图合并节点）。
 
 ```bash
 cd ~/ros2_navigation
 source /opt/ros/lyrical/setup.bash
-colcon build --symlink-install --packages-select rl_nav2_controller explore_lite_msgs explore_lite
+colcon build --symlink-install --packages-select rl_nav2_controller explore_lite_msgs explore_lite multirobot_map_merge
 source install/setup.bash
 ```
 
@@ -69,6 +69,7 @@ source install/setup.bash
 | `scripts/tb3_nav_gazebo.sh` | TurtleBot3 已知地图导航（MPPI 局部控制器，默认使用 `maps/tb3_map.yaml`） |
 | `scripts/tb3_nav_rl_gazebo.sh` | 同上，局部控制器换成 TD3（`rl_nav2_controller::RlController`） |
 | `scripts/tb3_explore_slam.sh` | TurtleBot3 自主前沿探索并建图 |
+| `scripts/tb3_multi_explore_slam.sh` | 双车 TurtleBot3 实时 SLAM 自主探索 + `multirobot_map_merge` 地图合并（默认 `HEADLESS=True`） |
 | `scripts/tb4_slam_gazebo.sh` | TurtleBot4 + Gazebo + SLAM（`warehouse` / `depot`） |
 | `scripts/tb4_nav_gazebo.sh` | TurtleBot4 使用 Nav2 自带地图导航 |
 | `scripts/tb4_explore_slam.sh` | TurtleBot4 自主探索并建图 |
@@ -133,11 +134,30 @@ WORLD=depot ./scripts/tb4_nav_gazebo.sh
 
 `tb4_nav_gazebo.sh` 也可以把一张自己保存的 yaml 作为第一个参数传入。
 
-## 自主探索
+## 自主探索与多车地图合并
+
+单车探索建图：
 
 ```bash
 ./scripts/tb3_explore_slam.sh
 ./scripts/tb4_explore_slam.sh
+```
+
+双车 TurtleBot3 实时 SLAM 探索 + `multirobot_map_merge` 地图合并（默认 `HEADLESS=True`，合并后的全局地图发布在 `/map`，坐标系为 `world`）：
+
+```bash
+# 默认无头模式运行双车自主探索与实时地图合并（默认 sandbox 世界）
+./scripts/tb3_multi_explore_slam.sh
+
+# 切换到 TurtleBot4 的 warehouse 或 depot 大型地图（自动匹配走廊双车初始位姿）
+WORLD=warehouse ./scripts/tb3_multi_explore_slam.sh
+WORLD=depot ./scripts/tb3_multi_explore_slam.sh
+
+# 同时打开 RViz 实时查看合并后的全局地图 /map
+USE_RVIZ=True WORLD=warehouse ./scripts/tb3_multi_explore_slam.sh
+
+# 保存合并后的全局地图
+ros2 run nav2_map_server map_saver_cli -f ~/tb3_merged_map --ros-args -r map:=/map
 ```
 
 暂停和继续：
@@ -147,7 +167,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: false}"
 ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 ```
 
-探索包来自 [m-explore-ros2](https://github.com/robo-friends/m-explore-ros2)，放在 `src/m-explore-ros2`。
+探索与地图合并包来自 [m-explore-ros2](https://github.com/robo-friends/m-explore-ros2)，放在 `src/m-explore-ros2`。
 
 ## 目录
 
@@ -155,6 +175,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 - `maps/`：内置的 TurtleBot3 默认仿真地图（`tb3_map.yaml` / `tb3_map.pgm`）
 - `config/nav2_params_rl.yaml`：TD3 导航参数
 - `config/nav2_params_vmware.yaml`：TurtleBot4 / MPPI 在虚拟机上的参数
+- `config/nav2_multirobot_slam_params.yaml`：双车多命名空间 Nav2 + `slam_toolbox` 参数
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁
 - `src/rl_nav2_controller/`：TD3 局部控制器
-- `src/m-explore-ros2/`：前沿探索 (`explore_lite` / `explore_lite_msgs`)
+- `src/m-explore-ros2/`：前沿探索 (`explore_lite` / `explore_lite_msgs`) 与多车地图合并 (`multirobot_map_merge`)
