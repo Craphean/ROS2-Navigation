@@ -179,3 +179,18 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁
 - `src/rl_nav2_controller/`：TD3 局部控制器
 - `src/m-explore-ros2/`：前沿探索 (`explore_lite` / `explore_lite_msgs`) 与多车地图合并 (`multirobot_map_merge`)
+
+
+## TODO
+
+1. robot1订阅/robot1/map, robot2订阅/robot2/map，虽然后台有 map_merge 在把它们俩的地图拼成全局大地图 /map，但它们各自的决策大脑并没有看这张合并后的总图。且两车没有任何通信协商机制，即可能重复探索，效率低下。
+方案：共享合并地图+竞拍协商机制
+
+2. TurtleBot3 搭载的是单线激光雷达（2D LiDAR）（在实物上是 LDS-01/02，在 Gazebo 仿真里是单层激光扫描插件）。但是项目的最终目标是构建出有高度、立体的 3D 地图，需要升级传感器和建图算法。
+
+3. 现在使用的 TurtleBot3 Waffle 车头正前方安装了一颗 Intel RealSense 深度摄像头，但在 Nav2 官方的精简仿真包（nav2_minimal_tb3_sim）中，为了极大降低对 CPU/GPU 的算力消耗（特别是虚拟机环境），默认只启动了激光雷达和里程计的桥接，摄像头的图像渲染插件默认被精简关闭了。
+目标：在拥有独立显卡直通的高性能主机上开启摄像头的视频流展示
+
+4. 地图世界方面，目前能使用的地图包括带有圆柱体障碍物的 sandbox 和 大型物流仓储 warehouse ，工业厂房与中转站世界 depot，无限开阔平地世界 empty。当前项目使用的仿真器是新版 Gazebo（gz-sim），它天生支持直接加载 Gazebo Fuel 官方云端模型库中的所有开源世界模型。如家庭生活环境、医院病房走廊。前提是地面必须平整。
+
+5. benchmark 基准测试，设计对比试验
