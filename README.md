@@ -186,7 +186,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 1. robot1订阅/robot1/map, robot2订阅/robot2/map，虽然后台有 map_merge 在把它们俩的地图拼成全局大地图 /map，但它们各自的决策大脑并没有看这张合并后的总图。且两车没有任何通信协商机制，即可能重复探索，效率低下。
 方案：共享合并地图+竞拍协商机制
 
-2. TurtleBot3 搭载的是单线激光雷达（2D LiDAR）（在实物上是 LDS-01/02，在 Gazebo 仿真里是单层激光扫描插件）。但是项目的最终目标是构建出有高度、立体的 3D 地图，需要升级传感器和建图算法。
+2. TurtleBot3 搭载的是单线激光雷达（2D LiDAR）（在实物上是 LDS-01/02，在 Gazebo 仿真里是单层激光扫描插件）。但是项目的最终目标是构建出有高度、立体的 3D 地图，需要升级传感器和建图算法。只需要考虑已知初始位姿的情况。
 
 3. 现在使用的 TurtleBot3 Waffle 车头正前方安装了一颗 Intel RealSense 深度摄像头，但在 Nav2 官方的精简仿真包（nav2_minimal_tb3_sim）中，为了极大降低对 CPU/GPU 的算力消耗（特别是虚拟机环境），默认只启动了激光雷达和里程计的桥接，摄像头的图像渲染插件默认被精简关闭了。
 目标：在拥有独立显卡直通的高性能主机上开启摄像头的视频流展示
@@ -194,3 +194,18 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 4. 地图世界方面，目前能使用的地图包括带有圆柱体障碍物的 sandbox 和 大型物流仓储 warehouse ，工业厂房与中转站世界 depot，无限开阔平地世界 empty。当前项目使用的仿真器是新版 Gazebo（gz-sim），它天生支持直接加载 Gazebo Fuel 官方云端模型库中的所有开源世界模型。如家庭生活环境、医院病房走廊。前提是地面必须平整。
 
 5. benchmark 基准测试，设计对比试验
+
+6. 中控台：
+    展示内容：
+    实时建图进度（实时全局地图，rviz视图）
+    集成 Gazebo 3D 数字孪生（3D Digital Twin）：无需开启笨重的 Gazebo GUI，加载环境 Mesh 和机器人 URDF 模型。
+    画中画或双窗口并列显示 robot1 和 robot2 车载摄像头实时画面。
+    小车当前生命周期状态监控：IDLE（待命）、PLANNING（规划中）、NAVIGATING（巡航中）、RECOVERY（正在脱困自旋）。
+
+    控制内容：
+    一键启停，召回返航
+    保存地图
+    人工应急接管车辆
+    点选导航目标，直接调用nav2
+
+    追求美观和专业。使用foxglove
