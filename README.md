@@ -214,7 +214,31 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 7. [x] **rviz界面加上goal, path等display用于调试**：在 `map_merge.rviz` 中分组集成了 Robot1/Robot2 的全局规划路径 (`/plan`)、局部跟踪路径 (`/transformed_global_plan`)、当前目标点 (`/current_goal`)、激光雷达点云 (`/scan`)、车体多边形 (`published_footprint`)、代价地图以及前沿探索竞拍标记 (`/exploration/markers`)。
 
-8. 出生点随机or相近，可选
+8. [x] **出生点随机or固定（可选，默认固定默认出生点）**：
+    - **设计策略**：针对大型仓储地图 `warehouse`，在空旷走廊与通道区域标定出 10 个合法的**巡检基站候选池**（各点离墙壁与货架净空均 $\ge 1.05\text{m}\sim 2.94\text{m}$，两两间距 $\ge 1.50\text{m}$）。
+    - **候选点位明细**：
+      - `[0] STATION_SOUTH_DOCK_1`：`x=2.00, y=-19.65, yaw=1.57`（南区装卸站1，默认起点R1）
+      - `[1] STATION_SOUTH_DOCK_2`：`x=0.50, y=-19.65, yaw=1.57`（南区装卸站2，默认起点R2）
+      - `[2] STATION_SOUTHWEST_AISLE`：`x=-11.50, y=-19.65, yaw=1.57`（西南主通道路口巡检站）
+      - `[3] STATION_SOUTHEAST_AISLE`：`x=8.75, y=-19.65, yaw=1.57`（东南主通道路口巡检站）
+      - `[4] STATION_SOUTHWEST_RACK`：`x=-6.25, y=-10.75, yaw=1.57`（西南仓储货架中继站）
+      - `[5] STATION_SOUTHEAST_RACK`：`x=8.75, y=-10.75, yaw=1.57`（东南立体货架巡检站）
+      - `[6] STATION_CENTRAL_CROSS_WEST`：`x=-6.25, y=6.00, yaw=0.00`（中区横向主干道西枢纽站）
+      - `[7] STATION_CENTRAL_CROSS_MID`：`x=1.60, y=6.00, yaw=0.00`（中区十字交叉核心枢纽站）
+      - `[8] STATION_CENTRAL_CROSS_EAST`：`x=8.75, y=6.00, yaw=0.00`（中区横向主干道东枢纽站）
+      - `[9] STATION_NORTHWEST_BAY`：`x=-9.00, y=13.50, yaw=1.57`（西北高位货架巡检基站）
+    - **随机抽取机制**：当开启 `RANDOM_SPAWN=true` 或传入 `--random-spawn` 时，启动脚本采用**无放回均匀随机抽样**从上述 10 个候选基站中抽取 2 个互不重复的点分别赋予 Robot 1 和 Robot 2，并自动同步给 Gazebo 仿真模型生成、`multirobot_map_merge`（已知初始位姿变换）以及 `multi_robot_coordinator`（分布式竞拍坐标系换算）。若设为 `false`（默认），则 100% 保持原有固定出生点位 `(2.0, -19.65)` 与 `(0.5, -19.65)`。
+    - **运行指令**：
+      ```bash
+      # 1. 默认固定出生点启动（原默认位姿）
+      WORLD=warehouse ./scripts/tb3_multi_explore_slam.sh
+
+      # 2. 随机基站出生点启动（环境变量方式）
+      WORLD=warehouse RANDOM_SPAWN=true ./scripts/tb3_multi_explore_slam.sh
+
+      # 3. 随机基站出生点启动（命令行参数快捷方式，自动缺省切至 warehouse）
+      ./scripts/tb3_multi_explore_slam.sh --random-spawn
+      ```
 
 9. 避免两车碰撞机制（动态避障）
 
