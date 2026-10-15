@@ -352,12 +352,12 @@ for i in $(seq 1 240); do
 
   r1_ok=0
   r2_ok=0
-  if grep -q "lifecycle_manager_navigation.*Managed nodes are active" "${ROBOT1_LOG}" 2>/dev/null && \
+  if grep -qE "lifecycle_manager.*Managed nodes are active" "${ROBOT1_LOG}" 2>/dev/null && \
      grep -q "StaticLayer: Resizing costmap" "${ROBOT1_LOG}" 2>/dev/null; then
     r1_ok=1
   fi
 
-  if grep -q "lifecycle_manager_navigation.*Managed nodes are active" "${ROBOT2_LOG}" 2>/dev/null && \
+  if grep -qE "lifecycle_manager.*Managed nodes are active" "${ROBOT2_LOG}" 2>/dev/null && \
      grep -q "StaticLayer: Resizing costmap" "${ROBOT2_LOG}" 2>/dev/null; then
     r2_ok=1
   fi

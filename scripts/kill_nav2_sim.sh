@@ -43,6 +43,8 @@ kill_matching TERM \
   '/lib/robot_state_publisher/robot_state_publisher' \
   '/lib/explore_lite/explore' \
   '/lib/multirobot_map_merge/map_merge' \
+  'multi_robot_coordinator.py' \
+  'multi_robot_plan_relay.py' \
   'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
 sleep 1
@@ -53,6 +55,8 @@ kill_matching KILL \
   'tb4_simulation_launch' \
   '/lib/rviz2/rviz2' \
   '/lib/multirobot_map_merge/map_merge' \
+  'multi_robot_coordinator.py' \
+  'multi_robot_plan_relay.py' \
   'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
 
