@@ -13,9 +13,11 @@ multi_robot_coordinator:
     # Minimum distance (meters) between two robots' targets to avoid conflict
     exclusion_radius: 1.5
     # Maximum time (seconds) allowed for a single navigation goal before cancelling
-    goal_timeout: 60.0
+    goal_timeout: 90.0
     # Number of failures before an unreachable frontier is permanently blacklisted
     blacklist_retry_limit: 2
     # Radius around a blacklisted point to ignore (meters)
-    blacklist_radius: 0.4
+    blacklist_radius: 0.9
+    # Minimum clearance from known obstacles for frontier safe goal retraction (meters)
+    min_clearance: 0.35
 

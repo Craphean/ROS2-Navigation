@@ -211,3 +211,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
     点选导航目标，直接调用nav2
 
     追求美观和专业。使用foxglove
+
+7. rviz界面加上goal, path等display用于调试
+
+8. 出生点随机or相近，可选

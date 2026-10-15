@@ -8,10 +8,10 @@ coordinates to robot-local coordinates, and drives /<robot>/navigate_to_pose act
 """
 
 import math
-import time
 from collections import deque
 from typing import Dict, List, Optional, Tuple
 
+import cv2
 import numpy as np
 import rclpy
 from rclpy.action import ActionClient
@@ -90,9 +90,10 @@ class MultiRobotCoordinator(Node):
         self.declare_parameter('potential_scale', 2.0)
         self.declare_parameter('orientation_scale', 0.5)
         self.declare_parameter('exclusion_radius', 1.5)
-        self.declare_parameter('goal_timeout', 60.0)
+        self.declare_parameter('goal_timeout', 90.0)
         self.declare_parameter('blacklist_retry_limit', 2)
-        self.declare_parameter('blacklist_radius', 0.4)
+        self.declare_parameter('blacklist_radius', 0.9)
+        self.declare_parameter('min_clearance', 0.35)
 
         namespaces = self.get_parameter('robot_namespaces').get_parameter_value().string_array_value
         if not namespaces:
@@ -107,9 +108,12 @@ class MultiRobotCoordinator(Node):
         self.goal_timeout = float(self.get_parameter('goal_timeout').value)
         self.blacklist_retry_limit = int(self.get_parameter('blacklist_retry_limit').value)
         self.blacklist_radius = float(self.get_parameter('blacklist_radius').value)
+        self.min_clearance = float(self.get_parameter('min_clearance').value)
 
         # Track blacklisted goal locations: list of (x, y)
         self.blacklisted_goals: List[Tuple[float, float]] = []
+        # Global failure counter shared across all robots: (x, y) -> count
+        self.global_failed_goals: Dict[Tuple[float, float], int] = {}
 
         # Setup robot trackers
         self.robots: Dict[str, RobotTracker] = {}
@@ -164,6 +168,10 @@ class MultiRobotCoordinator(Node):
             f'at {self.rate_hz} Hz. Listening on /map...'
         )
 
+    def get_sim_time_sec(self) -> float:
+        """Get simulation / node clock time in seconds."""
+        return self.get_clock().now().nanoseconds / 1e9
+
     def map_callback(self, msg: OccupancyGrid):
         """Receive global merged map and check for active goal invalidation."""
         self.latest_map = msg
@@ -171,20 +179,23 @@ class MultiRobotCoordinator(Node):
 
     def check_goal_invalidation(self, grid_msg: OccupancyGrid):
         """If an active goal's area has been cleared or blocked, cancel it to avoid futile navigation."""
+        now = self.get_sim_time_sec()
+        if now == 0.0 and self.get_parameter('use_sim_time').value:
+            return
+
         width = grid_msg.info.width
         height = grid_msg.info.height
         res = grid_msg.info.resolution
         origin_x = grid_msg.info.origin.position.x
         origin_y = grid_msg.info.origin.position.y
 
-        now = time.time()
         data = np.array(grid_msg.data, dtype=np.int8).reshape((height, width))
 
         for ns, robot in self.robots.items():
             if robot.state != 'NAVIGATING' or robot.current_goal_world is None:
                 continue
 
-            # Grace period: let the robot drive for at least 8.0s before checking invalidation
+            # Grace period: let the robot drive for at least 8.0s (in sim time) before checking invalidation
             # to avoid false cancellations right after goal dispatch.
             if now - robot.goal_start_time < 8.0:
                 continue
@@ -199,8 +210,8 @@ class MultiRobotCoordinator(Node):
             # Condition 1: Goal cell has become an obstacle (> 50)
             is_obstacle = data[gr, gc] > 50
 
-            # Condition 2: Surrounding area (radius 1.2m) has been completely cleared
-            check_radius_cells = max(3, int(1.2 / res))
+            # Condition 2: Surrounding area (radius 1.5m) has been completely cleared
+            check_radius_cells = max(3, int(1.5 / res))
             r_min = max(0, gr - check_radius_cells)
             r_max = min(height, gr + check_radius_cells + 1)
             c_min = max(0, gc - check_radius_cells)
@@ -258,8 +269,99 @@ class MultiRobotCoordinator(Node):
                 if found_tf:
                     break
 
+    def split_cluster_if_large(
+        self,
+        cluster_cells: List[Tuple[int, int]],
+        res: float,
+        min_size: int = 8
+    ) -> List[List[Tuple[int, int]]]:
+        """Split very spread-out/long frontier clusters so multi-robot auction can dispatch to different flanks."""
+        if len(cluster_cells) < min_size * 2:
+            return [cluster_cells]
+
+        coords = np.array(cluster_cells)
+        span = np.ptp(coords, axis=0)  # [span_r, span_c]
+        spread_m = math.hypot(span[0], span[1]) * res
+
+        if spread_m < 2.0:
+            return [cluster_cells]
+
+        var = np.var(coords, axis=0)
+        split_dim = 1 if var[1] > var[0] else 0
+        median_val = np.median(coords[:, split_dim])
+
+        part1 = [c for c in cluster_cells if c[split_dim] <= median_val]
+        part2 = [c for c in cluster_cells if c[split_dim] > median_val]
+
+        if len(part1) < min_size or len(part2) < min_size:
+            return [cluster_cells]
+
+        results = []
+        for part in (part1, part2):
+            p_coords = np.array(part)
+            p_span = np.ptp(p_coords, axis=0)
+            p_spread = math.hypot(p_span[0], p_span[1]) * res
+            if p_spread >= 2.5 and len(part) >= min_size * 2:
+                results.extend(self.split_cluster_if_large(part, res, min_size))
+            else:
+                results.append(part)
+        return results
+
+    def find_safe_goal(
+        self,
+        cluster_cells: List[Tuple[int, int]],
+        is_free: np.ndarray,
+        obstacle_dt: np.ndarray,
+        res: float
+    ) -> Optional[Tuple[int, int]]:
+        """
+        Check clearance from known obstacles. If centroid is too close (< min_clearance),
+        retract via BFS in known free space towards open area.
+        If entire region is trapped in a narrow slit (< min_clearance), return None to drop it.
+        """
+        height, width = is_free.shape
+        min_clearance_cells = self.min_clearance / res
+        max_retract_cells = int(1.5 / res)
+
+        mean_r = sum(c[0] for c in cluster_cells) / len(cluster_cells)
+        mean_c = sum(c[1] for c in cluster_cells) / len(cluster_cells)
+
+        # 1. Direct check: any cell in the cluster that already satisfies min_clearance?
+        safe_cells = [
+            (r, c) for (r, c) in cluster_cells
+            if obstacle_dt[r, c] >= min_clearance_cells
+        ]
+        if safe_cells:
+            return min(safe_cells, key=lambda p: (p[0] - mean_r) ** 2 + (p[1] - mean_c) ** 2)
+
+        # 2. Retract towards open free space via BFS
+        sorted_cluster = sorted(cluster_cells, key=lambda p: (p[0] - mean_r) ** 2 + (p[1] - mean_c) ** 2)
+        q = deque()
+        visited = set()
+        for r, c in sorted_cluster:
+            q.append((r, c, 0))
+            visited.add((r, c))
+
+        while q:
+            r, c, steps = q.popleft()
+            if steps > max_retract_cells:
+                break
+
+            if obstacle_dt[r, c] >= min_clearance_cells:
+                return (r, c)
+
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < height and 0 <= nc < width and (nr, nc) not in visited:
+                    visited.add((nr, nc))
+                    if is_free[nr, nc]:
+                        q.append((nr, nc, steps + 1))
+
+        # 3. Slit / dead-end check: cluster is squeezed in a tight corridor/nook (< robot width). Discard.
+        return None
+
     def extract_frontiers(self, grid_msg: OccupancyGrid) -> List[FrontierCluster]:
-        """Vectorized extraction of frontier cells from OccupancyGrid + BFS clustering."""
+        """Vectorized extraction of frontier cells from OccupancyGrid + BFS clustering + Safe Clearance Retraction."""
         width = grid_msg.info.width
         height = grid_msg.info.height
         res = grid_msg.info.resolution
@@ -270,6 +372,11 @@ class MultiRobotCoordinator(Node):
         is_free = (data >= 0) & (data < 20)
         is_unknown = (data == -1)
         is_lethal = (data > 50)
+
+        # Obstacle distance field (in cells) to nearest lethal obstacle
+        obstacle_binary = np.ones((height, width), dtype=np.uint8) * 255
+        obstacle_binary[is_lethal] = 0
+        obstacle_dt = cv2.distanceTransform(obstacle_binary, cv2.DIST_L2, 5)
 
         # Fast 8-neighbor detection via shifted padding
         unknown_padded = np.pad(is_unknown, 1, mode='constant', constant_values=False)
@@ -290,7 +397,7 @@ class MultiRobotCoordinator(Node):
         # BFS clustering
         frontier_coords = np.argwhere(frontier_mask)
         visited = np.zeros((height, width), dtype=bool)
-        clusters: List[FrontierCluster] = []
+        raw_clusters: List[List[Tuple[int, int]]] = []
 
         for r, c in frontier_coords:
             if visited[r, c]:
@@ -316,24 +423,32 @@ class MultiRobotCoordinator(Node):
                             q.append((nr, nc))
 
             if len(cluster_cells) >= self.min_frontier_size:
-                # Find centroid
-                mean_r = sum(cell[0] for cell in cluster_cells) / len(cluster_cells)
-                mean_c = sum(cell[1] for cell in cluster_cells) / len(cluster_cells)
+                sub_clusters = self.split_cluster_if_large(cluster_cells, res, self.min_frontier_size)
+                raw_clusters.extend(sub_clusters)
 
-                # Pick cell in cluster closest to centroid
-                best_cell = min(cluster_cells, key=lambda p: (p[0] - mean_r) ** 2 + (p[1] - mean_c) ** 2)
-                best_r, best_c = best_cell
+        clusters: List[FrontierCluster] = []
+        for sub_cells in raw_clusters:
+            safe_cell = self.find_safe_goal(sub_cells, is_free, obstacle_dt, res)
+            if safe_cell is None:
+                continue
 
-                wx = origin_x + (best_c + 0.5) * res
-                wy = origin_y + (best_r + 0.5) * res
+            safe_r, safe_c = safe_cell
+            wx = origin_x + (safe_c + 0.5) * res
+            wy = origin_y + (safe_r + 0.5) * res
 
-                # Check if close to blacklisted locations
-                is_blacklisted = any(
-                    math.hypot(wx - bx, wy - by) < self.blacklist_radius
-                    for bx, by in self.blacklisted_goals
-                )
-                if not is_blacklisted:
-                    clusters.append(FrontierCluster(wx, wy, len(cluster_cells), best_r, best_c))
+            # Check if close to blacklisted locations
+            is_blacklisted = any(
+                math.hypot(wx - bx, wy - by) < self.blacklist_radius
+                for bx, by in self.blacklisted_goals
+            )
+            if is_blacklisted:
+                continue
+
+            # Deduplicate targets that are very close to an already added candidate (< 0.4m)
+            if any(math.hypot(wx - c.world_x, wy - c.world_y) < 0.4 for c in clusters):
+                continue
+
+            clusters.append(FrontierCluster(wx, wy, len(sub_cells), safe_r, safe_c))
 
         return clusters
 
@@ -342,15 +457,18 @@ class MultiRobotCoordinator(Node):
         if self.latest_map is None:
             return
 
+        now = self.get_sim_time_sec()
+        if now == 0.0 and self.get_parameter('use_sim_time').value:
+            return
+
         self.update_robot_poses()
 
-        # Check timeouts for navigating robots
-        now = time.time()
+        # Check timeouts for navigating robots using simulation time
         for ns, robot in self.robots.items():
             if robot.state == 'NAVIGATING':
                 if now - robot.goal_start_time > self.goal_timeout:
                     self.get_logger().warning(
-                        f'[{ns}] Goal timed out after {self.goal_timeout}s! Cancelling...'
+                        f'[{ns}] Goal timed out after {self.goal_timeout}s sim time! Cancelling...'
                     )
                     self.cancel_robot_goal(robot)
 
@@ -378,6 +496,22 @@ class MultiRobotCoordinator(Node):
             if not conflict:
                 available_clusters.append(c)
 
+        # Anti-starvation fallback: if idle robots have no available clusters due to exclusion_radius,
+        # adaptively relax exclusion radius (down to 0.8m) so idle robots can explore nearby available flanks
+        if not available_clusters and clusters and active_goals:
+            reduced_radius = 0.8
+            for c in clusters:
+                conflict = any(
+                    math.hypot(c.world_x - ag[0], c.world_y - ag[1]) < reduced_radius
+                    for ag in active_goals
+                )
+                if not conflict:
+                    available_clusters.append(c)
+            if available_clusters:
+                self.get_logger().info(
+                    f'Anti-starvation: relaxed exclusion_radius to {reduced_radius}m, found {len(available_clusters)} clusters.'
+                )
+
         # Publish visualization markers
         self.publish_markers(available_clusters)
 
@@ -395,8 +529,8 @@ class MultiRobotCoordinator(Node):
         dy = cluster.world_y - robot.world_y
         dist = math.hypot(dx, dy)
 
-        # Ignore frontiers that are right at the robot's feet (< 0.5m)
-        if dist < 0.5:
+        # Only ignore frontiers that the robot is literally standing on (< 0.2m, within goal tolerance)
+        if dist < 0.2:
             return -float('inf')
 
         heading_to_goal = math.atan2(dy, dx)
@@ -454,10 +588,18 @@ class MultiRobotCoordinator(Node):
             remaining_robots.remove(winner_robot)
 
             # Exclude clusters near the assigned goal to enforce spatial dispersion
-            remaining_clusters = [
+            next_clusters = [
                 c for c in remaining_clusters
                 if math.hypot(c.world_x - won_cluster.world_x, c.world_y - won_cluster.world_y) >= self.exclusion_radius
             ]
+            # Anti-starvation in auction: if remaining idle robots have no clusters at full exclusion radius,
+            # relax to 0.8m so second robot can also take a goal in the same cycle
+            if not next_clusters and remaining_robots:
+                next_clusters = [
+                    c for c in remaining_clusters
+                    if math.hypot(c.world_x - won_cluster.world_x, c.world_y - won_cluster.world_y) >= 0.8
+                ]
+            remaining_clusters = next_clusters
 
     def world_to_robot_local(self, robot: RobotTracker, xw: float, yw: float) -> Tuple[float, float]:
         """Convert world coordinates (xw, yw) to robot local map frame coordinates (xl, yl)."""
@@ -510,7 +652,7 @@ class MultiRobotCoordinator(Node):
 
         robot.state = 'NAVIGATING'
         robot.current_goal_world = (cluster.world_x, cluster.world_y)
-        robot.goal_start_time = time.time()
+        robot.goal_start_time = self.get_sim_time_sec()
 
         self.get_logger().info(
             f'[{robot.namespace}] Sending Nav2 goal: world=({cluster.world_x:.2f}, {cluster.world_y:.2f}) -> '
@@ -534,6 +676,13 @@ class MultiRobotCoordinator(Node):
                 self.handle_goal_failure(robot, target)
                 return
 
+            if robot.current_goal_world != target:
+                self.get_logger().info(
+                    f'[{robot.namespace}] Goal accepted by server, but target was cancelled/superseded. Cancelling handle.'
+                )
+                goal_handle.cancel_goal_async()
+                return
+
             self.get_logger().info(f'[{robot.namespace}] Goal accepted.')
             robot.current_goal_handle = goal_handle
 
@@ -550,17 +699,20 @@ class MultiRobotCoordinator(Node):
         try:
             result = future.result()
             status = result.status
+            is_current = (robot.current_goal_world == target)
 
             if status == GoalStatus.STATUS_SUCCEEDED:
                 self.get_logger().info(f'[{robot.namespace}] Goal reached successfully! Target: {target}')
-                robot.state = 'IDLE'
-                robot.current_goal_world = None
-                robot.current_goal_handle = None
+                if is_current:
+                    robot.state = 'IDLE'
+                    robot.current_goal_world = None
+                    robot.current_goal_handle = None
             elif status == GoalStatus.STATUS_CANCELED:
                 self.get_logger().info(f'[{robot.namespace}] Goal canceled cleanly. Target: {target}')
-                robot.state = 'IDLE'
-                robot.current_goal_world = None
-                robot.current_goal_handle = None
+                if is_current:
+                    robot.state = 'IDLE'
+                    robot.current_goal_world = None
+                    robot.current_goal_handle = None
             else:
                 self.get_logger().warning(
                     f'[{robot.namespace}] Navigation failed with status code {status}.'
@@ -571,23 +723,36 @@ class MultiRobotCoordinator(Node):
             self.handle_goal_failure(robot, target)
 
     def handle_goal_failure(self, robot: RobotTracker, target: Tuple[float, float]):
-        """Track failure count and blacklist if threshold exceeded."""
-        robot.state = 'IDLE'
-        robot.current_goal_world = None
-        robot.current_goal_handle = None
+        """Track failure count globally across all robots and blacklist if threshold exceeded."""
+        if robot.current_goal_world == target or robot.current_goal_world is None:
+            robot.state = 'IDLE'
+            robot.current_goal_world = None
+            robot.current_goal_handle = None
 
         if target is None:
             return
 
-        key = (round(target[0], 1), round(target[1], 1))
-        current_count = robot.failed_goals_count.get(key, 0) + 1
-        robot.failed_goals_count[key] = current_count
+        tx, ty = target
+        # Find existing nearby failure record within 0.6m to group close failure points
+        found_key = None
+        for (fx, fy) in self.global_failed_goals.keys():
+            if math.hypot(tx - fx, ty - fy) < 0.6:
+                found_key = (fx, fy)
+                break
+
+        if found_key is None:
+            found_key = (round(tx, 2), round(ty, 2))
+            self.global_failed_goals[found_key] = 0
+
+        self.global_failed_goals[found_key] += 1
+        current_count = self.global_failed_goals[found_key]
 
         if current_count >= self.blacklist_retry_limit:
             self.get_logger().warning(
-                f'Goal {target} failed {current_count} times! Adding to blacklisted goals.'
+                f'Goal area near {found_key} failed {current_count} times! Adding to blacklisted goals (radius {self.blacklist_radius}m).'
             )
-            self.blacklisted_goals.append(target)
+            if found_key not in self.blacklisted_goals:
+                self.blacklisted_goals.append(found_key)
 
     def cancel_robot_goal(self, robot: RobotTracker):
         """Cancel an in-flight navigation goal."""
