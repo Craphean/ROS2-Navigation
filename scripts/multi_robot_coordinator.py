@@ -23,7 +23,7 @@ from rclpy.time import Time
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import Point, PoseStamped, Quaternion
 from nav2_msgs.action import NavigateToPose
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Path
 from visualization_msgs.msg import Marker, MarkerArray
 
 import tf2_ros
@@ -75,6 +75,9 @@ class RobotTracker:
 
         self.action_client: Optional[ActionClient] = None
         self.failed_goals_count: Dict[Tuple[int, int], int] = {}
+        self.goal_pub = None
+        self.plan_pub = None
+        self.plan_sub = None
 
 
 class MultiRobotCoordinator(Node):
@@ -136,11 +139,34 @@ class MultiRobotCoordinator(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        # Action clients for each robot
+        # Action clients, goal publishers, and plan relays for each robot
         for ns, robot in self.robots.items():
             action_topic = f'/{ns}/navigate_to_pose'
             self.get_logger().info(f'Connecting ActionClient to {action_topic} ...')
             robot.action_client = ActionClient(self, NavigateToPose, action_topic, callback_group=self.cb_group)
+
+            # Global goal pose publisher in 'world' frame for RViz display
+            robot.goal_pub = self.create_publisher(
+                PoseStamped,
+                f'/{ns}/goal_pose',
+                10
+            )
+
+            # Transformed plan publisher in 'world' frame for RViz display
+            robot.plan_pub = self.create_publisher(
+                Path,
+                f'/{ns}/plan_world',
+                10
+            )
+
+            # Local plan subscriber from Nav2 planner_server (header.frame_id='map')
+            robot.plan_sub = self.create_subscription(
+                Path,
+                f'/{ns}/plan',
+                lambda msg, r=robot: self.plan_callback(msg, r),
+                10,
+                callback_group=self.cb_group
+            )
 
         # Merged map subscription
         self.latest_map: Optional[OccupancyGrid] = None
@@ -628,6 +654,57 @@ class MultiRobotCoordinator(Node):
         yl = -dx * s + dy * c
         return xl, yl
 
+    def robot_local_to_world(self, robot: RobotTracker, xl: float, yl: float, yawl: float = 0.0) -> Tuple[float, float, float]:
+        """Convert robot local coordinates (xl, yl, yawl) to global 'world' frame."""
+        for map_frame in [f'{robot.namespace}/map', 'map']:
+            try:
+                t = self.tf_buffer.lookup_transform('world', map_frame, Time())
+                tx = t.transform.translation.x
+                ty = t.transform.translation.y
+                tyaw = quaternion_to_yaw(t.transform.rotation)
+                c = math.cos(tyaw)
+                s = math.sin(tyaw)
+                xw = tx + xl * c - yl * s
+                yw = ty + xl * s + yl * c
+                yaww = tyaw + yawl
+                return xw, yw, yaww
+            except Exception:
+                continue
+
+        # Analytical forward transform: P_world = R(init_yaw) * P_local + T_init
+        c = math.cos(robot.init_yaw)
+        s = math.sin(robot.init_yaw)
+        xw = robot.init_x + xl * c - yl * s
+        yw = robot.init_y + xl * s + yl * c
+        yaww = robot.init_yaw + yawl
+        return xw, yw, yaww
+
+    def plan_callback(self, msg: Path, robot: RobotTracker):
+        """Transform robot local path (header.frame_id='map') into global 'world' frame for RViz."""
+        if not msg.poses or robot.plan_pub is None:
+            return
+
+        world_path = Path()
+        world_path.header.stamp = self.get_clock().now().to_msg()
+        world_path.header.frame_id = 'world'
+
+        for p in msg.poses:
+            xl = p.pose.position.x
+            yl = p.pose.position.y
+            yawl = quaternion_to_yaw(p.pose.orientation)
+            xw, yw, yaww = self.robot_local_to_world(robot, xl, yl, yawl)
+
+            pw = PoseStamped()
+            pw.header.stamp = world_path.header.stamp
+            pw.header.frame_id = 'world'
+            pw.pose.position.x = xw
+            pw.pose.position.y = yw
+            pw.pose.position.z = p.pose.position.z
+            pw.pose.orientation = yaw_to_quaternion(yaww)
+            world_path.poses.append(pw)
+
+        robot.plan_pub.publish(world_path)
+
     def dispatch_goal(self, robot: RobotTracker, cluster: FrontierCluster):
         """Convert goal to local coordinates and send NavigateToPose action."""
         if robot.action_client is None or not robot.action_client.server_is_ready():
@@ -653,6 +730,18 @@ class MultiRobotCoordinator(Node):
         robot.state = 'NAVIGATING'
         robot.current_goal_world = (cluster.world_x, cluster.world_y)
         robot.goal_start_time = self.get_sim_time_sec()
+
+        # Publish global goal pose in 'world' frame for RViz visualization
+        if robot.goal_pub is not None:
+            gp = PoseStamped()
+            gp.header.frame_id = 'world'
+            gp.header.stamp = self.get_clock().now().to_msg()
+            gp.pose.position.x = cluster.world_x
+            gp.pose.position.y = cluster.world_y
+            gp.pose.position.z = 0.05
+            heading_world = math.atan2(cluster.world_y - robot.world_y, cluster.world_x - robot.world_x)
+            gp.pose.orientation = yaw_to_quaternion(heading_world)
+            robot.goal_pub.publish(gp)
 
         self.get_logger().info(
             f'[{robot.namespace}] Sending Nav2 goal: world=({cluster.world_x:.2f}, {cluster.world_y:.2f}) -> '
@@ -707,12 +796,22 @@ class MultiRobotCoordinator(Node):
                     robot.state = 'IDLE'
                     robot.current_goal_world = None
                     robot.current_goal_handle = None
+                    if robot.plan_pub is not None:
+                        empty_path = Path()
+                        empty_path.header.stamp = self.get_clock().now().to_msg()
+                        empty_path.header.frame_id = 'world'
+                        robot.plan_pub.publish(empty_path)
             elif status == GoalStatus.STATUS_CANCELED:
                 self.get_logger().info(f'[{robot.namespace}] Goal canceled cleanly. Target: {target}')
                 if is_current:
                     robot.state = 'IDLE'
                     robot.current_goal_world = None
                     robot.current_goal_handle = None
+                    if robot.plan_pub is not None:
+                        empty_path = Path()
+                        empty_path.header.stamp = self.get_clock().now().to_msg()
+                        empty_path.header.frame_id = 'world'
+                        robot.plan_pub.publish(empty_path)
             else:
                 self.get_logger().warning(
                     f'[{robot.namespace}] Navigation failed with status code {status}.'
@@ -764,6 +863,11 @@ class MultiRobotCoordinator(Node):
         robot.state = 'IDLE'
         robot.current_goal_world = None
         robot.current_goal_handle = None
+        if robot.plan_pub is not None:
+            empty_path = Path()
+            empty_path.header.stamp = self.get_clock().now().to_msg()
+            empty_path.header.frame_id = 'world'
+            robot.plan_pub.publish(empty_path)
 
     def publish_markers(self, clusters: List[FrontierCluster]):
         """Publish RViz visualization markers for candidate frontiers and assigned goals."""

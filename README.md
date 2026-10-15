@@ -212,6 +212,14 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
     追求美观和专业。使用foxglove
 
-7. rviz界面加上goal, path等display用于调试
+7. [x] **rviz界面加上goal, path等display用于调试**：在 `map_merge.rviz` 中分组集成了 Robot1/Robot2 的全局规划路径 (`/plan`)、局部跟踪路径 (`/transformed_global_plan`)、当前目标点 (`/current_goal`)、激光雷达点云 (`/scan`)、车体多边形 (`published_footprint`)、代价地图以及前沿探索竞拍标记 (`/exploration/markers`)。
 
 8. 出生点随机or相近，可选
+
+9. 避免两车碰撞机制（动态避障）
+
+10. 针对在大型仓库环境（WORLD=warehouse）实测中发现的新问题（结合日志）：
+
+    Robot2 到达边界后卡住不动，唯独 Robot1 独自探索；
+    地图仍然出现严重双层重影与角度偏移（货架轮廓错位约 5°）；
+    探索后期远处明明有大片未探索栅格，双车却全部停滞不再前进。

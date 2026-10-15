@@ -229,10 +229,11 @@ EXP1_PID=""
 EXP2_PID=""
 COORD_PID=""
 RVIZ_PID=""
+RELAY_PID=""
 
 cleanup() {
   echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & map merge..."
-  for pid in "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${R2_PID}" "${R1_PID}"; do
+  for pid in "${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${R2_PID}" "${R1_PID}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
     fi
@@ -344,6 +345,16 @@ else
     -r /tf_static:=tf_static \
     >"${EXPLORE2_LOG}" 2>&1 &
   EXP2_PID=$!
+
+  if [[ "${USE_RVIZ,,}" == "true" ]]; then
+    python3 "${ROOT_DIR}/scripts/multi_robot_plan_relay.py" --ros-args \
+      -p use_sim_time:=true \
+      -p robot_namespaces:="['robot1', 'robot2']" \
+      -p robot1_init_pose:="[${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}]" \
+      -p robot2_init_pose:="[${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW}]" \
+      >/dev/null 2>&1 &
+    RELAY_PID=$!
+  fi
 
   echo "[tb3_multi_explore_slam] Legacy dual exploration running!"
   echo "  - robot1 explore log: ${EXPLORE1_LOG}"
