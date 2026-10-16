@@ -70,24 +70,50 @@ fi
 EXPLORE_PARAMS="${EXPLORE_PARAMS:-${ROOT_DIR}/config/explore_params.yaml}"
 
 SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb3_sim)/share/nav2_minimal_tb3_sim"
+TB4_SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb4_sim 2>/dev/null)/share/nav2_minimal_tb4_sim" || true
+
 case "${WORLD:-sandbox}" in
   sandbox|tb3_sandbox)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_sandbox.sdf.xacro"
+    DEFAULT_X="-2.0"; DEFAULT_Y="-0.5"; DEFAULT_YAW="0.0"
     ;;
   empty|tb3_empty|tb3_empty_world)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_empty_world.sdf.xacro"
+    DEFAULT_X="0.0"; DEFAULT_Y="0.0"; DEFAULT_YAW="0.0"
+    ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    DEFAULT_X="-6.0"; DEFAULT_Y="0.0"; DEFAULT_YAW="0.0"
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    DEFAULT_X="0.0"; DEFAULT_Y="-0.4"; DEFAULT_YAW="1.57"
+    ;;
+  warehouse|tb4_warehouse)
+    WORLD_FILE="${TB4_SIM_SHARE}/worlds/warehouse.sdf"
+    DEFAULT_X="2.00"; DEFAULT_Y="-19.65"; DEFAULT_YAW="1.57"
+    ;;
+  depot|tb4_depot)
+    WORLD_FILE="${TB4_SIM_SHARE}/worlds/depot.sdf"
+    DEFAULT_X="0.00"; DEFAULT_Y="0.00"; DEFAULT_YAW="0.0"
     ;;
   *)
     WORLD_FILE="${WORLD}"
+    DEFAULT_X="0.0"; DEFAULT_Y="0.0"; DEFAULT_YAW="0.0"
     ;;
 esac
+
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb3_explore_slam] World not found: ${WORLD_FILE}" >&2
-  echo "Built-in: sandbox | empty" >&2
+  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house (or full path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 
-echo "[tb3_explore_slam] RMW=${RMW_IMPLEMENTATION} world=${WORLD_FILE}"
+X_POSE="${X_POSE:-${DEFAULT_X}}"
+Y_POSE="${Y_POSE:-${DEFAULT_Y}}"
+YAW="${YAW:-${DEFAULT_YAW}}"
+
+echo "[tb3_explore_slam] RMW=${RMW_IMPLEMENTATION} world=${WORLD_FILE} spawn=(${X_POSE},${Y_POSE},yaw=${YAW})"
 echo "[tb3_explore_slam] nav2 params=${PARAMS_FILE}"
 echo "[tb3_explore_slam] explore params=${EXPLORE_PARAMS}"
 echo "[tb3_explore_slam] RViz: add MarkerArray topic /explore/frontiers to see frontiers"
@@ -111,7 +137,10 @@ exec ros2 launch nav2_bringup tb3_simulation_launch.py \
   use_composition:='${USE_COMPOSITION}' \
   use_sim_time:=True \
   world:='${WORLD_FILE}' \
-  params_file:='${PARAMS_FILE}'
+  params_file:='${PARAMS_FILE}' \
+  x_pose:='${X_POSE}' \
+  y_pose:='${Y_POSE}' \
+  yaw:='${YAW}'
 " </dev/null >"${SLAM_LOG}" 2>&1 &
 SLAM_PID=$!
 echo "[tb3_explore_slam] Nav2+SLAM PID=${SLAM_PID} log=${SLAM_LOG}"

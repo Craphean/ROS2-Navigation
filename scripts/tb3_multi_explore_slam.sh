@@ -127,19 +127,109 @@ WAREHOUSE_STATION_POSES=(
   "-9.00 13.50 1.57 西北高位货架巡检基站"
 )
 
+# Hospital 8 Curated Inspection Base Stations (医院病房与走廊巡检基站池)
+HOSPITAL_STATION_NAMES=(
+  "STATION_WEST_CORRIDOR_SOUTH" # [0] 西主走廊南侧站 (默认起点 R1)
+  "STATION_WEST_CORRIDOR_NORTH" # [1] 西主走廊北侧站 (默认起点 R2)
+  "STATION_CENTRAL_CORRIDOR"    # [2] 中区中央走廊十字枢纽站
+  "STATION_NORTHWEST_WARD_A"    # [3] 西北双人病房A巡检基站
+  "STATION_NORTHEAST_ICU"       # [4] 东北重症监护ICU巡检基站
+  "STATION_SOUTHWEST_TRIAGE"    # [5] 西南门诊分诊大厅基站
+  "STATION_SOUTHEAST_DOCTOR"    # [6] 东南医生诊断与药房基站
+  "STATION_EAST_CORRIDOR_END"   # [7] 东主走廊巡检折返站
+)
+
+HOSPITAL_STATION_POSES=(
+  "-6.00 -0.60 0.00 西主走廊南侧站(默认起点R1)"
+  "-6.00 0.60 0.00 西主走廊北侧站(默认起点R2)"
+  "0.00 0.00 0.00 中区中央走廊十字枢纽站"
+  "-3.50 2.50 1.57 西北双人病房A巡检基站"
+  "3.50 2.50 1.57 东北重症监护ICU巡检基站"
+  "-4.50 -4.20 -1.57 西南门诊分诊大厅基站"
+  "3.50 -4.50 -1.57 东南医生诊断与药房基站"
+  "6.00 0.00 3.14 东主走廊巡检折返站"
+)
+
+# House 6 Curated Inspection Base Stations (家庭室内生活环境巡检基站池)
+HOUSE_STATION_NAMES=(
+  "STATION_HALLWAY_SOUTH"       # [0] 玄关走廊南基站 (默认起点 R1)
+  "STATION_HALLWAY_NORTH"       # [1] 玄关走廊北基站 (默认起点 R2)
+  "STATION_LIVING_ROOM"         # [2] 客厅开阔活动区
+  "STATION_MASTER_BEDROOM"      # [3] 主卧室入口巡检区
+  "STATION_STUDY_ROOM"          # [4] 独立书房工作区
+  "STATION_DINING_ROOM"         # [5] 餐厅就餐过渡区
+)
+
+HOUSE_STATION_POSES=(
+  "0.00 -0.50 1.57 玄关走廊南基站(默认起点R1)"
+  "0.00 0.50 0.00 玄关走廊北基站(默认起点R2)"
+  "-2.00 1.20 1.57 客厅开阔活动区"
+  "2.00 1.20 0.00 主卧室入口巡检区"
+  "2.00 -1.50 -1.57 独立书房工作区"
+  "-2.00 -1.50 -1.57 餐厅就餐过渡区"
+)
+
 case "${WORLD:-sandbox}" in
   sandbox|tb3_sandbox)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_sandbox.sdf.xacro"
     DEFAULT_R1_X="-2.0"; DEFAULT_R1_Y="-0.5"; DEFAULT_R1_YAW="0.0"
     DEFAULT_R2_X="0.0";  DEFAULT_R2_Y="0.5";  DEFAULT_R2_YAW="0.0"
     if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
-      echo "[tb3_multi_explore_slam] Note: Random inspection stations are calibrated for warehouse. Using default poses for sandbox."
+      echo "[tb3_multi_explore_slam] Note: Random inspection stations are calibrated for warehouse/hospital/house. Using default poses for sandbox."
     fi
     ;;
   empty|tb3_empty|tb3_empty_world)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_empty_world.sdf.xacro"
     DEFAULT_R1_X="-2.0"; DEFAULT_R1_Y="-0.5"; DEFAULT_R1_YAW="0.0"
     DEFAULT_R2_X="0.0";  DEFAULT_R2_Y="0.5";  DEFAULT_R2_YAW="0.0"
+    ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    DEFAULT_R1_X="-6.00"; DEFAULT_R1_Y="-0.60"; DEFAULT_R1_YAW="0.0"
+    DEFAULT_R2_X="-6.00"; DEFAULT_R2_Y="0.60";  DEFAULT_R2_YAW="0.0"
+
+    if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
+      if command -v shuf >/dev/null 2>&1; then
+        mapfile -t indices < <(shuf -i 0-7 -n 2)
+        idx1="${indices[0]}"; idx2="${indices[1]}"
+      else
+        idx1=$(( RANDOM % 8 ))
+        idx2=$(( (idx1 + 1 + (RANDOM % 7)) % 8 ))
+      fi
+      read -r r1_x r1_y r1_yaw r1_desc <<< "${HOSPITAL_STATION_POSES[idx1]}"
+      read -r r2_x r2_y r2_yaw r2_desc <<< "${HOSPITAL_STATION_POSES[idx2]}"
+      DEFAULT_R1_X="${r1_x}"; DEFAULT_R1_Y="${r1_y}"; DEFAULT_R1_YAW="${r1_yaw}"
+      DEFAULT_R2_X="${r2_x}"; DEFAULT_R2_Y="${r2_y}"; DEFAULT_R2_YAW="${r2_yaw}"
+      sep_dist=$(python3 -c "import math; print(f'{math.hypot(float(\"${r1_x}\") - float(\"${r2_x}\"), float(\"${r1_y}\") - float(\"${r2_y}\")):.2f}')" 2>/dev/null || echo "N/A")
+      echo "[tb3_multi_explore_slam] [Random Spawn] Hospital Base Stations Activated:"
+      echo "[tb3_multi_explore_slam]   Robot1 -> Station #${idx1} [${HOSPITAL_STATION_NAMES[idx1]}]: (${DEFAULT_R1_X}, ${DEFAULT_R1_Y}) [${r1_desc}]"
+      echo "[tb3_multi_explore_slam]   Robot2 -> Station #${idx2} [${HOSPITAL_STATION_NAMES[idx2]}]: (${DEFAULT_R2_X}, ${DEFAULT_R2_Y}) [${r2_desc}]"
+      echo "[tb3_multi_explore_slam]   Spawn Distance: ${sep_dist}m"
+    fi
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    DEFAULT_R1_X="0.00"; DEFAULT_R1_Y="-0.50"; DEFAULT_R1_YAW="1.57"
+    DEFAULT_R2_X="0.00"; DEFAULT_R2_Y="0.50";  DEFAULT_R2_YAW="0.0"
+
+    if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
+      if command -v shuf >/dev/null 2>&1; then
+        mapfile -t indices < <(shuf -i 0-5 -n 2)
+        idx1="${indices[0]}"; idx2="${indices[1]}"
+      else
+        idx1=$(( RANDOM % 6 ))
+        idx2=$(( (idx1 + 1 + (RANDOM % 5)) % 6 ))
+      fi
+      read -r r1_x r1_y r1_yaw r1_desc <<< "${HOUSE_STATION_POSES[idx1]}"
+      read -r r2_x r2_y r2_yaw r2_desc <<< "${HOUSE_STATION_POSES[idx2]}"
+      DEFAULT_R1_X="${r1_x}"; DEFAULT_R1_Y="${r1_y}"; DEFAULT_R1_YAW="${r1_yaw}"
+      DEFAULT_R2_X="${r2_x}"; DEFAULT_R2_Y="${r2_y}"; DEFAULT_R2_YAW="${r2_yaw}"
+      sep_dist=$(python3 -c "import math; print(f'{math.hypot(float(\"${r1_x}\") - float(\"${r2_x}\"), float(\"${r1_y}\") - float(\"${r2_y}\")):.2f}')" 2>/dev/null || echo "N/A")
+      echo "[tb3_multi_explore_slam] [Random Spawn] House Base Stations Activated:"
+      echo "[tb3_multi_explore_slam]   Robot1 -> Station #${idx1} [${HOUSE_STATION_NAMES[idx1]}]: (${DEFAULT_R1_X}, ${DEFAULT_R1_Y}) [${r1_desc}]"
+      echo "[tb3_multi_explore_slam]   Robot2 -> Station #${idx2} [${HOUSE_STATION_NAMES[idx2]}]: (${DEFAULT_R2_X}, ${DEFAULT_R2_Y}) [${r2_desc}]"
+      echo "[tb3_multi_explore_slam]   Spawn Distance: ${sep_dist}m"
+    fi
     ;;
   warehouse|tb4_warehouse)
     WORLD_FILE="${TB4_SIM_SHARE}/worlds/warehouse.sdf"
@@ -197,7 +287,7 @@ esac
 
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb3_multi_explore_slam] World not found: ${WORLD_FILE}" >&2
-  echo "Supported presets: sandbox | empty | warehouse | depot (or full path to .sdf/.sdf.xacro)" >&2
+  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house (or full path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 

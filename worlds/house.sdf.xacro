@@ -1,0 +1,310 @@
+<?xml version="1.0"?>
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="headless" default="true"/>
+
+  <world name="house">
+    <scene>
+      <grid>false</grid>
+      <shadows>false</shadows>
+    </scene>
+
+    <physics name="1ms" type="ode">
+      <max_step_size>0.003</max_step_size>
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- 仿真引擎核心插件 (与 gz-sim / Nav2 完美兼容) -->
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+    <xacro:unless value="$(arg headless)">
+      <plugin
+        filename="gz-sim-scene-broadcaster-system"
+        name="gz::sim::systems::SceneBroadcaster">
+      </plugin>
+    </xacro:unless>
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin
+      filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
+
+    <!-- 暖色调室内顶部漫反射照明 (营造温馨家庭氛围) -->
+    <light name="house_ceiling_light" type="directional">
+      <cast_shadows>0</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.92 0.88 0.82 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.1 0.1 -0.98</direction>
+    </light>
+
+    <!-- 100% 坚硬平整的家庭地板 (零坡度/无台阶，保证轮式小车平稳行进) -->
+    <model name="house_ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>40 40</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>40 40</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.85 0.78 0.70 1.0</ambient>
+            <diffuse>0.85 0.78 0.70 1.0</diffuse>
+            <specular>0.2 0.2 0.2 1.0</specular>
+          </material>
+        </visual>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+    </model>
+
+    <!-- ===================================================================== -->
+    <!-- 家庭户型建筑墙体结构 (外围 11m x 9m，室内三室两厅经典住宅格局)          -->
+    <!-- 墙高 1.5m，激光雷达 (扫描高度 0.17~0.25m) 处于稳定水平反射截面           -->
+    <!-- 门洞通道开阔度 >= 1.2m，方便 TurtleBot3/TurtleBot4 自主导航与双车穿梭探索 -->
+    <!-- ===================================================================== -->
+    <model name="house_architecture">
+      <static>true</static>
+      <link name="walls">
+        <!-- 外围北墙 (长 11.2m) -->
+        <collision name="wall_outer_north">
+          <pose>0 4.5 0.75 0 0 0</pose>
+          <geometry><box><size>11.2 0.2 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_north_vis">
+          <pose>0 4.5 0.75 0 0 0</pose>
+          <geometry><box><size>11.2 0.2 1.5</size></box></geometry>
+          <material><ambient>0.92 0.90 0.88 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+
+        <!-- 外围南墙 (长 11.2m) -->
+        <collision name="wall_outer_south">
+          <pose>0 -4.5 0.75 0 0 0</pose>
+          <geometry><box><size>11.2 0.2 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_south_vis">
+          <pose>0 -4.5 0.75 0 0 0</pose>
+          <geometry><box><size>11.2 0.2 1.5</size></box></geometry>
+          <material><ambient>0.92 0.90 0.88 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+
+        <!-- 外围西墙 (长 9.2m) -->
+        <collision name="wall_outer_west">
+          <pose>-5.5 0 0.75 0 0 0</pose>
+          <geometry><box><size>0.2 9.2 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_west_vis">
+          <pose>-5.5 0 0.75 0 0 0</pose>
+          <geometry><box><size>0.2 9.2 1.5</size></box></geometry>
+          <material><ambient>0.92 0.90 0.88 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+
+        <!-- 外围东墙 (长 9.2m) -->
+        <collision name="wall_outer_east">
+          <pose>5.5 0 0.75 0 0 0</pose>
+          <geometry><box><size>0.2 9.2 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_east_vis">
+          <pose>5.5 0 0.75 0 0 0</pose>
+          <geometry><box><size>0.2 9.2 1.5</size></box></geometry>
+          <material><ambient>0.92 0.90 0.88 1</ambient><diffuse>0.92 0.90 0.88 1</diffuse></material>
+        </visual>
+
+        <!-- 中央纵向分隔墙 (X=0.0) - 北段 (留出门洞连通客厅与主卧) -->
+        <collision name="wall_mid_vertical_north">
+          <pose>0.0 3.2 0.75 0 0 0</pose>
+          <geometry><box><size>0.15 2.4 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_mid_vertical_north_vis">
+          <pose>0.0 3.2 0.75 0 0 0</pose>
+          <geometry><box><size>0.15 2.4 1.5</size></box></geometry>
+          <material><ambient>0.88 0.85 0.82 1</ambient><diffuse>0.88 0.85 0.82 1</diffuse></material>
+        </visual>
+
+        <!-- 中央纵向分隔墙 (X=0.0) - 南段 (留出门洞连通餐厅与书房) -->
+        <collision name="wall_mid_vertical_south">
+          <pose>0.0 -3.2 0.75 0 0 0</pose>
+          <geometry><box><size>0.15 2.4 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_mid_vertical_south_vis">
+          <pose>0.0 -3.2 0.75 0 0 0</pose>
+          <geometry><box><size>0.15 2.4 1.5</size></box></geometry>
+          <material><ambient>0.88 0.85 0.82 1</ambient><diffuse>0.88 0.85 0.82 1</diffuse></material>
+        </visual>
+
+        <!-- 西区横向分隔墙 (Y=0.0, X:[-5.5, 0.0]) 分隔客厅与餐厅 (留出门洞) -->
+        <collision name="wall_west_horizontal">
+          <pose>-3.5 0.0 0.75 0 0 0</pose>
+          <geometry><box><size>3.8 0.15 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_west_horizontal_vis">
+          <pose>-3.5 0.0 0.75 0 0 0</pose>
+          <geometry><box><size>3.8 0.15 1.5</size></box></geometry>
+          <material><ambient>0.88 0.85 0.82 1</ambient><diffuse>0.88 0.85 0.82 1</diffuse></material>
+        </visual>
+
+        <!-- 东区横向分隔墙 (Y=0.0, X:[0.0, 5.5]) 分隔主卧与书房 (留出门洞) -->
+        <collision name="wall_east_horizontal">
+          <pose>3.5 0.0 0.75 0 0 0</pose>
+          <geometry><box><size>3.8 0.15 1.5</size></box></geometry>
+        </collision>
+        <visual name="wall_east_horizontal_vis">
+          <pose>3.5 0.0 0.75 0 0 0</pose>
+          <geometry><box><size>3.8 0.15 1.5</size></box></geometry>
+          <material><ambient>0.88 0.85 0.82 1</ambient><diffuse>0.88 0.85 0.82 1</diffuse></material>
+        </visual>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+    </model>
+
+    <!-- ===================================================================== -->
+    <!-- Gazebo Fuel 官方家庭生活家居模型引入                                   -->
+    <!-- 1. Table (客厅茶几与餐厅餐桌)                                          -->
+    <!-- 2. Chair & foldable_chair (客厅沙发休闲椅与餐椅)                        -->
+    <!-- 3. Desk & OfficeChairGrey (书房办公桌与转椅)                            -->
+    <!-- 4. SquareShelf (书房储物书架)                                          -->
+    <!-- 5. WhiteCabinet (电视柜、床头柜与餐边柜)                               -->
+    <!-- 6. MetalCabinet (卧室大衣柜与储物柜)                                   -->
+    <!-- 7. CGMClassic (卧室主卧大床)                                           -->
+    <!-- ===================================================================== -->
+
+    <!-- [客厅 (西北区域)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Table</uri>
+      <name>living_room_table</name>
+      <pose>-2.6 2.4 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>living_chair_1</name>
+      <pose>-2.6 1.4 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>living_chair_2</name>
+      <pose>-3.6 2.4 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/WhiteCabinet</uri>
+      <name>tv_stand_cabinet</name>
+      <pose>-4.8 2.4 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [主卧室 (东北区域)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/CGMClassic</uri>
+      <name>bedroom_bed</name>
+      <pose>3.2 2.6 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/WhiteCabinet</uri>
+      <name>bedroom_nightstand</name>
+      <pose>4.6 2.6 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MetalCabinet</uri>
+      <name>bedroom_wardrobe</name>
+      <pose>1.5 3.8 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/foldable_chair</uri>
+      <name>bedroom_relax_chair</name>
+      <pose>4.2 1.0 0 0 0 -1.57</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [书房 / 独立办公区 (东南区域)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Desk</uri>
+      <name>study_desk</name>
+      <pose>2.8 -2.4 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/OfficeChairGrey</uri>
+      <name>study_office_chair</name>
+      <pose>2.8 -3.1 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/SquareShelf</uri>
+      <name>study_bookshelf_1</name>
+      <pose>4.8 -2.0 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/SquareShelf</uri>
+      <name>study_bookshelf_2</name>
+      <pose>4.8 -3.2 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [餐厅与厨房过渡区 (西南区域)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Table</uri>
+      <name>dining_table</name>
+      <pose>-2.8 -2.5 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>dining_chair_1</name>
+      <pose>-2.0 -2.5 0 0 0 -3.14</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>dining_chair_2</name>
+      <pose>-3.6 -2.5 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/WhiteCabinet</uri>
+      <name>sideboard_cabinet</name>
+      <pose>-4.8 -2.5 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+
+  </world>
+</sdf>
+

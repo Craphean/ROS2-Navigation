@@ -76,8 +76,32 @@ case "${WORLD_NAME}" in
     QZ="0.0"
     QW="1.0"
     ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    MAP_DEFAULT="${ROOT_DIR}/maps/hospital_map.yaml"
+    KEEPOUT=""
+    SPEED=""
+    GRAPH=""
+    X_POSE="-6.00"
+    Y_POSE="0.00"
+    YAW="0.00"
+    QZ="0.0"
+    QW="1.0"
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    MAP_DEFAULT="${ROOT_DIR}/maps/house_map.yaml"
+    KEEPOUT=""
+    SPEED=""
+    GRAPH=""
+    X_POSE="0.00"
+    Y_POSE="-0.40"
+    YAW="1.57"
+    QZ="0.70710678"
+    QW="0.70710678"
+    ;;
   *)
-    echo "[tb4_nav_gazebo] Unknown WORLD=${WORLD_NAME} (use warehouse|depot)" >&2
+    echo "[tb4_nav_gazebo] Unknown WORLD=${WORLD_NAME} (use warehouse|depot|hospital|house)" >&2
     exit 1
     ;;
 esac

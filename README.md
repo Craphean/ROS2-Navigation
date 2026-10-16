@@ -70,12 +70,21 @@ source install/setup.bash
 | `scripts/tb3_nav_rl_gazebo.sh` | 同上，局部控制器换成 TD3（`rl_nav2_controller::RlController`） |
 | `scripts/tb3_explore_slam.sh` | TurtleBot3 自主前沿探索并建图 |
 | `scripts/tb3_multi_explore_slam.sh` | 双车 TurtleBot3 实时 SLAM 自主探索 + `multirobot_map_merge` 地图合并（默认 `HEADLESS=True`） |
-| `scripts/tb4_slam_gazebo.sh` | TurtleBot4 + Gazebo + SLAM（`warehouse` / `depot`） |
+| `scripts/tb4_slam_gazebo.sh` | TurtleBot4 + Gazebo + SLAM（`warehouse` / `depot` / `hospital` / `house`） |
 | `scripts/tb4_nav_gazebo.sh` | TurtleBot4 使用 Nav2 自带地图导航 |
 | `scripts/tb4_explore_slam.sh` | TurtleBot4 自主探索并建图 |
+| `scripts/download_fuel_models.sh` | 一键检查并预热下载 Gazebo Fuel 官方模型（医院/家庭/仓储等模型本地秒开） |
 | `scripts/kill_nav2_sim.sh` | 结束 Gazebo、Nav2、RViz，并清理 DDS 共享内存 |
 
-世界可用环境变量切换。TurtleBot3 默认 `sandbox`，也可 `WORLD=empty`。TurtleBot4 默认 `warehouse`，也可 `WORLD=depot`。VMware 上若要打开 Gazebo 窗口：`HEADLESS=False ./scripts/...`。
+世界可用环境变量切换（支持 TurtleBot3 与 TurtleBot4 全系脚本）：
+- `sandbox`（TurtleBot3 默认，含圆柱体障碍物）
+- `empty`（无限开阔平地）
+- `hospital`（**全新新增**：医院病房与走廊医疗综合区，含普通双人病房、ICU急救室、分诊护士站、医生诊断室及贯通走廊，配有病床、医疗不锈钢柜等高精度 Fuel 官方模型，100% 水平平整地面）
+- `house`（**全新新增**：室内家庭生活环境，三室两厅套房户型，包含客厅、主卧、独立书房、餐厅与玄关，配有沙发茶几、大床衣柜、办公桌椅与书架等 Fuel 模型，通道规整，极度适合小车穿梭）
+- `warehouse`（TurtleBot4 默认，大型立体物流仓储）
+- `depot`（工业厂房与物流中转站世界）
+
+VMware 上若要打开 Gazebo 窗口：`HEADLESS=False ./scripts/...`。首次加载如果网络较慢，可先执行 `./scripts/download_fuel_models.sh` 提前缓存。
 
 ## TurtleBot3：建图与已知地图导航
 
@@ -193,7 +202,10 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 3. 现在使用的 TurtleBot3 Waffle 车头正前方安装了一颗 Intel RealSense 深度摄像头，但在 Nav2 官方的精简仿真包（nav2_minimal_tb3_sim）中，为了极大降低对 CPU/GPU 的算力消耗（特别是虚拟机环境），默认只启动了激光雷达和里程计的桥接，摄像头的图像渲染插件默认被精简关闭了。
 目标：在拥有独立显卡直通的高性能主机上开启摄像头的视频流展示
 
-4. 地图世界方面，目前能使用的地图包括带有圆柱体障碍物的 sandbox 和 大型物流仓储 warehouse ，工业厂房与中转站世界 depot，无限开阔平地世界 empty。当前项目使用的仿真器是新版 Gazebo（gz-sim），它天生支持直接加载 Gazebo Fuel 官方云端模型库中的所有开源世界模型。如家庭生活环境、医院病房走廊。前提是地面必须平整。
+4. [x] **多样化高精度室内地图世界（已完成）**：基于 Gazebo Fuel 官方模型库（`fuel.gazebosim.org`）配置了完全水平平整、专门针对室内小车探索优化的两大真实仿真世界：
+   - **医院综合病区 (`hospital`)**：[worlds/hospital.sdf.xacro](file:///home/qing/ros2_navigation/worlds/hospital.sdf.xacro)，包含双人病房、重症ICU监护室、分诊台/护士站、医生诊断室及贯通主走廊。集成 Fuel 官方高精度病床（`CGMClassic`）、医用不锈钢仪器柜（`MetalCabinet`）、配药白柜（`WhiteCabinet`）、就诊办公桌椅与候诊椅。
+   - **室内家庭生活套房 (`house`)**：[worlds/house.sdf.xacro](file:///home/qing/ros2_navigation/worlds/house.sdf.xacro)，包含三室两厅套房户型（客厅、主卧、独立书房、餐厅与玄关走廊），集成沙发、茶几、双人卧床、书房办公桌椅与书架。
+   - 配套提供 `scripts/download_fuel_models.sh` 一键批量预热/缓存 Fuel 模型，单车与双车多机器人探索脚本均原生支持 `WORLD=hospital` 与 `WORLD=house`，并为双车协同探索内置了精准避障的巡检基站池与随机出生点。
 
 5. benchmark 基准测试，设计对比试验
 

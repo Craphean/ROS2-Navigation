@@ -74,30 +74,64 @@ fi
 
 # World must match the map you saved. Examples:
 #   WORLD=empty MAP=~/empty_map.yaml ./scripts/tb3_nav_gazebo.sh
+#   WORLD=hospital MAP=~/hospital_map.yaml ./scripts/tb3_nav_gazebo.sh
+#   WORLD=house MAP=~/house_map.yaml ./scripts/tb3_nav_gazebo.sh
 SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb3_sim)/share/nav2_minimal_tb3_sim"
+TB4_SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb4_sim 2>/dev/null)/share/nav2_minimal_tb4_sim" || true
+
+DEFAULT_SLAM_X="-2.0"
+DEFAULT_SLAM_Y="-0.5"
+DEFAULT_X="0.00"
+DEFAULT_Y="0.50"
+DEFAULT_YAW="0.00"
+
 case "${WORLD:-sandbox}" in
   sandbox|tb3_sandbox)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_sandbox.sdf.xacro"
+    DEFAULT_SLAM_X="-2.0"; DEFAULT_SLAM_Y="-0.5"
+    DEFAULT_X="0.00"; DEFAULT_Y="0.50"; DEFAULT_YAW="0.00"
     ;;
   empty|tb3_empty|tb3_empty_world)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_empty_world.sdf.xacro"
+    DEFAULT_SLAM_X="0.0"; DEFAULT_SLAM_Y="0.0"
+    DEFAULT_X="0.00"; DEFAULT_Y="0.00"; DEFAULT_YAW="0.00"
+    ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    DEFAULT_SLAM_X="-6.0"; DEFAULT_SLAM_Y="0.0"
+    DEFAULT_X="-6.00"; DEFAULT_Y="0.00"; DEFAULT_YAW="0.00"
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    DEFAULT_SLAM_X="0.0"; DEFAULT_SLAM_Y="-0.4"
+    DEFAULT_X="0.00"; DEFAULT_Y="-0.40"; DEFAULT_YAW="1.57"
+    ;;
+  warehouse|tb4_warehouse)
+    WORLD_FILE="${TB4_SIM_SHARE}/worlds/warehouse.sdf"
+    DEFAULT_SLAM_X="2.00"; DEFAULT_SLAM_Y="-19.65"
+    DEFAULT_X="2.00"; DEFAULT_Y="-19.65"; DEFAULT_YAW="1.57"
+    ;;
+  depot|tb4_depot)
+    WORLD_FILE="${TB4_SIM_SHARE}/worlds/depot.sdf"
+    DEFAULT_SLAM_X="0.00"; DEFAULT_SLAM_Y="0.00"
+    DEFAULT_X="0.00"; DEFAULT_Y="0.00"; DEFAULT_YAW="0.00"
     ;;
   *)
     WORLD_FILE="${WORLD}"
     ;;
 esac
+
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb3_nav_gazebo] World not found: ${WORLD_FILE}" >&2
-  echo "Built-in: sandbox | empty" >&2
+  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house (or path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 
-# Map frame origin is the SLAM start pose (default Gazebo spawn -2, -0.5).
-SLAM_WORLD_X="${SLAM_WORLD_X:--2.0}"
-SLAM_WORLD_Y="${SLAM_WORLD_Y:--0.5}"
-X_POSE="${X_POSE:-0.00}"
-Y_POSE="${Y_POSE:-0.50}"
-YAW_POSE="${YAW_POSE:-0.00}"
+SLAM_WORLD_X="${SLAM_WORLD_X:-${DEFAULT_SLAM_X}}"
+SLAM_WORLD_Y="${SLAM_WORLD_Y:-${DEFAULT_SLAM_Y}}"
+X_POSE="${X_POSE:-${DEFAULT_X}}"
+Y_POSE="${Y_POSE:-${DEFAULT_Y}}"
+YAW_POSE="${YAW_POSE:-${DEFAULT_YAW}}"
 MAP_X="$(python3 -c "print(f'{float(\"${X_POSE}\") - float(\"${SLAM_WORLD_X}\"):.2f}')")"
 MAP_Y="$(python3 -c "print(f'{float(\"${Y_POSE}\") - float(\"${SLAM_WORLD_Y}\"):.2f}')")"
 

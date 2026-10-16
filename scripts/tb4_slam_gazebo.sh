@@ -46,7 +46,7 @@ if [[ "${LIBGL_ALWAYS_SOFTWARE:-0}" == "1" ]]; then
 fi
 
 SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb4_sim)/share/nav2_minimal_tb4_sim"
-# Default: warehouse (larger / more complex). Alternative: WORLD=depot
+# Default: warehouse (larger / more complex). Alternative: WORLD=depot | hospital | house
 WORLD_NAME="${WORLD:-warehouse}"
 case "${WORLD_NAME}" in
   warehouse)
@@ -61,6 +61,18 @@ case "${WORLD_NAME}" in
     Y_POSE="0.00"
     YAW="0.00"
     ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    X_POSE="-6.00"
+    Y_POSE="0.00"
+    YAW="0.00"
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    X_POSE="0.00"
+    Y_POSE="-0.40"
+    YAW="1.57"
+    ;;
   *)
     # Treat WORLD as a path to an SDF/xacro
     WORLD_FILE="${WORLD_NAME}"
@@ -72,7 +84,7 @@ esac
 
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb4_slam_gazebo] World not found: ${WORLD_FILE}" >&2
-  echo "Built-in: warehouse | depot" >&2
+  echo "Supported presets: warehouse | depot | hospital | house (or path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 

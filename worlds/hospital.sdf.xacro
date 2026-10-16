@@ -1,0 +1,385 @@
+<?xml version="1.0"?>
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="headless" default="true"/>
+
+  <world name="hospital">
+    <scene>
+      <grid>false</grid>
+      <shadows>false</shadows>
+    </scene>
+
+    <physics name="1ms" type="ode">
+      <max_step_size>0.003</max_step_size>
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- 仿真引擎核心插件 (与 gz-sim / Nav2 完美兼容) -->
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+    <xacro:unless value="$(arg headless)">
+      <plugin
+        filename="gz-sim-scene-broadcaster-system"
+        name="gz::sim::systems::SceneBroadcaster">
+      </plugin>
+    </xacro:unless>
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin
+      filename="gz-sim-imu-system"
+      name="gz::sim::systems::Imu">
+    </plugin>
+
+    <!-- 顶部漫反射照明 (模拟医院明亮室内日光灯) -->
+    <light name="ceiling_light_center" type="directional">
+      <cast_shadows>0</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.85 0.88 0.92 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.2 0.2 -0.95</direction>
+    </light>
+
+    <!-- 100% 坚硬平整的医院地面 (零坡度/无台阶，保证轮式小车平稳行进) -->
+    <model name="hospital_ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>50 50</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>50 50</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.82 0.86 0.88 1.0</ambient>
+            <diffuse>0.82 0.86 0.88 1.0</diffuse>
+            <specular>0.3 0.3 0.3 1.0</specular>
+          </material>
+        </visual>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+    </model>
+
+    <!-- ===================================================================== -->
+    <!-- 医院建筑墙体结构 (外围 16m x 12m，内设 2.4m 宽主走廊及 4 间病房/诊室)   -->
+    <!-- 墙高 1.6m，雷达扫描高度 (0.17~0.25m) 完全处于垂直平壁范围内              -->
+    <!-- 门洞开口宽度均达 1.3m ~ 1.5m，保障 TurtleBot3/TurtleBot4 双向通畅探索    -->
+    <!-- ===================================================================== -->
+    <model name="hospital_architecture">
+      <static>true</static>
+      <link name="walls">
+        <!-- 外围北墙 (分为东/西两段，长 16m) -->
+        <collision name="wall_outer_north">
+          <pose>0 6.0 0.8 0 0 0</pose>
+          <geometry><box><size>16.2 0.2 1.6</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_north_vis">
+          <pose>0 6.0 0.8 0 0 0</pose>
+          <geometry><box><size>16.2 0.2 1.6</size></box></geometry>
+          <material><ambient>0.9 0.93 0.95 1</ambient><diffuse>0.9 0.93 0.95 1</diffuse></material>
+        </visual>
+
+        <!-- 外围南墙 (长 16m) -->
+        <collision name="wall_outer_south">
+          <pose>0 -6.0 0.8 0 0 0</pose>
+          <geometry><box><size>16.2 0.2 1.6</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_south_vis">
+          <pose>0 -6.0 0.8 0 0 0</pose>
+          <geometry><box><size>16.2 0.2 1.6</size></box></geometry>
+          <material><ambient>0.9 0.93 0.95 1</ambient><diffuse>0.9 0.93 0.95 1</diffuse></material>
+        </visual>
+
+        <!-- 外围西墙 (长 12m) -->
+        <collision name="wall_outer_west">
+          <pose>-8.0 0 0.8 0 0 0</pose>
+          <geometry><box><size>0.2 12.2 1.6</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_west_vis">
+          <pose>-8.0 0 0.8 0 0 0</pose>
+          <geometry><box><size>0.2 12.2 1.6</size></box></geometry>
+          <material><ambient>0.9 0.93 0.95 1</ambient><diffuse>0.9 0.93 0.95 1</diffuse></material>
+        </visual>
+
+        <!-- 外围东墙 (长 12m) -->
+        <collision name="wall_outer_east">
+          <pose>8.0 0 0.8 0 0 0</pose>
+          <geometry><box><size>0.2 12.2 1.6</size></box></geometry>
+        </collision>
+        <visual name="wall_outer_east_vis">
+          <pose>8.0 0 0.8 0 0 0</pose>
+          <geometry><box><size>0.2 12.2 1.6</size></box></geometry>
+          <material><ambient>0.9 0.93 0.95 1</ambient><diffuse>0.9 0.93 0.95 1</diffuse></material>
+        </visual>
+
+        <!-- 走廊北隔墙 (Y=+1.2) - 西段与东段 (中间留出门洞连通病房) -->
+        <collision name="corridor_north_west">
+          <pose>-4.8 1.2 0.8 0 0 0</pose>
+          <geometry><box><size>5.0 0.15 1.6</size></box></geometry>
+        </collision>
+        <visual name="corridor_north_west_vis">
+          <pose>-4.8 1.2 0.8 0 0 0</pose>
+          <geometry><box><size>5.0 0.15 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <collision name="corridor_north_mid">
+          <pose>0.0 1.2 0.8 0 0 0</pose>
+          <geometry><box><size>2.0 0.15 1.6</size></box></geometry>
+        </collision>
+        <visual name="corridor_north_mid_vis">
+          <pose>0.0 1.2 0.8 0 0 0</pose>
+          <geometry><box><size>2.0 0.15 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <collision name="corridor_north_east">
+          <pose>4.8 1.2 0.8 0 0 0</pose>
+          <geometry><box><size>5.0 0.15 1.6</size></box></geometry>
+        </collision>
+        <visual name="corridor_north_east_vis">
+          <pose>4.8 1.2 0.8 0 0 0</pose>
+          <geometry><box><size>5.0 0.15 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <!-- 走廊南隔墙 (Y=-1.2) - 西段与东段 (留出护士站/大厅开阔口及办公室门洞) -->
+        <collision name="corridor_south_west">
+          <pose>-5.8 -1.2 0.8 0 0 0</pose>
+          <geometry><box><size>3.0 0.15 1.6</size></box></geometry>
+        </collision>
+        <visual name="corridor_south_west_vis">
+          <pose>-5.8 -1.2 0.8 0 0 0</pose>
+          <geometry><box><size>3.0 0.15 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <collision name="corridor_south_mid">
+          <pose>0.0 -1.2 0.8 0 0 0</pose>
+          <geometry><box><size>2.0 0.15 1.6</size></box></geometry>
+        </collision>
+        <visual name="corridor_south_mid_vis">
+          <pose>0.0 -1.2 0.8 0 0 0</pose>
+          <geometry><box><size>2.0 0.15 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <collision name="corridor_south_east">
+          <pose>4.8 -1.2 0.8 0 0 0</pose>
+          <geometry><box><size>5.0 0.15 1.6</size></box></geometry>
+        </collision>
+        <visual name="corridor_south_east_vis">
+          <pose>4.8 -1.2 0.8 0 0 0</pose>
+          <geometry><box><size>5.0 0.15 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <!-- 北部病房间纵向分隔墙 (X=0.0, Y:[1.2, 6.0]) 分隔普通病房与重症监护室 -->
+        <collision name="wall_north_divider">
+          <pose>0.0 3.6 0.8 0 0 0</pose>
+          <geometry><box><size>0.15 4.65 1.6</size></box></geometry>
+        </collision>
+        <visual name="wall_north_divider_vis">
+          <pose>0.0 3.6 0.8 0 0 0</pose>
+          <geometry><box><size>0.15 4.65 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+
+        <!-- 南部诊室间纵向分隔墙 (X=0.0, Y:[-6.0, -1.2]) 分隔分诊大厅与医生办公室 -->
+        <collision name="wall_south_divider">
+          <pose>0.0 -3.6 0.8 0 0 0</pose>
+          <geometry><box><size>0.15 4.65 1.6</size></box></geometry>
+        </collision>
+        <visual name="wall_south_divider_vis">
+          <pose>0.0 -3.6 0.8 0 0 0</pose>
+          <geometry><box><size>0.15 4.65 1.6</size></box></geometry>
+          <material><ambient>0.85 0.9 0.92 1</ambient><diffuse>0.85 0.9 0.92 1</diffuse></material>
+        </visual>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+    </model>
+
+    <!-- ===================================================================== -->
+    <!-- Gazebo Fuel 官方医疗设施模型引入                                       -->
+    <!-- 1. CGMClassic (高仿真医用病床，含抬升护栏与医用滚轮)                     -->
+    <!-- 2. MetalCabinet (不锈钢医疗药品柜/仪器柜)                              -->
+    <!-- 3. WhiteCabinet (病房床头柜与配药柜)                                   -->
+    <!-- 4. Desk (分诊台与医生诊断桌)                                           -->
+    <!-- 5. OfficeChairGrey (医护转椅)                                          -->
+    <!-- 6. Chair & foldable_chair (候诊长排椅与陪护折叠椅)                      -->
+    <!-- 7. SquareShelf (医疗病历与档案储物架)                                  -->
+    <!-- ===================================================================== -->
+
+    <!-- [病房 A: 普通双人病房 (西北区)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/CGMClassic</uri>
+      <name>ward_a_bed_1</name>
+      <pose>-5.2 4.2 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/WhiteCabinet</uri>
+      <name>ward_a_cabinet_1</name>
+      <pose>-6.8 4.2 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/CGMClassic</uri>
+      <name>ward_a_bed_2</name>
+      <pose>-2.2 4.2 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/WhiteCabinet</uri>
+      <name>ward_a_cabinet_2</name>
+      <pose>-0.8 4.2 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/foldable_chair</uri>
+      <name>ward_a_chair</name>
+      <pose>-3.7 2.5 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [病房 B: 重症监护与急救病房 ICU (东北区)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/CGMClassic</uri>
+      <name>icu_bed</name>
+      <pose>4.2 4.2 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MetalCabinet</uri>
+      <name>icu_metal_cabinet_1</name>
+      <pose>2.0 5.4 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MetalCabinet</uri>
+      <name>icu_metal_cabinet_2</name>
+      <pose>6.5 5.4 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/WhiteCabinet</uri>
+      <name>icu_white_cabinet</name>
+      <pose>2.0 3.0 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [门诊与分诊大厅 / 护士站 (西南区)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Desk</uri>
+      <name>triage_desk</name>
+      <pose>-3.8 -2.4 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/OfficeChairGrey</uri>
+      <name>triage_nurse_chair</name>
+      <pose>-3.8 -3.1 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/SquareShelf</uri>
+      <name>triage_archive_shelf</name>
+      <pose>-6.8 -4.5 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <!-- 候诊长椅排 -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>waiting_chair_1</name>
+      <pose>-2.0 -3.8 0 0 0 -1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>waiting_chair_2</name>
+      <pose>-3.0 -3.8 0 0 0 -1.57</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [医生诊断室与药品储备站 (东南区)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Desk</uri>
+      <name>doctor_desk</name>
+      <pose>3.5 -3.5 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/OfficeChairGrey</uri>
+      <name>doctor_chair</name>
+      <pose>3.5 -4.2 0 0 0 1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>patient_consult_chair</name>
+      <pose>3.5 -2.6 0 0 0 -1.57</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MetalCabinet</uri>
+      <name>pharmacy_storage_cabinet_1</name>
+      <pose>6.8 -3.0 0 0 0 3.14</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/MetalCabinet</uri>
+      <name>pharmacy_storage_cabinet_2</name>
+      <pose>6.8 -4.5 0 0 0 3.14</pose>
+      <static>true</static>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/SquareShelf</uri>
+      <name>doctor_shelf</name>
+      <pose>1.5 -5.2 0 0 0 0</pose>
+      <static>true</static>
+    </include>
+
+    <!-- [主走廊端部候诊椅 (东端走廊过渡区)] -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Chair</uri>
+      <name>corridor_end_chair</name>
+      <pose>7.2 0.0 0 0 0 3.14</pose>
+      <static>true</static>
+    </include>
+
+  </world>
+</sdf>
+

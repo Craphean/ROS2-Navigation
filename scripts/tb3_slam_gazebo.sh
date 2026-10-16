@@ -59,27 +59,54 @@ fi
 
 # World file. Examples:
 #   WORLD=empty ./scripts/tb3_slam_gazebo.sh
-#   WORLD=/path/to/my_world.sdf.xacro ./scripts/tb3_slam_gazebo.sh
+#   WORLD=hospital ./scripts/tb3_slam_gazebo.sh
+#   WORLD=house ./scripts/tb3_slam_gazebo.sh
 SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb3_sim)/share/nav2_minimal_tb3_sim"
+TB4_SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb4_sim 2>/dev/null)/share/nav2_minimal_tb4_sim" || true
+
 case "${WORLD:-sandbox}" in
   sandbox|tb3_sandbox)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_sandbox.sdf.xacro"
+    DEFAULT_X="-2.0"; DEFAULT_Y="-0.5"; DEFAULT_YAW="0.0"
     ;;
   empty|tb3_empty|tb3_empty_world)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_empty_world.sdf.xacro"
+    DEFAULT_X="0.0"; DEFAULT_Y="0.0"; DEFAULT_YAW="0.0"
+    ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    DEFAULT_X="-6.0"; DEFAULT_Y="0.0"; DEFAULT_YAW="0.0"
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    DEFAULT_X="0.0"; DEFAULT_Y="-0.4"; DEFAULT_YAW="1.57"
+    ;;
+  warehouse|tb4_warehouse)
+    WORLD_FILE="${TB4_SIM_SHARE}/worlds/warehouse.sdf"
+    DEFAULT_X="2.00"; DEFAULT_Y="-19.65"; DEFAULT_YAW="1.57"
+    ;;
+  depot|tb4_depot)
+    WORLD_FILE="${TB4_SIM_SHARE}/worlds/depot.sdf"
+    DEFAULT_X="0.00"; DEFAULT_Y="0.00"; DEFAULT_YAW="0.0"
     ;;
   *)
     WORLD_FILE="${WORLD}"
+    DEFAULT_X="0.0"; DEFAULT_Y="0.0"; DEFAULT_YAW="0.0"
     ;;
 esac
+
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb3_slam_gazebo] World not found: ${WORLD_FILE}" >&2
-  echo "Built-in: sandbox | empty" >&2
+  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house (or full path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 
+X_POSE="${X_POSE:-${DEFAULT_X}}"
+Y_POSE="${Y_POSE:-${DEFAULT_Y}}"
+YAW="${YAW:-${DEFAULT_YAW}}"
+
 echo "[tb3_slam_gazebo] DISPLAY=${DISPLAY} WAYLAND_DISPLAY=${WAYLAND_DISPLAY} XAUTHORITY=${XAUTHORITY:-unset}"
-echo "[tb3_slam_gazebo] world=${WORLD_FILE} headless=${HEADLESS} use_composition=${USE_COMPOSITION}"
+echo "[tb3_slam_gazebo] world=${WORLD_FILE} spawn=(${X_POSE},${Y_POSE},yaw=${YAW}) headless=${HEADLESS} use_composition=${USE_COMPOSITION}"
 echo "[tb3_slam_gazebo] Launching: ros2 launch nav2_bringup tb3_simulation_launch.py slam:=True ..."
 
 exec ros2 launch nav2_bringup tb3_simulation_launch.py \
@@ -88,5 +115,8 @@ exec ros2 launch nav2_bringup tb3_simulation_launch.py \
   use_composition:="${USE_COMPOSITION}" \
   use_sim_time:=True \
   world:="${WORLD_FILE}" \
+  x_pose:="${X_POSE}" \
+  y_pose:="${Y_POSE}" \
+  yaw:="${YAW}" \
   "${ROBOT_SDF_ARGS[@]}" \
   "$@"

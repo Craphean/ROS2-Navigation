@@ -91,14 +91,29 @@ case "${WORLD_NAME}" in
     Y_POSE="0.00"
     YAW="0.00"
     ;;
+  hospital|tb3_hospital|clinic)
+    WORLD_FILE="${ROOT_DIR}/worlds/hospital.sdf.xacro"
+    X_POSE="-6.00"
+    Y_POSE="0.00"
+    YAW="0.00"
+    ;;
+  house|tb3_house|home)
+    WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
+    X_POSE="0.00"
+    Y_POSE="-0.40"
+    YAW="1.57"
+    ;;
   *)
-    echo "[tb4_explore_slam] Unknown WORLD=${WORLD_NAME} (use warehouse|depot)" >&2
-    exit 1
+    WORLD_FILE="${WORLD_NAME}"
+    X_POSE="${X_POSE:-0.00}"
+    Y_POSE="${Y_POSE:-0.00}"
+    YAW="${YAW:-0.00}"
     ;;
 esac
 
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb4_explore_slam] World not found: ${WORLD_FILE}" >&2
+  echo "Supported presets: warehouse | depot | hospital | house (or path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 
