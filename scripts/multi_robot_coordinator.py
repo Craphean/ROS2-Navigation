@@ -515,23 +515,23 @@ class MultiRobotCoordinator(Node):
 
         available_clusters = []
         for c in clusters:
-            conflict = any(
+            conflict_goal = any(
                 math.hypot(c.world_x - ag[0], c.world_y - ag[1]) < self.exclusion_radius
                 for ag in active_goals
             )
-            if not conflict:
+            if not conflict_goal:
                 available_clusters.append(c)
 
         # Anti-starvation fallback: if idle robots have no available clusters due to exclusion_radius,
-        # adaptively relax exclusion radius (down to 0.8m) so idle robots can explore nearby available flanks
+        # adaptively relax exclusion radius with other goals (down to 0.8m)
         if not available_clusters and clusters and active_goals:
             reduced_radius = 0.8
             for c in clusters:
-                conflict = any(
+                conflict_goal = any(
                     math.hypot(c.world_x - ag[0], c.world_y - ag[1]) < reduced_radius
                     for ag in active_goals
                 )
-                if not conflict:
+                if not conflict_goal:
                     available_clusters.append(c)
             if available_clusters:
                 self.get_logger().info(
@@ -555,8 +555,8 @@ class MultiRobotCoordinator(Node):
         dy = cluster.world_y - robot.world_y
         dist = math.hypot(dx, dy)
 
-        # Only ignore frontiers that the robot is literally standing on (< 0.2m, within goal tolerance)
-        if dist < 0.2:
+        # Ignore frontiers that ANY robot has already physically arrived at / is standing on (< 0.35m)
+        if any(math.hypot(cluster.world_x - r.world_x, cluster.world_y - r.world_y) < 0.35 for r in self.robots.values()):
             return -float('inf')
 
         heading_to_goal = math.atan2(dy, dx)
@@ -903,18 +903,23 @@ class MultiRobotCoordinator(Node):
             'robot1': (1.0, 0.2, 0.2),  # Red
             'robot2': (0.2, 0.5, 1.0),  # Blue
         }
-        marker_id = 1
-        for ns, robot in self.robots.items():
+        for idx, (ns, robot) in enumerate(self.robots.items(), start=1):
+            goal_sphere = Marker()
+            goal_sphere.header.frame_id = 'world'
+            goal_sphere.header.stamp = stamp
+            goal_sphere.ns = 'assigned_goals'
+            goal_sphere.id = idx
+
+            text_marker = Marker()
+            text_marker.header.frame_id = 'world'
+            text_marker.header.stamp = stamp
+            text_marker.ns = 'assigned_labels'
+            text_marker.id = idx
+
             if robot.state == 'NAVIGATING' and robot.current_goal_world is not None:
                 gx, gy = robot.current_goal_world
                 cr, cg, cb = colors.get(ns, (1.0, 1.0, 0.0))
 
-                goal_sphere = Marker()
-                goal_sphere.header.frame_id = 'world'
-                goal_sphere.header.stamp = stamp
-                goal_sphere.ns = 'assigned_goals'
-                goal_sphere.id = marker_id
-                marker_id += 1
                 goal_sphere.type = Marker.SPHERE
                 goal_sphere.action = Marker.ADD
                 goal_sphere.pose.position.x = gx
@@ -927,14 +932,7 @@ class MultiRobotCoordinator(Node):
                 goal_sphere.color.g = cg
                 goal_sphere.color.b = cb
                 goal_sphere.color.a = 0.95
-                ma.markers.append(goal_sphere)
 
-                text_marker = Marker()
-                text_marker.header.frame_id = 'world'
-                text_marker.header.stamp = stamp
-                text_marker.ns = 'assigned_labels'
-                text_marker.id = marker_id
-                marker_id += 1
                 text_marker.type = Marker.TEXT_VIEW_FACING
                 text_marker.action = Marker.ADD
                 text_marker.pose.position.x = gx
@@ -946,7 +944,12 @@ class MultiRobotCoordinator(Node):
                 text_marker.color.g = 1.0
                 text_marker.color.b = 1.0
                 text_marker.color.a = 1.0
-                ma.markers.append(text_marker)
+            else:
+                goal_sphere.action = Marker.DELETE
+                text_marker.action = Marker.DELETE
+
+            ma.markers.append(goal_sphere)
+            ma.markers.append(text_marker)
 
         self.marker_pub.publish(ma)
 
