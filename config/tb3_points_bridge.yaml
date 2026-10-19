@@ -1,0 +1,9 @@
+# Bridge for the 3D LiDAR point cloud.
+# GZ publishes the point cloud on <lidar3d topic>/points.
+# With expand_gz_topic_names: true and __ns:=/robot1, this becomes
+#   /robot1/lidar3d/points -> /robot1/points
+- ros_topic_name: "points"
+  gz_topic_name: "lidar3d/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS

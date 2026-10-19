@@ -19,11 +19,15 @@ sudo apt update && sudo apt install -y \
   ros-lyrical-slam-toolbox \
   ros-lyrical-nav2-minimal-tb3-sim \
   ros-lyrical-nav2-minimal-tb4-sim \
+  ros-lyrical-octomap-server \
+  ros-lyrical-octomap-msgs \
   ros-lyrical-rmw-cyclonedds-cpp \
   python3-colcon-common-extensions \
   python3-rosdep \
   pciutils
 ```
+
+> `ros-lyrical-octomap-server` / `ros-lyrical-octomap-msgs` 只用于双机 3D 点云建图；不跑 3D 链路时可以不装。
 
 ## 快速开始 (Getting Started)
 
@@ -69,7 +73,7 @@ source install/setup.bash
 | `scripts/tb3_nav_gazebo.sh` | TurtleBot3 已知地图导航（MPPI 局部控制器，默认使用 `maps/tb3_map.yaml`） |
 | `scripts/tb3_nav_rl_gazebo.sh` | 同上，局部控制器换成 TD3（`rl_nav2_controller::RlController`） |
 | `scripts/tb3_explore_slam.sh` | TurtleBot3 自主前沿探索并建图 |
-| `scripts/tb3_multi_explore_slam.sh` | 双车 TurtleBot3 实时 SLAM 自主探索 + `multirobot_map_merge` 地图合并（默认 `HEADLESS=True`） |
+| `scripts/tb3_multi_explore_slam.sh` | 双车 TurtleBot3 实时 SLAM 自主探索 + `multirobot_map_merge` 地图合并 + 3D 点云/OctoMap（默认 `HEADLESS=True`） |
 | `scripts/tb4_slam_gazebo.sh` | TurtleBot4 + Gazebo + SLAM（`warehouse` / `depot` / `hospital` / `house`） |
 | `scripts/tb4_nav_gazebo.sh` | TurtleBot4 使用 Nav2 自带地图导航 |
 | `scripts/tb4_explore_slam.sh` | TurtleBot4 自主探索并建图 |
@@ -181,6 +185,111 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 探索与地图合并包来自 [m-explore-ros2](https://github.com/robo-friends/m-explore-ros2)，放在 `src/m-explore-ros2`。
 
+## 双机 3D 点云建图（无头）
+
+在原有 2D SLAM / frontier / Nav2 之上，双车链路额外增加一条并行的 3D 建图层：
+
+- 每台车在 `base_scan` 上增加一颗 16 线、360° 水平、3 Hz 的 `gpu_lidar`，桥接为 `/robotX/points`
+- `/robotX/points` 同时作为 Nav2 局部 `voxel_layer` 和全局 `obstacle_layer` 的 `PointCloud2` 观测源，因此桌面、床面、柜顶等悬空结构会投影进 2D 代价地图
+- `scripts/merge_pointclouds.py` 用 TF 把两车点云从 `robotX/base_scan` 变换到 `world`，体素降采样后发布 `/points_merged`
+- `octomap_server` 订阅 `/points_merged`，输出 `/octomap_binary`、`/octomap_full`、`/octomap_point_cloud_centers` 和 `/projected_map`
+
+2D SLAM、`/robotX/scan`、frontier 探索和 Nav2 规划逻辑都不变；3D 图只用于展示和存档，不参与后续导航。
+
+```bash
+# 默认无头：不启动 Gazebo GUI，也不启动 RViz
+HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
+```
+
+### 无头验收
+
+所有检查只依赖 ROS 2 topic、TF 和离线文件，不需要 RViz：
+
+```bash
+# 1. 合并点云概况：点数、xyz 包围盒、z 直方图、0.05 m 体素数
+python3 scripts/check_3d_map.py cloud \
+  --topic /points_merged --duration 10 --json
+
+# 2. 3D 完成判据：最近 30 s 占据体素增长 < 1%
+#    （小地图允许 ≤ 30 个体素的绝对波动，避免 300 体素场景被噪声误判）
+python3 scripts/check_3d_map.py growth \
+  --topic /octomap_point_cloud_centers --window 30 --json
+
+# 3. 桌/床是否投影进 2D 代价地图（坐标从 worlds/*.sdf.xacro 中取）
+python3 scripts/check_3d_map.py costmap \
+  --robot robot1 --world-point <table_x>,<table_y> --expect-lethal --json
+
+# 4. 存档并离线校验 PCD
+python3 scripts/save_cloud_pcd.py \
+  --topic /octomap_point_cloud_centers --output maps/tb3_3d_map.pcd
+python3 scripts/check_3d_map.py pcd --input maps/tb3_3d_map.pcd --json
+```
+
+**看哪些指标：**
+
+| 检查 | JSON 字段 | 通过标准 |
+|---|---|---|
+| `cloud` | `points` / `bbox` / `z_histogram` / `voxels` | 点数 > 0（整屋探索后通常数万）；`bbox` 的 x/y 覆盖已探索区域，z 在 0.05–2.0 m 内；`0.60-1.20`、`1.20-2.00` 两档有非零点（桌面/床面/墙），`0.05-0.30` 有低矮家具点；没有大量地面点 |
+| `growth` | `pass` / `first_voxels` / `last_voxels` / `growth_percent` / `growth_voxels` | `pass: true`，且 `growth_percent ≤ 1.0` 或 `growth_voxels ≤ 30`。必须在探索基本结束后再跑；机器人在开拓新区域时体素持续增长是正常的 |
+| `costmap` | `pass` / `lethal` / `cost` / `in_bounds` | `pass: true`、`lethal: true`、`cost: 100`。`cost` 为 0/50 说明该处还没被观测到或已被清除；`in_bounds: false` 说明该点还没进地图 |
+| `pcd` | `points` / `bbox` / `z_histogram` / `voxels` | 点数 > 0，包围盒和 z 直方图与在线 `cloud` 结果一致 |
+
+命令的退出码同样是判据：`0` 表示脚本自身认为通过（`cloud`/`pcd` 只要求有非零点），`1` 表示没有数据或检查失败。人会看的重点还是上表字段。
+
+`costmap` 模式会用 `multirobot_map_merge` 发布的 `world -> robotX/map` 初始位姿变换，把 world 坐标换算到该车局部 `map` 栅格；因此要先确认 `map_merge` 已启动。探索完成时协调器日志会打印 `No remaining reachable frontiers. Exploration complete or paused.`：
+
+```bash
+grep 'No remaining reachable frontiers' /tmp/tb3_multi_coordinator.log
+```
+
+house 场景已实测的桌/床投影检查点（world 坐标）：
+
+```bash
+# 客厅桌桌心、近边
+python3 scripts/check_3d_map.py costmap --robot robot2 --world-point -2.6,2.4 --expect-lethal --json
+python3 scripts/check_3d_map.py costmap --robot robot2 --world-point -2.6,2.0 --expect-lethal --json
+# 餐桌近边
+python3 scripts/check_3d_map.py costmap --robot robot1 --world-point -2.8,-2.1 --expect-lethal --json
+```
+
+### 3D 地图存档
+
+探索结束后，在 `octomap_server` 仍存活时执行：
+
+```bash
+# OctoMap 二进制树（.bt）
+ros2 run octomap_server octomap_saver_node --ros-args \
+  -p octomap_path:="$PWD/maps/tb3_3d_map.bt" -p full:=true
+
+# 占据体素中心点云（ASCII .pcd）
+python3 scripts/save_cloud_pcd.py \
+  --topic /octomap_point_cloud_centers --output maps/tb3_3d_map.pcd
+
+# 3D 图的 2D 投影（.pgm + .yaml）
+ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
+  --ros-args -r map:=/projected_map \
+  -p map_subscribe_transient_local:=false
+
+# 无 GUI 预览：XY 俯视 + XZ/YZ 侧视，输出 PNG
+python3 scripts/plot_cloud_pcd.py \
+  --input maps/tb3_3d_map.pcd --output maps/tb3_3d_map.png
+```
+
+`.pcd` 是 ASCII 格式的占据体素中心，可以直接用文本编辑器查看，也可以复制到有图形界面的机器上用 CloudCompare / MeshLab 打开。`plot_cloud_pcd.py` 只依赖 matplotlib，使用 `Agg` 后端，不需要显示器或 OpenGL；俯视图按高度着色，能直接看出桌面、床面和墙体，侧视图能看出悬空结构。
+
+`config/octomap_params.yaml` 中 `latch: false` 是为了避免无头 VM 上 `octomap_server` 每次点云更新都序列化整棵 `octomap_binary`/`octomap_full` 树。检查器和 `save_cloud_pcd.py` 使用 volatile reliable QoS，靠周期性更新取数；存档时保持 `merge_pointclouds.py` / `octomap_server` 运行即可。
+
+**2D 建图完成 ≠ 3D 建图完成。** 2D frontier 结束只说明地面可通行区域没有未知边界；家具背面、桌下、垂直视场外仍可能有空洞。因此 3D 侧要单独看 `growth`（体素增长收敛）、`cloud`（点数/包围盒）和 `pcd`（存档可读、z 直方图有家具峰）三个指标。
+
+常用参数文件：
+
+- `config/gz_waffle_3d_lidar.sdf.xacro`：3D 雷达（默认 16 线 / 3 Hz；有独显时可升到 24 线 / 5 Hz）
+- `config/tb3_points_bridge.yaml`、`config/tb3_bridge_no_clock.yaml`：`gz.msgs.PointCloudPacked` → `sensor_msgs/msg/PointCloud2` 桥接
+- `config/octomap_params.yaml`：OctoMap 分辨率、z 裁剪和发布 QoS（`latch: false`）
+- `config/nav2_multirobot_slam_params.yaml`：双车 Nav2 的 `PointCloud2` 观测源
+
+无独显的 VMware 环境如果出现卡顿，先把 3D 雷达降到 12 线或水平 240 点，并保持全程无头；用 `free -h` / `top` 观察内存和 CPU。
+
 ## 目录
 
 - `scripts/`：启动和清理脚本
@@ -188,6 +297,14 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 - `config/nav2_params_rl.yaml`：TD3 导航参数
 - `config/nav2_params_vmware.yaml`：TurtleBot4 / MPPI 在虚拟机上的参数
 - `config/nav2_multirobot_slam_params.yaml`：双车多命名空间 Nav2 + `slam_toolbox` 参数
+- `config/gz_waffle_3d_lidar.sdf.xacro`：双车 3D 点云建图使用的 16 线 / 3 Hz TB3 模型
+- `config/tb3_points_bridge.yaml`：robot1 的 3D 点云 GZ → ROS 桥接；robot2 的桥接条目在 `tb3_bridge_no_clock.yaml`
+- `config/octomap_params.yaml`：OctoMap 3D 占据地图参数
+- `scripts/merge_pointclouds.py`：双车点云变换到 `world` 并按体素合并
+- `scripts/save_cloud_pcd.py`：把周期发布的点云保存为 ASCII PCD
+- `scripts/check_3d_map.py`：无头 3D 建图验收检查器（cloud / growth / costmap / pcd）
+- `scripts/plot_cloud_pcd.py`：把 ASCII PCD 渲染成 XY/XZ/YZ 三视图 PNG（无需 GUI）
+- `docs/3d_mapping_plan.md`：3D 点云建图的完整设计与实施计划
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁
 - `src/rl_nav2_controller/`：TD3 局部控制器
 - `src/m-explore-ros2/`：前沿探索 (`explore_lite` / `explore_lite_msgs`) 与多车地图合并 (`multirobot_map_merge`)
@@ -197,7 +314,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 1. [x] **共享合并地图 + 竞拍协商机制（已完成）**：实现 `scripts/multi_robot_coordinator.py`，统一订阅全局合并大地图 `/map`，基于边际效益（前沿增益减去距离/航向代价）进行多车竞拍协商调度，并通过 TF / 初始位姿矩阵逆变换下发 Nav2 导航目标，消除重复探索与航向冲突。详细配置见 `config/coordinator_params.yaml`。
 
-2. TurtleBot3 搭载的是单线激光雷达（2D LiDAR）（在实物上是 LDS-01/02，在 Gazebo 仿真里是单层激光扫描插件）。但是项目的最终目标是构建出有高度、立体的 3D 地图，需要升级传感器和建图算法。只需要考虑已知初始位姿的情况。
+2. [x] **仿真 3D 点云建图（部分完成）**：TurtleBot3 实物使用单线激光雷达（LDS-01/02）。本次只在 **Gazebo 双机仿真**中增加 16 线 / 3 Hz 3D 雷达，沿用现有 `slam_toolbox` 的 2D 位姿，把两车点云合并后送入 `octomap_server`；桌/床等悬空物通过 Nav2 `PointCloud2` 观测源投影进 2D 代价地图。3D 图仅用于展示和存档，不用于后续导航；实车传感器升级、标定和 3D 重定位仍未实现。设计与验收流程见 `docs/3d_mapping_plan.md` 和 README 的“双机 3D 点云建图（无头）”章节。
 
 3. 现在使用的 TurtleBot3 Waffle 车头正前方安装了一颗 Intel RealSense 深度摄像头，但在 Nav2 官方的精简仿真包（nav2_minimal_tb3_sim）中，为了极大降低对 CPU/GPU 的算力消耗（特别是虚拟机环境），默认只启动了激光雷达和里程计的桥接，摄像头的图像渲染插件默认被精简关闭了。
 目标：在拥有独立显卡直通的高性能主机上开启摄像头的视频流展示

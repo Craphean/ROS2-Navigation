@@ -9,6 +9,20 @@
 #   KNOWN_INIT_POSES=true  (set KNOWN_INIT_POSES=false for feature-matching mode)
 #   RANDOM_SPAWN=false     (set RANDOM_SPAWN=true to randomly pick 2 non-overlapping inspection stations)
 #
+# 3D point-cloud mapping (headless by default):
+#   - Each robot gets a 16-line / 3 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
+#   - /robotX/points feeds Nav2 costmaps and scripts/merge_pointclouds.py.
+#   - The merged cloud is published as /points_merged in the world frame and fed to
+#     octomap_server (3D map + projected_map + octomap_point_cloud_centers).
+#   - Archive after exploration:
+#       ros2 run octomap_server octomap_saver_node --ros-args \
+#         -p octomap_path:="$PWD/maps/tb3_3d_map.bt" -p full:=true
+#       python3 scripts/save_cloud_pcd.py \
+#         --topic /octomap_point_cloud_centers --output maps/tb3_3d_map.pcd
+#       ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
+#         --ros-args -r map:=/projected_map -p map_subscribe_transient_local:=false
+#   - Headless acceptance checker: scripts/check_3d_map.py
+#
 # Usage:
 #   ./scripts/tb3_multi_explore_slam.sh
 #   USE_RVIZ=True ./scripts/tb3_multi_explore_slam.sh
@@ -17,7 +31,7 @@
 #   WORLD=warehouse RANDOM_SPAWN=true USE_RVIZ=True ./scripts/tb3_multi_explore_slam.sh
 #   ./scripts/tb3_multi_explore_slam.sh --random-spawn
 #
-# Save merged map when done:
+# Save merged 2D map when done:
 #   ros2 run nav2_map_server map_saver_cli -f ~/tb3_merged_map --ros-args -r map:=/map
 set -eo pipefail
 
@@ -308,10 +322,16 @@ RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_
 
 echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} known_init_poses=${KNOWN_INIT_POSES}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
+echo "[tb3_multi_explore_slam] 3D LiDAR: 16 beams / 360 horizontal / 3 Hz (headless default)"
+if command -v free >/dev/null 2>&1; then
+  LC_ALL=C free -h | awk '/^Mem:/ {printf "[tb3_multi_explore_slam] memory: %s total, %s available\n", $2, $7}'
+fi
 
 ROBOT1_LOG="/tmp/tb3_multi_robot1_bringup.log"
 ROBOT2_LOG="/tmp/tb3_multi_robot2_bringup.log"
 MERGE_LOG="/tmp/tb3_multi_map_merge.log"
+CLOUD_LOG="/tmp/tb3_multi_merge_clouds.log"
+OCTOMAP_LOG="/tmp/tb3_multi_octomap.log"
 EXPLORE1_LOG="/tmp/tb3_multi_explore1.log"
 EXPLORE2_LOG="/tmp/tb3_multi_explore2.log"
 COORDINATOR_LOG="/tmp/tb3_multi_coordinator.log"
@@ -337,6 +357,7 @@ exec ros2 launch nav2_bringup tb3_simulation_launch.py \
   use_speed_zones:=False \
   use_simulator:=True \
   use_rviz:=False \
+  robot_sdf:='${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro' \
   headless:='${HEADLESS}' \
   use_composition:='${USE_COMPOSITION}' \
   use_respawn:=True \
@@ -350,6 +371,18 @@ exec ros2 launch nav2_bringup tb3_simulation_launch.py \
 R1_PID=$!
 echo "[tb3_multi_explore_slam] Launched Gazebo + robot1 (PID=${R1_PID}, log=${ROBOT1_LOG})"
 
+# Extra bridge for robot1's 3D point cloud. The official tb3_simulation_launch.py
+# bridge config does not include PointCloud2, so bridge it separately.
+POINTS1_LOG="/tmp/tb3_multi_robot1_points_bridge.log"
+ros2 run ros_gz_bridge parameter_bridge \
+  --ros-args -r __ns:=/robot1 \
+  -p config_file:="${ROOT_DIR}/config/tb3_points_bridge.yaml" \
+  -p use_sim_time:=true \
+  -p expand_gz_topic_names:=true \
+  >"${POINTS1_LOG}" 2>&1 &
+POINTS1_PID=$!
+echo "[tb3_multi_explore_slam] robot1 points bridge PID=${POINTS1_PID} log=${POINTS1_LOG}"
+
 sleep 4
 
 # 2. Spawn robot2 into same Gazebo server + launch robot2 (Nav2 + slam_toolbox in /robot2)
@@ -357,7 +390,7 @@ sleep 4
 # preventing duplicate /clock jumps that clear tf2 buffers.
 BRIDGE_NO_CLOCK="${ROOT_DIR}/config/tb3_bridge_no_clock.yaml"
 URDF_FILE="${SIM_SHARE}/urdf/turtlebot3_waffle.urdf"
-SDF_XACRO="${SIM_SHARE}/urdf/gz_waffle.sdf.xacro"
+SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
 
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
@@ -411,6 +444,8 @@ R2_PID=$!
 echo "[tb3_multi_explore_slam] Launched robot2 (PID=${R2_PID}, log=${ROBOT2_LOG})"
 
 MERGE_PID=""
+CLOUD_PID=""
+OCTOMAP_PID=""
 EXP1_PID=""
 EXP2_PID=""
 COORD_PID=""
@@ -418,8 +453,8 @@ RVIZ_PID=""
 RELAY_PID=""
 
 cleanup() {
-  echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & map merge..."
-  for pid in "${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${R2_PID}" "${R1_PID}"; do
+  echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & 3D mapping..."
+  for pid in "${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${R2_PID}" "${R1_PID}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
     fi
@@ -488,6 +523,35 @@ ros2 run multirobot_map_merge map_merge --ros-args \
   >"${MERGE_LOG}" 2>&1 &
 MERGE_PID=$!
 echo "[tb3_multi_explore_slam] map_merge PID=${MERGE_PID} log=${MERGE_LOG}"
+
+# 3b. Merge both robots' 3D point clouds into the world frame and build OctoMap.
+sleep 2
+
+# The merger needs world -> robotX/map, which map_merge publishes once it
+# receives both SLAM maps. It retries TF lookups until then, so it is safe to
+# start right after map_merge.
+python3 "${ROOT_DIR}/scripts/merge_pointclouds.py" --ros-args \
+  -p use_sim_time:=true \
+  -p robots:="['robot1', 'robot2']" \
+  -p world_frame:=world \
+  -p voxel_size:=0.05 \
+  -p publish_rate:=3.0 \
+  >"${CLOUD_LOG}" 2>&1 &
+CLOUD_PID=$!
+echo "[tb3_multi_explore_slam] point-cloud merger PID=${CLOUD_PID} log=${CLOUD_LOG}"
+
+if ros2 pkg prefix octomap_server >/dev/null 2>&1; then
+  ros2 run octomap_server octomap_server_node --ros-args \
+    --params-file "${ROOT_DIR}/config/octomap_params.yaml" \
+    -p use_sim_time:=true \
+    -r cloud_in:=/points_merged \
+    >"${OCTOMAP_LOG}" 2>&1 &
+  OCTOMAP_PID=$!
+  echo "[tb3_multi_explore_slam] octomap_server PID=${OCTOMAP_PID} log=${OCTOMAP_LOG}"
+else
+  echo "[tb3_multi_explore_slam] WARNING: ros-lyrical-octomap-server is not installed; 3D OctoMap disabled." >&2
+  echo "[tb3_multi_explore_slam]   sudo apt install ros-lyrical-octomap-server ros-lyrical-octomap-msgs" >&2
+fi
 
 if [[ "${USE_RVIZ,,}" == "true" ]]; then
   echo "[tb3_multi_explore_slam] Launching RViz with ${RVIZ_CONFIG} ..."

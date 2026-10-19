@@ -1,0 +1,22 @@
+# OctoMap 3D occupancy map for the dual-robot simulation.
+# Input: /points_merged (sensor_msgs/PointCloud2, frame_id: world)
+# Outputs: /octomap_binary, /octomap_full, /octomap_point_cloud_centers,
+#          /projected_map, /occupied_cells_vis_array
+octomap_server:
+  ros__parameters:
+    frame_id: world
+    base_frame_id: base_footprint
+    resolution: 0.05
+    point_cloud_min_z: 0.08
+    point_cloud_max_z: 2.0
+    occupancy_min_z: 0.08
+    occupancy_max_z: 2.0
+    filter_ground_plane: false
+    sensor_model.max_range: 12.0
+    publish_free_space: false
+    # Keep this false in the headless VM: with latch=true octomap_server
+    # serializes octomap_binary/full on every cloud update even when nobody
+    # subscribes, which is expensive for a large map.  The checkers and
+    # saver use volatile reliable QoS and read the periodic updates instead.
+    latch: false
+    incremental_2D_projection: false
