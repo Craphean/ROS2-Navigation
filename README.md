@@ -201,57 +201,6 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
 ```
 
-### 无头验收
-
-所有检查只依赖 ROS 2 topic、TF 和离线文件，不需要 RViz：
-
-```bash
-# 1. 合并点云概况：点数、xyz 包围盒、z 直方图、0.05 m 体素数
-python3 scripts/check_3d_map.py cloud \
-  --topic /points_merged --duration 10 --json
-
-# 2. 3D 完成判据：最近 30 s 占据体素增长 < 1%
-#    （小地图允许 ≤ 30 个体素的绝对波动，避免 300 体素场景被噪声误判）
-python3 scripts/check_3d_map.py growth \
-  --topic /octomap_point_cloud_centers --window 30 --json
-
-# 3. 桌/床是否投影进 2D 代价地图（坐标从 worlds/*.sdf.xacro 中取）
-python3 scripts/check_3d_map.py costmap \
-  --robot robot1 --world-point <table_x>,<table_y> --expect-lethal --json
-
-# 4. 存档并离线校验 PCD
-python3 scripts/save_cloud_pcd.py \
-  --topic /octomap_point_cloud_centers --output maps/tb3_3d_map.pcd
-python3 scripts/check_3d_map.py pcd --input maps/tb3_3d_map.pcd --json
-```
-
-**看哪些指标：**
-
-| 检查 | JSON 字段 | 通过标准 |
-|---|---|---|
-| `cloud` | `points` / `bbox` / `z_histogram` / `voxels` | 点数 > 0（整屋探索后通常数万）；`bbox` 的 x/y 覆盖已探索区域，z 在 0.05–2.0 m 内；`0.60-1.20`、`1.20-2.00` 两档有非零点（桌面/床面/墙），`0.05-0.30` 有低矮家具点；没有大量地面点 |
-| `growth` | `pass` / `first_voxels` / `last_voxels` / `growth_percent` / `growth_voxels` | `pass: true`，且 `growth_percent ≤ 1.0` 或 `growth_voxels ≤ 30`。必须在探索基本结束后再跑；机器人在开拓新区域时体素持续增长是正常的 |
-| `costmap` | `pass` / `lethal` / `cost` / `in_bounds` | `pass: true`、`lethal: true`、`cost: 100`。`cost` 为 0/50 说明该处还没被观测到或已被清除；`in_bounds: false` 说明该点还没进地图 |
-| `pcd` | `points` / `bbox` / `z_histogram` / `voxels` | 点数 > 0，包围盒和 z 直方图与在线 `cloud` 结果一致 |
-
-命令的退出码同样是判据：`0` 表示脚本自身认为通过（`cloud`/`pcd` 只要求有非零点），`1` 表示没有数据或检查失败。人会看的重点还是上表字段。
-
-`costmap` 模式会用 `multirobot_map_merge` 发布的 `world -> robotX/map` 初始位姿变换，把 world 坐标换算到该车局部 `map` 栅格；因此要先确认 `map_merge` 已启动。探索完成时协调器日志会打印 `No remaining reachable frontiers. Exploration complete or paused.`：
-
-```bash
-grep 'No remaining reachable frontiers' /tmp/tb3_multi_coordinator.log
-```
-
-house 场景已实测的桌/床投影检查点（world 坐标）：
-
-```bash
-# 客厅桌桌心、近边
-python3 scripts/check_3d_map.py costmap --robot robot2 --world-point -2.6,2.4 --expect-lethal --json
-python3 scripts/check_3d_map.py costmap --robot robot2 --world-point -2.6,2.0 --expect-lethal --json
-# 餐桌近边
-python3 scripts/check_3d_map.py costmap --robot robot1 --world-point -2.8,-2.1 --expect-lethal --json
-```
-
 ### 3D 地图存档
 
 探索结束后，在 `octomap_server` 仍存活时执行：
@@ -270,16 +219,13 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
   --ros-args -r map:=/projected_map \
   -p map_subscribe_transient_local:=false
 
-# 无 GUI 预览：XY 俯视 + XZ/YZ 侧视，输出 PNG
-python3 scripts/plot_cloud_pcd.py \
-  --input maps/tb3_3d_map.pcd --output maps/tb3_3d_map.png
 ```
 
-`.pcd` 是 ASCII 格式的占据体素中心，可以直接用文本编辑器查看，也可以复制到有图形界面的机器上用 CloudCompare / MeshLab 打开。`plot_cloud_pcd.py` 只依赖 matplotlib，使用 `Agg` 后端，不需要显示器或 OpenGL；俯视图按高度着色，能直接看出桌面、床面和墙体，侧视图能看出悬空结构。
+`.pcd` 是 ASCII 格式的占据体素中心，可以直接用文本编辑器查看，也可以复制到有图形界面的机器上用 CloudCompare / MeshLab 打开。
 
-`config/octomap_params.yaml` 中 `latch: false` 是为了避免无头 VM 上 `octomap_server` 每次点云更新都序列化整棵 `octomap_binary`/`octomap_full` 树。检查器和 `save_cloud_pcd.py` 使用 volatile reliable QoS，靠周期性更新取数；存档时保持 `merge_pointclouds.py` / `octomap_server` 运行即可。
+`config/octomap_params.yaml` 中 `latch: false` 是为了避免无头 VM 上 `octomap_server` 每次点云更新都序列化整棵 `octomap_binary`/`octomap_full` 树。`save_cloud_pcd.py` 使用 volatile reliable QoS，靠周期性更新取数；存档时保持 `merge_pointclouds.py` / `octomap_server` 运行即可。
 
-**2D 建图完成 ≠ 3D 建图完成。** 2D frontier 结束只说明地面可通行区域没有未知边界；家具背面、桌下、垂直视场外仍可能有空洞。因此 3D 侧要单独看 `growth`（体素增长收敛）、`cloud`（点数/包围盒）和 `pcd`（存档可读、z 直方图有家具峰）三个指标。
+**2D 建图完成 ≠ 3D 建图完成。** 2D frontier 结束只说明地面可通行区域没有未知边界；家具背面、桌下、垂直视场外仍可能有空洞。
 
 常用参数文件：
 
@@ -302,8 +248,6 @@ python3 scripts/plot_cloud_pcd.py \
 - `config/octomap_params.yaml`：OctoMap 3D 占据地图参数
 - `scripts/merge_pointclouds.py`：双车点云变换到 `world` 并按体素合并
 - `scripts/save_cloud_pcd.py`：把周期发布的点云保存为 ASCII PCD
-- `scripts/check_3d_map.py`：无头 3D 建图验收检查器（cloud / growth / costmap / pcd）
-- `scripts/plot_cloud_pcd.py`：把 ASCII PCD 渲染成 XY/XZ/YZ 三视图 PNG（无需 GUI）
 - `docs/3d_mapping_plan.md`：3D 点云建图的完整设计与实施计划
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁
 - `src/rl_nav2_controller/`：TD3 局部控制器

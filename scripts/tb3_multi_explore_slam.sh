@@ -21,7 +21,6 @@
 #         --topic /octomap_point_cloud_centers --output maps/tb3_3d_map.pcd
 #       ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 #         --ros-args -r map:=/projected_map -p map_subscribe_transient_local:=false
-#   - Headless acceptance checker: scripts/check_3d_map.py
 #
 # Usage:
 #   ./scripts/tb3_multi_explore_slam.sh
