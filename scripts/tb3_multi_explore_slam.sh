@@ -611,7 +611,16 @@ else
   echo "  - map_merge log:      ${MERGE_LOG}"
   echo "  - Merged map topic:   /map (frame_id: world)"
 fi
-echo "Press Ctrl-C to stop."
 
-wait "${MERGE_PID}"
+DASHBOARD="${DASHBOARD:-true}"
+if [[ "${DASHBOARD,,}" == "true" && -f "${ROOT_DIR}/scripts/monitor_dashboard.py" ]]; then
+  echo ""
+  echo "[tb3_multi_explore_slam] Starting live exploration dashboard..."
+  echo "[tb3_multi_explore_slam] Press Ctrl-C to stop simulation and clean up."
+  sleep 1
+  python3 "${ROOT_DIR}/scripts/monitor_dashboard.py" || true
+else
+  echo "Press Ctrl-C to stop."
+  wait "${MERGE_PID}"
+fi
 

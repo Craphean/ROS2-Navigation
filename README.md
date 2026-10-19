@@ -248,6 +248,7 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 - `config/octomap_params.yaml`：OctoMap 3D 占据地图参数
 - `scripts/merge_pointclouds.py`：双车点云变换到 `world` 并按体素合并
 - `scripts/save_cloud_pcd.py`：把周期发布的点云保存为 ASCII PCD
+- `scripts/monitor_dashboard.py`：双车协同自主探索实时监控仪表盘（由仿真脚本自动拉起）
 - `docs/3d_mapping_plan.md`：3D 点云建图的完整设计与实施计划
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁
 - `src/rl_nav2_controller/`：TD3 局部控制器
