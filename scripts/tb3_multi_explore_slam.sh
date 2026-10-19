@@ -321,7 +321,6 @@ RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_
 
 echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} known_init_poses=${KNOWN_INIT_POSES}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
-echo "[tb3_multi_explore_slam] 3D LiDAR: 16 beams / 360 horizontal / 3 Hz (headless default)"
 if command -v free >/dev/null 2>&1; then
   LC_ALL=C free -h | awk '/^Mem:/ {printf "[tb3_multi_explore_slam] memory: %s total, %s available\n", $2, $7}'
 fi

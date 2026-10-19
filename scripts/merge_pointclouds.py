@@ -64,8 +64,31 @@ class PointCloudMerger(Node):
         )
         self.min_z = float(self.declare_parameter("min_z", 0.05).value)
         self.max_z = float(self.declare_parameter("max_z", 2.0).value)
+        self.min_range = float(self.declare_parameter("min_range", 0.1).value)
         self.max_range = float(self.declare_parameter("max_range", 12.0).value)
         self.tf_timeout = float(self.declare_parameter("tf_timeout", 0.1).value)
+
+        # Vehicle self-reflection box filter in sensor frame (base_scan)
+        # TurtleBot3 Waffle footprint: length 0.265m, width 0.265m, wheels at y=+-0.144m.
+        # With base_scan at x=-0.064m in base_link, the chassis extends:
+        #   x in [-0.14, +0.20]m, y in [-0.16, +0.16]m.
+        # Points inside this bounding box and below the sensor (z <= footprint_z_max)
+        # are robot self-reflections and should be rejected.
+        self.footprint_x_min = float(
+            self.declare_parameter("footprint_x_min", -0.22).value
+        )
+        self.footprint_x_max = float(
+            self.declare_parameter("footprint_x_max", 0.22).value
+        )
+        self.footprint_y_min = float(
+            self.declare_parameter("footprint_y_min", -0.18).value
+        )
+        self.footprint_y_max = float(
+            self.declare_parameter("footprint_y_max", 0.18).value
+        )
+        self.footprint_z_max = float(
+            self.declare_parameter("footprint_z_max", 0.05).value
+        )
 
         if self.publish_rate <= 0.0:
             self.publish_rate = 3.0
@@ -94,7 +117,10 @@ class PointCloudMerger(Node):
 
         self.get_logger().info(
             f"Merging {self.robots} into {self.world_frame}; "
-            f"voxel={self.voxel_size:.3f} m, rate={self.publish_rate:.1f} Hz"
+            f"voxel={self.voxel_size:.3f} m, rate={self.publish_rate:.1f} Hz, "
+            f"box_filter=[x: ({self.footprint_x_min}, {self.footprint_x_max}), "
+            f"y: ({self.footprint_y_min}, {self.footprint_y_max}), "
+            f"z<={self.footprint_z_max}]"
         )
 
     def cloud_callback(self, robot: str, msg: PointCloud2) -> None:
@@ -129,10 +155,21 @@ class PointCloudMerger(Node):
 
         # Range/crop in the sensor frame before the transform.
         ranges = np.linalg.norm(points[:, :2], axis=1)
+
+        # Reject self-reflections on robot's own chassis / camera / wheels
+        is_self_body = (
+            (points[:, 0] >= self.footprint_x_min)
+            & (points[:, 0] <= self.footprint_x_max)
+            & (points[:, 1] >= self.footprint_y_min)
+            & (points[:, 1] <= self.footprint_y_max)
+            & (points[:, 2] <= self.footprint_z_max)
+        )
+
         valid = (
             np.isfinite(points).all(axis=1)
-            & (ranges >= 0.1)
+            & (ranges >= self.min_range)
             & (ranges <= self.max_range)
+            & (~is_self_body)
         )
         points = points[valid]
         if points.size == 0:
