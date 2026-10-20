@@ -532,7 +532,7 @@ python3 "${ROOT_DIR}/scripts/merge_pointclouds.py" --ros-args \
   -p use_sim_time:=true \
   -p robots:="['robot1', 'robot2']" \
   -p world_frame:=world \
-  -p voxel_size:=0.05 \
+  -p voxel_size:=0.02 \
   -p publish_rate:=3.0 \
   >"${CLOUD_LOG}" 2>&1 &
 CLOUD_PID=$!

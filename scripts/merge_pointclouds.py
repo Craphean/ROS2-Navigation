@@ -13,7 +13,7 @@ Usage:
     -p use_sim_time:=true \
     -p robots:="['robot1', 'robot2']" \
     -p world_frame:=world \
-    -p voxel_size:=0.05 \
+    -p voxel_size:=0.02 \
     -p publish_rate:=3.0
 """
 
@@ -58,7 +58,7 @@ class PointCloudMerger(Node):
         self.world_frame = str(
             self.declare_parameter("world_frame", "world").value
         )
-        self.voxel_size = float(self.declare_parameter("voxel_size", 0.05).value)
+        self.voxel_size = float(self.declare_parameter("voxel_size", 0.02).value)
         self.publish_rate = float(
             self.declare_parameter("publish_rate", 3.0).value
         )
@@ -93,7 +93,7 @@ class PointCloudMerger(Node):
         if self.publish_rate <= 0.0:
             self.publish_rate = 3.0
         if self.voxel_size <= 0.0:
-            self.voxel_size = 0.05
+            self.voxel_size = 0.02
 
         self.tf_buffer = Buffer(cache_time=Duration(seconds=30.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)

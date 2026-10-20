@@ -23,18 +23,20 @@ from sensor_msgs_py import point_cloud2
 
 
 class CloudSaver(Node):
-    def __init__(self, topic: str) -> None:
+    def __init__(self, topic: str, accumulate_sec: float = 0.0) -> None:
         super().__init__("save_cloud_pcd")
         # octomap_server uses latch=false to avoid serializing the full tree
         # on every update; its point-cloud topic is published periodically
         # while a subscriber is present.
         qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
-            depth=1,
-            reliability=ReliabilityPolicy.RELIABLE,
+            depth=50 if accumulate_sec > 0.0 else 1,
+            reliability=ReliabilityPolicy.BEST_EFFORT if ("points" in topic and topic.startswith("/robot")) else ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
         )
         self.message = None
+        self.messages = []
+        self.accumulate_sec = accumulate_sec
         self.subscription = self.create_subscription(
             PointCloud2, topic, self.callback, qos
         )
@@ -42,6 +44,8 @@ class CloudSaver(Node):
 
     def callback(self, msg: PointCloud2) -> None:
         self.message = msg
+        if self.accumulate_sec > 0.0:
+            self.messages.append(msg)
 
 
 def parse_points(msg: PointCloud2) -> np.ndarray:
@@ -51,6 +55,14 @@ def parse_points(msg: PointCloud2) -> np.ndarray:
     if points.size == 0:
         return np.empty((0, 3), dtype=np.float32)
     return np.asarray(points, dtype=np.float32).reshape(-1, 3)
+
+
+def voxel_downsample(points: np.ndarray, voxel_size: float) -> np.ndarray:
+    if points.size == 0 or voxel_size <= 0.0:
+        return points
+    keys = np.floor(points / voxel_size).astype(np.int64)
+    _, indices = np.unique(keys, axis=0, return_index=True)
+    return points[indices]
 
 
 def write_pcd(path: str, points: np.ndarray) -> None:
@@ -81,10 +93,22 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--timeout", type=float, default=10.0, help="Seconds to wait for a message"
     )
+    parser.add_argument(
+        "--accumulate",
+        type=float,
+        default=0.0,
+        help="Seconds to accumulate incoming point cloud frames (0 to save single snapshot)",
+    )
+    parser.add_argument(
+        "--voxel-size",
+        type=float,
+        default=0.0,
+        help="Optional voxel downsampling leaf size in meters for accumulated points",
+    )
     args, ros_args = parser.parse_known_args(argv)
 
     rclpy.init(args=[sys.argv[0], *ros_args])
-    node = CloudSaver(args.topic)
+    node = CloudSaver(args.topic, accumulate_sec=args.accumulate)
     try:
         deadline = time.monotonic() + args.timeout
         while rclpy.ok() and node.message is None:
@@ -97,11 +121,33 @@ def main(argv=None) -> int:
             )
             return 1
 
-        points = parse_points(node.message)
+        if args.accumulate > 0.0:
+            node.get_logger().info(
+                f"Accumulating frames from {args.topic} for {args.accumulate:.1f}s ..."
+            )
+            accumulate_deadline = time.monotonic() + args.accumulate
+            while rclpy.ok() and time.monotonic() < accumulate_deadline:
+                rclpy.spin_once(node, timeout_sec=0.1)
+
+            clouds = [parse_points(m) for m in node.messages if m is not None]
+            valid_clouds = [c for c in clouds if c.size > 0]
+            if not valid_clouds:
+                node.get_logger().error("No valid points parsed from accumulated frames.")
+                return 1
+            points = np.vstack(valid_clouds)
+            if args.voxel_size > 0.0:
+                points = voxel_downsample(points, args.voxel_size)
+        else:
+            points = parse_points(node.message)
+            if args.voxel_size > 0.0:
+                points = voxel_downsample(points, args.voxel_size)
+
         write_pcd(args.output, points)
+        frame_id = (
+            node.message.header.frame_id if node.message else "world"
+        )
         node.get_logger().info(
-            f"Wrote {len(points)} points to {args.output} "
-            f"(frame_id={node.message.header.frame_id})"
+            f"Wrote {len(points)} points to {args.output} (frame_id={frame_id})"
         )
         return 0
     finally:
