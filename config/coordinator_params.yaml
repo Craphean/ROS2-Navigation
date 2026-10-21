@@ -26,6 +26,16 @@ multi_robot_coordinator:
     # Minimum clearance from known obstacles for frontier safe goal retraction (meters)
     min_clearance: 0.35
 
+    # --- No-progress livelock breaker ---
+    # A goal that succeeds almost instantly without the robot having moved
+    # means it was already standing at the viewpoint; the frontier pocket
+    # may never clear (stale merged map / cells a 2D lidar cannot see).
+    # After this many consecutive repeats the spot is blacklisted so the
+    # residual stage and convergence are not blocked forever.
+    no_progress_time: 2.0
+    no_progress_distance: 0.3
+    no_progress_limit: 2
+
     # --- 3D information gain ---
     use_3d_gain: true
     octomap_cloud_topic: "/octomap_point_cloud_centers"

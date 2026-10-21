@@ -168,6 +168,13 @@ class RobotTracker:
         self.rewrite_count: int = 0
         self.current_residual_key: Optional[Tuple[float, float]] = None
 
+        # No-progress livelock breaker: repeated instant successes on the
+        # same goal mean the robot is already standing at a frontier pocket
+        # that never clears (stale map / 2D-invisible cells); after a few
+        # repeats the spot is blacklisted so exploration can move on.
+        self.no_progress_key: Optional[Tuple[float, float]] = None
+        self.no_progress_streak: int = 0
+
         # Relocalization jump detection
         self.prev_world_x: Optional[float] = None
         self.prev_world_y: Optional[float] = None
@@ -193,6 +200,11 @@ class MultiRobotCoordinator(Node):
         self.declare_parameter('blacklist_retry_limit', 2)
         self.declare_parameter('blacklist_radius', 0.9)
         self.declare_parameter('min_clearance', 0.35)
+
+        # No-progress livelock breaker
+        self.declare_parameter('no_progress_time', 2.0)
+        self.declare_parameter('no_progress_distance', 0.3)
+        self.declare_parameter('no_progress_limit', 2)
 
         # 3D information gain
         self.declare_parameter('use_3d_gain', True)
@@ -301,6 +313,15 @@ class MultiRobotCoordinator(Node):
             self.get_parameter('blacklist_radius').value
         )
         self.min_clearance = float(self.get_parameter('min_clearance').value)
+        self.no_progress_time = float(
+            self.get_parameter('no_progress_time').value
+        )
+        self.no_progress_distance = float(
+            self.get_parameter('no_progress_distance').value
+        )
+        self.no_progress_limit = int(
+            self.get_parameter('no_progress_limit').value
+        )
 
         self.use_3d_gain = bool(self.get_parameter('use_3d_gain').value)
         self.octomap_cloud_topic = str(
@@ -2230,6 +2251,7 @@ class MultiRobotCoordinator(Node):
                     f'[{robot.namespace}] Goal reached successfully! '
                     f'Target: {target}'
                 )
+                self._check_no_progress_success(robot, target)
                 self._mark_tour_residuals_resolved(robot)
                 robot.through_poses_failures = 0
                 self._reset_robot_nav(robot)
@@ -2275,6 +2297,73 @@ class MultiRobotCoordinator(Node):
             key = robot.current_residual_key
             self._reset_robot_nav(robot)
             self.handle_goal_failure(robot, target, key)
+
+    def _check_no_progress_success(
+        self, robot: RobotTracker, target: Optional[Tuple[float, float]]
+    ):
+        """Break instant-success livelocks on persistent frontier pockets.
+
+        When the robot is already standing at a goal when it is dispatched
+        (within Nav2's goal tolerance), the action succeeds in well under a
+        second and no new observations happen.  If the frontier pocket never
+        clears (stale merged map, cells a 2D lidar cannot see), the same
+        candidate is re-extracted and won every cycle: dispatch -> instant
+        success -> dispatch ... forever.  That loop also keeps the frontier
+        count above zero, which blocks both the residual stage and
+        convergence.  After a few consecutive repeats the spot is added to
+        the regular blacklist so the pocket stops being re-won.
+
+        Called from the success branch of the goal result callback, before
+        the tracker is reset (goal_start_time / stall_ref are still valid).
+        """
+        if target is None:
+            return
+        elapsed = self.get_sim_time_sec() - robot.goal_start_time
+        moved = math.hypot(
+            robot.world_x - robot.stall_ref_x,
+            robot.world_y - robot.stall_ref_y,
+        )
+        if (
+            elapsed >= self.no_progress_time
+            or moved >= self.no_progress_distance
+        ):
+            # Real travel happened; any pocket suspicion is stale.
+            robot.no_progress_streak = 0
+            robot.no_progress_key = None
+            return
+
+        tx, ty = float(target[0]), float(target[1])
+        if (
+            robot.no_progress_key is not None
+            and math.hypot(
+                tx - robot.no_progress_key[0],
+                ty - robot.no_progress_key[1],
+            )
+            <= self.blacklist_radius
+        ):
+            robot.no_progress_streak += 1
+        else:
+            robot.no_progress_streak = 1
+        robot.no_progress_key = (tx, ty)
+
+        if robot.no_progress_streak >= self.no_progress_limit:
+            self.get_logger().warning(
+                f'[{robot.namespace}] Goal at ({tx:.2f}, {ty:.2f}) '
+                f'succeeded instantly {robot.no_progress_streak} times '
+                f'without the frontier clearing. Adding to blacklisted '
+                f'goals (radius {self.blacklist_radius}m).'
+            )
+            if robot.no_progress_key not in self.blacklisted_goals:
+                self.blacklisted_goals.append(robot.no_progress_key)
+            robot.no_progress_key = None
+            robot.no_progress_streak = 0
+        else:
+            self.get_logger().warning(
+                f'[{robot.namespace}] Instant success at ({tx:.2f}, '
+                f'{ty:.2f}): goal was already reached, frontier pocket may '
+                f'not clear (no-progress {robot.no_progress_streak}/'
+                f'{self.no_progress_limit}).'
+            )
 
     def _failed_waypoint_index(self, result) -> Optional[int]:
         statuses = getattr(result, 'waypoint_statuses', None)

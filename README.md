@@ -235,7 +235,7 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 - **Local / Global 双层调度**：距空闲车 6 m 内且同自由连通域的候选进入该车 Local 池；其余进入 Global 池，按 `roi = gain / (dist + 1)` 竞拍，避免长时间折返。
 - **近场 TSP 连续巡游**：Local 池按最近邻 + 2-opt 排序，一次 `NavigateThroughPoses` 下发（最多 6 点、总长 ≤10 m、点距 ≥1.2 m），中间点不停车。
 
-运行中的降级行为：`navigate_through_poses` 不可用或连续失败 2 次时，该车自动退回单点 `NavigateToPose`；单点规划失败会按点计失败并拉黑重试；3D 索引构建超过 `cycle_time_budget_ms` 时只跳过本周期的 3D 评分并保留上一版索引，不影响 2D 调度。
+运行中的降级行为：`navigate_through_poses` 不可用或连续失败 2 次时，该车自动退回单点 `NavigateToPose`；单点规划失败会按点计失败并拉黑重试；3D 索引构建超过 `cycle_time_budget_ms` 时只跳过本周期的 3D 评分并保留上一版索引，不影响 2D 调度。另外，同一目标被“瞬间到达”（机器人本就站在视点上、前沿却始终不清除，常见于地图陈旧或 2D 雷达看不到的口袋）连续 `no_progress_limit` 次后自动拉黑该点，避免派发死循环并让残差阶段接管。
 
 所有新行为都有开关；关闭后回到原来的 2D 单点竞拍：
 
