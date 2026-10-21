@@ -11,7 +11,7 @@ from voxel_exploration_core import FREE, OCCUPIED, GroundGrid, SensorModel, Voxe
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORLD = ROOT / "worlds/classroom.sdf.xacro"
-DEFAULT_CONFIG = ROOT / "config/voxel360_planner_params.yaml"
+DEFAULT_CONFIG = ROOT / "config/voxel360_strong_baseline_params.yaml"
 
 
 def pose_matrix(element):

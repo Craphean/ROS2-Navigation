@@ -186,35 +186,35 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 探索与地图合并包来自 [m-explore-ros2](https://github.com/robo-friends/m-explore-ros2)，放在 `src/m-explore-ros2`。
 
-## 360° 雷达双车体素探索：强基线与异步 V2
+## 360° 雷达双车体素探索：Strong Baseline 与 A1 Algorithm
 
-本分支保留两套算法：**全候选强基线**和**最新版异步 V2（包含 R2 空闲任务补充修复）**。
+本分支保留两套算法：**Strong Baseline（全候选）**和**A1 Algorithm（包含 R2 空闲任务补充修复）**。
 两者共享 5 cm 体素、5 m 有效探测距离、64×1024 / 10 Hz 全周雷达、前沿优先、孤立未知簇过滤和双车最大完成时间优化。
 
 | 算法 | 离线入口 | 参数 | 重规划期间 |
 | --- | --- | --- | --- |
-| 强基线 | `scripts/demo_voxel360_exploration.py` | `config/voxel360_planner_params.yaml` | 任一车到达后双车扫描、全候选求解；离线视频不计计算耗时 |
-| 异步 V2 | `scripts/demo_voxel360_async_v2.py` | `config/voxel360_async_v2_params.yaml` | 继续旧路线，实测计算耗时计入仿真；预测接入位置并校验新路线 |
+| Strong Baseline | `scripts/demo_voxel360_strong_baseline.py` | `config/voxel360_strong_baseline_params.yaml` | 任一车到达后双车扫描、全候选求解；离线视频不计计算耗时 |
+| A1 Algorithm | `scripts/demo_voxel360_a1.py` | `config/voxel360_a1_params.yaml` | 继续旧路线，实测计算耗时计入仿真；预测接入位置并校验新路线 |
 
 ```bash
 source /opt/ros/lyrical/setup.bash
 # 默认运行到保留的可观测未知体素清空并通过稳定性检查
-python3 scripts/demo_voxel360_exploration.py
-python3 scripts/demo_voxel360_async_v2.py
+python3 scripts/demo_voxel360_strong_baseline.py
+python3 scripts/demo_voxel360_a1.py
 
 # 160 秒回归上限；达到上限会记为未完成
-python3 scripts/demo_voxel360_async_v2.py --duration 160 --simulation-rate 0 \
-  --output-dir maps/async_v2_new_run
+python3 scripts/demo_voxel360_a1.py --duration 160 --simulation-rate 0 \
+  --output-dir maps/a1_new_run
 
 # 6 类室内布局 × 3 组出生点，结果另存
 python3 scripts/benchmark_indoor_suite.py --duration 160 --jobs 3 \
-  --output maps/indoor_async_v2_new_run
+  --output maps/indoor_a1_new_run
 
-# Gazebo / Nav2：强基线；替换 VOXEL_PARAMS 可切到异步 V2
+# Gazebo / Nav2：Strong Baseline；替换 VOXEL_PARAMS 可切到 A1 Algorithm
 EXPLORATION_MODE=voxel360 WORLD=classroom USE_RVIZ=True \
   ./scripts/tb3_multi_explore_slam.sh
 EXPLORATION_MODE=voxel360 WORLD=classroom USE_RVIZ=True \
-  VOXEL_PARAMS="$PWD/config/voxel360_async_v2_params.yaml" \
+  VOXEL_PARAMS="$PWD/config/voxel360_a1_params.yaml" \
   ./scripts/tb3_multi_explore_slam.sh
 ```
 
@@ -222,10 +222,10 @@ EXPLORATION_MODE=voxel360 WORLD=classroom USE_RVIZ=True \
 
 | 保存的结果 | 视频 / 报告 | 最终画面 |
 | --- | --- | --- |
-| 强基线 160 秒 | [MP4](maps/classroom_voxel360_frontier_160s/exploration.mp4) | [PNG](maps/classroom_voxel360_frontier_160s/final.png) |
-| 强基线 1500 秒 | [MP4](maps/classroom_voxel360_frontier_1500s_rerun/exploration.mp4) | [PNG](maps/classroom_voxel360_frontier_1500s_rerun/final.png) |
-| 异步 V2 修复后 160 秒 | [MP4](maps/classroom_voxel360_async_v2_r2fix_160s/exploration.mp4) | [PNG](maps/classroom_voxel360_async_v2_r2fix_160s/final.png) |
-| 异步 V2：18 组室内测试 | [本地 HTML 视频索引](maps/indoor_async_v2_suite_160s/index.html) · [汇总 CSV](maps/indoor_async_v2_suite_160s/summary.csv) | [布局总览](maps/indoor_async_v2_suite_160s/overview.png) |
+| Strong Baseline 160 秒 | [MP4](maps/classroom_voxel360_frontier_160s/exploration.mp4) | [PNG](maps/classroom_voxel360_frontier_160s/final.png) |
+| Strong Baseline 1500 秒 | [MP4](maps/classroom_voxel360_frontier_1500s_rerun/exploration.mp4) | [PNG](maps/classroom_voxel360_frontier_1500s_rerun/final.png) |
+| A1 Algorithm 修复后 160 秒 | [MP4](maps/classroom_voxel360_async_v2_r2fix_160s/exploration.mp4) | [PNG](maps/classroom_voxel360_async_v2_r2fix_160s/final.png) |
+| A1 Algorithm：18 组室内测试 | [本地 HTML 视频索引](maps/indoor_async_v2_suite_160s/index.html) · [汇总 CSV](maps/indoor_async_v2_suite_160s/summary.csv) | [布局总览](maps/indoor_async_v2_suite_160s/overview.png) |
 
 18 组测试均通过归档核验；每组平均规划耗时 0.445–0.562 秒，P95 为 0.541–0.847 秒。
 全部在 160 秒测试上限结束，**尚未完成探索**。这些是有二维通行先验的离线回放，尚不等同于真车验证，双车轨迹避碰也尚未实现。

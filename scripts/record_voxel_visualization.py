@@ -133,7 +133,7 @@ class ObservationView(Node):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     root = FilePath(__file__).resolve().parents[1]
-    parser.add_argument("--config", type=FilePath, default=root/"config/voxel360_planner_params.yaml")
+    parser.add_argument("--config", type=FilePath, default=root/"config/voxel360_strong_baseline_params.yaml")
     parser.add_argument("--output", type=FilePath, default=root/"maps/classroom_observed_live.mp4")
     parser.add_argument("--duration", type=float, default=0.,
                         help="Optional wall-time cap; 0 records until exploration completes or is interrupted")

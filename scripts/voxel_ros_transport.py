@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared ROS transport for the baseline and async V2 voxel planners.
+"""Shared ROS transport for Strong Baseline and A1 Algorithm.
 
 The historical ROS node name is retained for parameter-file compatibility.
 Task selection and execution policies live in voxel_exploration_planner.

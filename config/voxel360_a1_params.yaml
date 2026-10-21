@@ -1,3 +1,4 @@
+# A1 Algorithm: bounded route commitment, predictive starts and incremental targets.
 # The base ROS transport node retains its existing name.
 rolling_observation_planner:
   ros__parameters:
@@ -14,16 +15,31 @@ rolling_observation_planner:
     lidar_profile: config/lidar360_os0.yaml
     candidate_ownership: nearest
     target_policy: frontier
+    candidate_evaluation: incremental_frontier
+    fast_view_budget: 32
+    fast_audit_budget: 24
+    fast_cluster_size: 1.5
+    fast_cache_mb: 64.0
+    fast_recovery_limit: 192
+    fast_ray_workers: 2
     # Keep the 5 cm map; filter only task utility, never free-space evidence.
     min_unknown_component_volume: 0.005  # m^3; ignore 26-connected islands < 40 voxels at 5 cm.
     frontier_support_radius: 0.4         # m; local 3D unknown support around each visible boundary.
     frontier_unknown_fraction: 0.35
     min_frontier_area: 0.10              # m^2; boundary-voxel count * resolution^2 (area proxy).
     frontier_task_limit: 8               # Joint rolling batch, then re-evaluate on any arrival.
+    frontier_fill_detail_tasks: true    # Fronts first; spare slots retain useful 3D tasks for the other car.
     frontier_separation: 0.75            # m; prefer spatially separated selected viewpoints.
     frontier_view_distance: 1.0          # m from unseen sensor-height columns; prefer advancing the measured front.
     audit_when_idle: true
-    replan_policy: arrival_cycle
+    replan_policy: async_v2
+    async_commit_seconds: 1.5
+    async_refill_margin: 0.4
+    async_refill_interval: 2.0
+    async_initial_latency: 1.0
+    async_latency_window: 20
+    async_idle_search_seconds: 5.0      # One idle car still searches while its peer executes.
+    fast_incremental_targets: true
     integration_rate: 10.0
     control_rate: 10.0
 

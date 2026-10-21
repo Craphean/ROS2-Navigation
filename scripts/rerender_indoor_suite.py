@@ -31,7 +31,7 @@ def main():
         folder = output/case['id']
         before = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                   for p in [folder/'events.json', folder/'observed_points.bin', folder/'final_voxels.npz']}
-        command = [sys.executable, str(ROOT/'scripts/demo_voxel360_async_v2.py'),
+        command = [sys.executable, str(ROOT/'scripts/demo_voxel360_a1.py'),
                    '--render-only', '--output-dir', str(folder)]
         with (folder/'render.log').open('w') as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)

@@ -16,7 +16,7 @@ from classroom_voxel_scene import ROOT, DEFAULT_WORLD, scene
 
 SUITE = ROOT/'config/indoor_suite'
 WORLDS = ROOT/'worlds/indoor_suite'
-BASE_CONFIG = ROOT/'config/voxel360_async_v2_params.yaml'
+BASE_CONFIG = ROOT/'config/voxel360_a1_params.yaml'
 SPAWNS = {
     'front_split': ((-6.5, 4.8, 0.), (6.5, 4.8, math.pi)),
     'rear_together': ((5.5, -5.3, math.pi/2), (6.8, -5.3, math.pi/2)),
@@ -184,7 +184,7 @@ def generate():
                               safe_cells=int(ground.safe.sum()), reachable_safe_cells=int(np.isfinite(distance).sum()),
                               spawn_distance_m=float(distance[ground.cell(starts[1])]),
                               voxel_count=int(truth.state.size), spawn_validated=True))
-    result = dict(algorithm='async_v2 + retained detail fill + idle search',
+    result = dict(algorithm='A1 Algorithm',
                   base_config=str(BASE_CONFIG.relative_to(ROOT)), cases=cases)
     (SUITE/'suite.json').write_text(json.dumps(result, indent=2)+'\n')
     print(f'Generated and checked {len(cases)} cases in {SUITE}', flush=True)

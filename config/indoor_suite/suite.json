@@ -1,6 +1,6 @@
 {
-  "algorithm": "async_v2 + retained detail fill + idle search",
-  "base_config": "config/voxel360_async_v2_params.yaml",
+  "algorithm": "A1 Algorithm",
+  "base_config": "config/voxel360_a1_params.yaml",
   "cases": [
     {
       "id": "classroom__front_split",

@@ -15,7 +15,7 @@
 #   - The merged cloud is published as /points_merged in the world frame and fed to
 #     octomap_server (3D map + projected_map + octomap_point_cloud_centers).
 #   - EXPLORATION_MODE=voxel360 uses 64x1024 / 10 Hz full-circle position observations
-#     with the strong baseline or async V2 selected by VOXEL_PARAMS.
+#     with the Strong Baseline or A1 Algorithm selected by VOXEL_PARAMS.
 #   - Archive after exploration:
 #       ros2 run octomap_server octomap_saver_node --ros-args \
 #         -p octomap_path:="$PWD/maps/tb3_3d_map.bt" -p full:=true
@@ -636,7 +636,7 @@ if [[ "${EXPLORATION_MODE,,}" == "auction" ]]; then
   echo "  - map_merge log:      ${MERGE_LOG}"
 elif [[ "${EXPLORATION_MODE,,}" == "voxel360" ]]; then
   PLANNER_SCRIPT="${ROOT_DIR}/scripts/voxel_exploration_planner.py"
-  VOXEL_PARAMS="${VOXEL_PARAMS:-${ROOT_DIR}/config/voxel360_planner_params.yaml}"
+  VOXEL_PARAMS="${VOXEL_PARAMS:-${ROOT_DIR}/config/voxel360_strong_baseline_params.yaml}"
   LIDAR_PLANNER_ARGS=(-p "lidar_profile:=${LIDAR360_PROFILE}")
   echo "[tb3_multi_explore_slam] Starting 360-degree voxel planner ..."
   python3 "${PLANNER_SCRIPT}" --ros-args \

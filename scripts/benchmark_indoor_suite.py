@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the latest async planner on isolated indoor cases and publish a local report."""
+"""Run A1 Algorithm on isolated indoor cases and publish a local report."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -95,7 +95,7 @@ def run_case(case, cpus, args, hashes):
     if not archive.exists():
         archive.symlink_to('../source_snapshot.tar.gz')
     command = ['taskset', '-c', ','.join(map(str, cpus)), sys.executable,
-               str(ROOT/'scripts/demo_voxel360_async_v2.py'), '--world', str(ROOT/case['world']),
+               str(ROOT/'scripts/demo_voxel360_a1.py'), '--world', str(ROOT/case['world']),
                '--config', str(ROOT/case['config']), '--duration', str(args.duration),
                '--simulation-rate', '0', '--record-period', '1', '--output-dir', str(folder)]
     manifest = dict(started_at_utc=datetime.now(timezone.utc).isoformat(), source_sha256=hashes,
@@ -175,7 +175,7 @@ def write_report(output, cases, results, args):
 body{font-family:system-ui,sans-serif;background:#101720;color:#e4ebf3;max-width:1500px;margin:36px auto;padding:0 22px}
 h1{font-size:30px}h2{font-size:18px}p{line-height:1.6}a{color:#65bfff}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:20px}
 article{background:#1b2634;padding:20px;border-radius:12px}img{width:100%;border-radius:6px}.error{color:#ff9b9b}
-</style>'''+f'<h1>室内双车探索 · 最新 async V2</h1><p>6 类场景 × 3 组出生点；已完成 {len(rows)} / {len(cases)}。'
+</style>'''+f'<h1>室内双车探索 · A1 Algorithm</h1><p>6 类场景 × 3 组出生点；已完成 {len(rows)} / {len(cases)}。'
                 f'每组最多 {args.duration:g} 秒，5 cm 体素、5 m / 64×1024 / 10 Hz 雷达。</p>'
                 '<p>未知减少比例以首次扫描后的未知为分母，不等于可观测空间完成率。布局图是真值预览，视频只显示实测信息。'
                 '这是带已知二维通行先验的离线回放；计算实测耗时计入仿真，尚未验证真车。每组仅一次运行，耗时不作为严格速度对照。'
@@ -194,7 +194,7 @@ def overview(output, cases):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, default=ROOT/'maps/indoor_async_v2_suite_160s')
+    parser.add_argument('--output', type=Path, default=ROOT/'maps/indoor_a1_suite_160s')
     parser.add_argument('--duration', type=float, default=160.)
     parser.add_argument('--jobs', type=int, default=3)
     parser.add_argument('--cases', nargs='*')

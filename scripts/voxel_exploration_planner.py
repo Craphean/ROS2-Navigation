@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ROS adapter for bounded unknown-voxel coverage exploration.
 
-The strong baseline and async V2 share subscriptions, TF and Nav2 action clients.
+Strong Baseline and A1 Algorithm share subscriptions, TF and Nav2 action clients.
 Planning, completion and action lifecycles are implemented below.
 """
 from __future__ import annotations

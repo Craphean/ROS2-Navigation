@@ -27,6 +27,7 @@ def verify(folder):
         for name, digest in manifest['source_sha256'].items():
             assert hashlib.sha256(archive.extractfile(name).read()).hexdigest() == digest, name
         import yaml
+        # Pre-rename archives without an explicit config retain their original filename.
         config_name = manifest.get('config', 'config/voxel360_async_v2_params.yaml')
         config = yaml.safe_load(archive.extractfile(config_name).read())
         params = config['rolling_observation_planner']['ros__parameters']

@@ -20,7 +20,7 @@ def prepare(output, profile_path=DEFAULT_PROFILE, nav_path=None):
     tree = ET.parse(ROOT/"config/gz_waffle_3d_lidar.sdf.xacro")
     spatial = tree.find(".//sensor[@name='tb3_3d_lidar']")
     original = np.fromstring(spatial.findtext("pose"), sep=" ")
-    base = yaml.safe_load((ROOT/"config/voxel360_planner_params.yaml").read_text())["rolling_observation_planner"]["ros__parameters"]
+    base = yaml.safe_load((ROOT/"config/voxel360_strong_baseline_params.yaml").read_text())["rolling_observation_planner"]["ros__parameters"]
     pose = np.array([0., 0., original[2]+(profile.height-base["observation_z"]), 0., 0., 0.])
     for name in ("hls_lfcd_lds", "tb3_3d_lidar"):
         sensor = tree.find(f".//sensor[@name='{name}']")

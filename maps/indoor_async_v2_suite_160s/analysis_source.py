@@ -21,7 +21,7 @@ def summarize(folder):
     title, label, small = [ImageFont.truetype(font_path, n) for n in (30, 22, 18)]
     canvas = Image.new('RGB', (1600, 1350), '#111923')
     draw = ImageDraw.Draw(canvas)
-    draw.text((32, 20), 'Indoor async V2 / reduction of unknown voxels after the initial scan', fill='white', font=title)
+    draw.text((32, 20), 'Indoor A1 Algorithm / reduction of unknown voxels after the initial scan', fill='white', font=title)
     for i, spawn in enumerate(SPAWNS):
         draw.line((36+i*500, 83, 84+i*500, 83), fill=colors[i], width=4)
         draw.text((96+i*500, 68), spawn, fill='#e2ebf7', font=label)

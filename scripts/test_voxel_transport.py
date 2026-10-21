@@ -15,8 +15,8 @@ class TransportTests(unittest.TestCase):
     def test_supported_configs_initialize_complete_planners(self):
         root = Path(__file__).resolve().parents[1]
         for algorithm, filename in (
-            ('arrival_cycle', 'voxel360_planner_params.yaml'),
-            ('async_v2', 'voxel360_async_v2_params.yaml'),
+            ('arrival_cycle', 'voxel360_strong_baseline_params.yaml'),
+            ('async_v2', 'voxel360_a1_params.yaml'),
         ):
             with self.subTest(algorithm=algorithm), ExitStack() as stack:
                 params = yaml.safe_load((root/'config'/filename).read_text())['rolling_observation_planner']['ros__parameters']

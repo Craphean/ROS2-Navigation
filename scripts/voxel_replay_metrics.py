@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared metrics for async V2 replay validation."""
+"""Shared metrics for A1 Algorithm replay validation."""
 import json
 from pathlib import Path
 

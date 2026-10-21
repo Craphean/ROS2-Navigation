@@ -158,7 +158,7 @@ class Lidar360Tests(unittest.TestCase):
         self.assertEqual(covered, coverage.actionable)
 
     def test_new_entry_retains_completion_driven_defaults(self):
-        args = parse_args([], defaults={"scan_hz": 10., "config": ROOT/"config/voxel360_planner_params.yaml"})
+        args = parse_args([], defaults={"scan_hz": 10., "config": ROOT/"config/voxel360_strong_baseline_params.yaml"})
         self.assertEqual(args.duration, 0.)
         self.assertIsNone(args.max_events)
         self.assertEqual(args.scan_hz, 10.)
