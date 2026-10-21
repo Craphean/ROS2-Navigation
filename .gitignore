@@ -7,3 +7,17 @@ log/
 __pycache__/
 *.pyc
 *.pcd
+
+# Replay inputs are published once in replay_data.zip (see docs/voxel360_exploration.md).
+maps/**/frames/
+maps/**/observed_points.bin
+maps/**/final_voxels.npz
+maps/**/source_snapshot.tar.gz
+maps/**/render_source_snapshot.tar.gz
+# Redundant previews and live-run controls; MP4, initial/final PNG and metrics are retained.
+maps/**/exploration.gif
+maps/**/latest.png
+maps/**/replanning.png
+maps/**/control.json
+maps/**/exit_code
+maps/**/run_status.json

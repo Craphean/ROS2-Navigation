@@ -1,0 +1,84 @@
+{
+  "initial_snapshot": {
+    "total_seconds": 3.5269716379989404,
+    "stage_timings_inclusive": {
+      "unknown_components_and_support": {
+        "seconds": 0.27264507600921206,
+        "calls": 1
+      },
+      "ground_distances_nested": {
+        "seconds": 0.11823271903267596,
+        "calls": 26
+      },
+      "dense_360_raycast_and_nearest_ownership": {
+        "seconds": 2.3680477509915363,
+        "calls": 1
+      },
+      "all_candidate_evaluation_including_audit": {
+        "seconds": 2.9037844609993044,
+        "calls": 1
+      },
+      "frontier_batch_selection": {
+        "seconds": 0.1116283029987244,
+        "calls": 1
+      },
+      "joint_route_solver": {
+        "seconds": 0.10530226099945139,
+        "calls": 1
+      }
+    },
+    "counts": {
+      "tested_candidate_positions": 2203
+    },
+    "unknown": 3456065,
+    "selected_views": 8,
+    "available_candidates": 313,
+    "actionable": 1022,
+    "deferred": 3450079,
+    "excluded": 0,
+    "ground_distance_cache": "shared within this process, cold at first case"
+  },
+  "final_snapshot": {
+    "total_seconds": 46.417614670004696,
+    "stage_timings_inclusive": {
+      "unknown_components_and_support": {
+        "seconds": 0.1020939789887052,
+        "calls": 1
+      },
+      "ground_distances_nested": {
+        "seconds": 0.035764631000347435,
+        "calls": 6
+      },
+      "dense_360_raycast_and_nearest_ownership": {
+        "seconds": 20.077717780004605,
+        "calls": 1
+      },
+      "optimistic_visibility_audit": {
+        "seconds": 25.003635300774476,
+        "calls": 2201
+      },
+      "all_candidate_evaluation_including_audit": {
+        "seconds": 46.31216118299926,
+        "calls": 1
+      },
+      "frontier_batch_selection": {
+        "seconds": 1.085101393982768e-05,
+        "calls": 1
+      },
+      "joint_route_solver": {
+        "seconds": 1.3299999409355223e-05,
+        "calls": 1
+      }
+    },
+    "counts": {
+      "tested_candidate_positions": 2201
+    },
+    "unknown": 130486,
+    "selected_views": 0,
+    "available_candidates": 0,
+    "actionable": 0,
+    "deferred": 1890,
+    "excluded": 128596,
+    "ground_distance_cache": "shared within this process, cold at first case"
+  }
+}

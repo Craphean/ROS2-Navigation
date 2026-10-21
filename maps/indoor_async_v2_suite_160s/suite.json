@@ -1,0 +1,510 @@
+{
+  "algorithm": "async_v2 + retained detail fill + idle search",
+  "base_config": "config/voxel360_async_v2_params.yaml",
+  "cases": [
+    {
+      "id": "classroom__front_split",
+      "layout": "classroom",
+      "spawn": "front_split",
+      "starts": [
+        [
+          -6.5,
+          4.8,
+          0.0
+        ],
+        [
+          6.5,
+          4.8,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/classroom.sdf",
+      "config": "config/indoor_suite/classroom__front_split.yaml",
+      "preview": "config/indoor_suite/classroom__front_split.png",
+      "collision_boxes": 103,
+      "world_sha256": "08f47886546f7256753701e843a67a7ac0b5088e9ec7ca96491f68225cf1ec4f",
+      "ground_sha256": "5445120fa8d8e8960133311cbbb70d7b8f6df77a8ce41904c048517c1bb172e9",
+      "safe_cells": 55394,
+      "reachable_safe_cells": 55394,
+      "spawn_distance_m": 13.201040764008617,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "classroom__rear_together",
+      "layout": "classroom",
+      "spawn": "rear_together",
+      "starts": [
+        [
+          5.5,
+          -5.3,
+          1.5707963267948966
+        ],
+        [
+          6.8,
+          -5.3,
+          1.5707963267948966
+        ]
+      ],
+      "world": "worlds/indoor_suite/classroom.sdf",
+      "config": "config/indoor_suite/classroom__rear_together.yaml",
+      "preview": "config/indoor_suite/classroom__rear_together.png",
+      "collision_boxes": 103,
+      "world_sha256": "08f47886546f7256753701e843a67a7ac0b5088e9ec7ca96491f68225cf1ec4f",
+      "ground_sha256": "5445120fa8d8e8960133311cbbb70d7b8f6df77a8ce41904c048517c1bb172e9",
+      "safe_cells": 55394,
+      "reachable_safe_cells": 55394,
+      "spawn_distance_m": 1.3353553390593278,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "classroom__diagonal",
+      "layout": "classroom",
+      "spawn": "diagonal",
+      "starts": [
+        [
+          -6.5,
+          -3.5,
+          0.0
+        ],
+        [
+          6.5,
+          3.5,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/classroom.sdf",
+      "config": "config/indoor_suite/classroom__diagonal.yaml",
+      "preview": "config/indoor_suite/classroom__diagonal.png",
+      "collision_boxes": 103,
+      "world_sha256": "08f47886546f7256753701e843a67a7ac0b5088e9ec7ca96491f68225cf1ec4f",
+      "ground_sha256": "5445120fa8d8e8960133311cbbb70d7b8f6df77a8ce41904c048517c1bb172e9",
+      "safe_cells": 55394,
+      "reachable_safe_cells": 55394,
+      "spawn_distance_m": 16.181296885077714,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "office__front_split",
+      "layout": "office",
+      "spawn": "front_split",
+      "starts": [
+        [
+          -6.5,
+          4.8,
+          0.0
+        ],
+        [
+          6.5,
+          4.8,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/office.sdf",
+      "config": "config/indoor_suite/office__front_split.yaml",
+      "preview": "config/indoor_suite/office__front_split.png",
+      "collision_boxes": 65,
+      "world_sha256": "2928080ae581b4a62debdc6344df31bb2639a4468acdc6ca0f23a45c1cd34669",
+      "ground_sha256": "d157855a31f683ff050a74af361f5f6ca07465c5a22ba3530a9fda3ba1c6be9f",
+      "safe_cells": 57980,
+      "reachable_safe_cells": 57980,
+      "spawn_distance_m": 13.03535533905938,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "office__rear_together",
+      "layout": "office",
+      "spawn": "rear_together",
+      "starts": [
+        [
+          5.5,
+          -5.3,
+          1.5707963267948966
+        ],
+        [
+          6.8,
+          -5.3,
+          1.5707963267948966
+        ]
+      ],
+      "world": "worlds/indoor_suite/office.sdf",
+      "config": "config/indoor_suite/office__rear_together.yaml",
+      "preview": "config/indoor_suite/office__rear_together.png",
+      "collision_boxes": 65,
+      "world_sha256": "2928080ae581b4a62debdc6344df31bb2639a4468acdc6ca0f23a45c1cd34669",
+      "ground_sha256": "d157855a31f683ff050a74af361f5f6ca07465c5a22ba3530a9fda3ba1c6be9f",
+      "safe_cells": 57980,
+      "reachable_safe_cells": 57980,
+      "spawn_distance_m": 1.3353553390593278,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "office__diagonal",
+      "layout": "office",
+      "spawn": "diagonal",
+      "starts": [
+        [
+          -6.5,
+          -3.5,
+          0.0
+        ],
+        [
+          6.5,
+          3.5,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/office.sdf",
+      "config": "config/indoor_suite/office__diagonal.yaml",
+      "preview": "config/indoor_suite/office__diagonal.png",
+      "collision_boxes": 65,
+      "world_sha256": "2928080ae581b4a62debdc6344df31bb2639a4468acdc6ca0f23a45c1cd34669",
+      "ground_sha256": "d157855a31f683ff050a74af361f5f6ca07465c5a22ba3530a9fda3ba1c6be9f",
+      "safe_cells": 57980,
+      "reachable_safe_cells": 57980,
+      "spawn_distance_m": 16.491347391416586,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "meeting__front_split",
+      "layout": "meeting",
+      "spawn": "front_split",
+      "starts": [
+        [
+          -6.5,
+          4.8,
+          0.0
+        ],
+        [
+          6.5,
+          4.8,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/meeting.sdf",
+      "config": "config/indoor_suite/meeting__front_split.yaml",
+      "preview": "config/indoor_suite/meeting__front_split.png",
+      "collision_boxes": 32,
+      "world_sha256": "fdccf399287f096884dd7b8f5b4ac4a06988447b175d9540d8e60782db17b5d0",
+      "ground_sha256": "fe60e2b5a57266d2eed21eac89186f7f83db8c3df7f7fd01c23d7b597dc6b25b",
+      "safe_cells": 62278,
+      "reachable_safe_cells": 62278,
+      "spawn_distance_m": 13.03535533905938,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "meeting__rear_together",
+      "layout": "meeting",
+      "spawn": "rear_together",
+      "starts": [
+        [
+          5.5,
+          -5.3,
+          1.5707963267948966
+        ],
+        [
+          6.8,
+          -5.3,
+          1.5707963267948966
+        ]
+      ],
+      "world": "worlds/indoor_suite/meeting.sdf",
+      "config": "config/indoor_suite/meeting__rear_together.yaml",
+      "preview": "config/indoor_suite/meeting__rear_together.png",
+      "collision_boxes": 32,
+      "world_sha256": "fdccf399287f096884dd7b8f5b4ac4a06988447b175d9540d8e60782db17b5d0",
+      "ground_sha256": "fe60e2b5a57266d2eed21eac89186f7f83db8c3df7f7fd01c23d7b597dc6b25b",
+      "safe_cells": 62278,
+      "reachable_safe_cells": 62278,
+      "spawn_distance_m": 1.3353553390593278,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "meeting__diagonal",
+      "layout": "meeting",
+      "spawn": "diagonal",
+      "starts": [
+        [
+          -6.5,
+          -3.5,
+          0.0
+        ],
+        [
+          6.5,
+          3.5,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/meeting.sdf",
+      "config": "config/indoor_suite/meeting__diagonal.yaml",
+      "preview": "config/indoor_suite/meeting__diagonal.png",
+      "collision_boxes": 32,
+      "world_sha256": "fdccf399287f096884dd7b8f5b4ac4a06988447b175d9540d8e60782db17b5d0",
+      "ground_sha256": "fe60e2b5a57266d2eed21eac89186f7f83db8c3df7f7fd01c23d7b597dc6b25b",
+      "safe_cells": 62278,
+      "reachable_safe_cells": 62278,
+      "spawn_distance_m": 15.934850275670986,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "library__front_split",
+      "layout": "library",
+      "spawn": "front_split",
+      "starts": [
+        [
+          -6.5,
+          4.8,
+          0.0
+        ],
+        [
+          6.5,
+          4.8,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/library.sdf",
+      "config": "config/indoor_suite/library__front_split.yaml",
+      "preview": "config/indoor_suite/library__front_split.png",
+      "collision_boxes": 25,
+      "world_sha256": "be7806353fb0b16df81b5c06356ab5958a2acea75169a65c32ccfa7891590528",
+      "ground_sha256": "74ed7db8a887e5fd97758ba05a77fde489bca47f37d9112a0a4c0666c9404c8f",
+      "safe_cells": 58088,
+      "reachable_safe_cells": 58088,
+      "spawn_distance_m": 13.03535533905938,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "library__rear_together",
+      "layout": "library",
+      "spawn": "rear_together",
+      "starts": [
+        [
+          5.5,
+          -5.3,
+          1.5707963267948966
+        ],
+        [
+          6.8,
+          -5.3,
+          1.5707963267948966
+        ]
+      ],
+      "world": "worlds/indoor_suite/library.sdf",
+      "config": "config/indoor_suite/library__rear_together.yaml",
+      "preview": "config/indoor_suite/library__rear_together.png",
+      "collision_boxes": 25,
+      "world_sha256": "be7806353fb0b16df81b5c06356ab5958a2acea75169a65c32ccfa7891590528",
+      "ground_sha256": "74ed7db8a887e5fd97758ba05a77fde489bca47f37d9112a0a4c0666c9404c8f",
+      "safe_cells": 58088,
+      "reachable_safe_cells": 58088,
+      "spawn_distance_m": 1.3353553390593278,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "library__diagonal",
+      "layout": "library",
+      "spawn": "diagonal",
+      "starts": [
+        [
+          -6.5,
+          -3.5,
+          0.0
+        ],
+        [
+          6.5,
+          3.5,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/library.sdf",
+      "config": "config/indoor_suite/library__diagonal.yaml",
+      "preview": "config/indoor_suite/library__diagonal.png",
+      "collision_boxes": 25,
+      "world_sha256": "be7806353fb0b16df81b5c06356ab5958a2acea75169a65c32ccfa7891590528",
+      "ground_sha256": "74ed7db8a887e5fd97758ba05a77fde489bca47f37d9112a0a4c0666c9404c8f",
+      "safe_cells": 58088,
+      "reachable_safe_cells": 58088,
+      "spawn_distance_m": 17.02479976933218,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "laboratory__front_split",
+      "layout": "laboratory",
+      "spawn": "front_split",
+      "starts": [
+        [
+          -6.5,
+          4.8,
+          0.0
+        ],
+        [
+          6.5,
+          4.8,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/laboratory.sdf",
+      "config": "config/indoor_suite/laboratory__front_split.yaml",
+      "preview": "config/indoor_suite/laboratory__front_split.png",
+      "collision_boxes": 20,
+      "world_sha256": "b4c65898e1d29a8c39230245f833ef49448c0d37493a97e697ec3375db7a9649",
+      "ground_sha256": "a27d61c2499196bfee848ff9b933354e8a7a02589e074c9a64d7e16f91e484b4",
+      "safe_cells": 57640,
+      "reachable_safe_cells": 57640,
+      "spawn_distance_m": 13.283883476483235,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "laboratory__rear_together",
+      "layout": "laboratory",
+      "spawn": "rear_together",
+      "starts": [
+        [
+          5.5,
+          -5.3,
+          1.5707963267948966
+        ],
+        [
+          6.8,
+          -5.3,
+          1.5707963267948966
+        ]
+      ],
+      "world": "worlds/indoor_suite/laboratory.sdf",
+      "config": "config/indoor_suite/laboratory__rear_together.yaml",
+      "preview": "config/indoor_suite/laboratory__rear_together.png",
+      "collision_boxes": 20,
+      "world_sha256": "b4c65898e1d29a8c39230245f833ef49448c0d37493a97e697ec3375db7a9649",
+      "ground_sha256": "a27d61c2499196bfee848ff9b933354e8a7a02589e074c9a64d7e16f91e484b4",
+      "safe_cells": 57640,
+      "reachable_safe_cells": 57640,
+      "spawn_distance_m": 1.3353553390593278,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "laboratory__diagonal",
+      "layout": "laboratory",
+      "spawn": "diagonal",
+      "starts": [
+        [
+          -6.5,
+          -3.5,
+          0.0
+        ],
+        [
+          6.5,
+          3.5,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/laboratory.sdf",
+      "config": "config/indoor_suite/laboratory__diagonal.yaml",
+      "preview": "config/indoor_suite/laboratory__diagonal.png",
+      "collision_boxes": 20,
+      "world_sha256": "b4c65898e1d29a8c39230245f833ef49448c0d37493a97e697ec3375db7a9649",
+      "ground_sha256": "a27d61c2499196bfee848ff9b933354e8a7a02589e074c9a64d7e16f91e484b4",
+      "safe_cells": 57640,
+      "reachable_safe_cells": 57640,
+      "spawn_distance_m": 15.93485027567101,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "multiroom__front_split",
+      "layout": "multiroom",
+      "spawn": "front_split",
+      "starts": [
+        [
+          -6.5,
+          4.8,
+          0.0
+        ],
+        [
+          6.5,
+          4.8,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/multiroom.sdf",
+      "config": "config/indoor_suite/multiroom__front_split.yaml",
+      "preview": "config/indoor_suite/multiroom__front_split.png",
+      "collision_boxes": 43,
+      "world_sha256": "bd623326cead0c0b6e32710adcabd0026f03b23a2d47b97c732450cb29c2808a",
+      "ground_sha256": "6e80aad095db178e3c2343d803d854a2641da1db7b716b44ca9f51c43d72366a",
+      "safe_cells": 54760,
+      "reachable_safe_cells": 54760,
+      "spawn_distance_m": 17.391347391416602,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "multiroom__rear_together",
+      "layout": "multiroom",
+      "spawn": "rear_together",
+      "starts": [
+        [
+          5.5,
+          -5.3,
+          1.5707963267948966
+        ],
+        [
+          6.8,
+          -5.3,
+          1.5707963267948966
+        ]
+      ],
+      "world": "worlds/indoor_suite/multiroom.sdf",
+      "config": "config/indoor_suite/multiroom__rear_together.yaml",
+      "preview": "config/indoor_suite/multiroom__rear_together.png",
+      "collision_boxes": 43,
+      "world_sha256": "bd623326cead0c0b6e32710adcabd0026f03b23a2d47b97c732450cb29c2808a",
+      "ground_sha256": "6e80aad095db178e3c2343d803d854a2641da1db7b716b44ca9f51c43d72366a",
+      "safe_cells": 54760,
+      "reachable_safe_cells": 54760,
+      "spawn_distance_m": 1.3353553390593278,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    },
+    {
+      "id": "multiroom__diagonal",
+      "layout": "multiroom",
+      "spawn": "diagonal",
+      "starts": [
+        [
+          -6.5,
+          -3.5,
+          0.0
+        ],
+        [
+          6.5,
+          3.5,
+          3.141592653589793
+        ]
+      ],
+      "world": "worlds/indoor_suite/multiroom.sdf",
+      "config": "config/indoor_suite/multiroom__diagonal.yaml",
+      "preview": "config/indoor_suite/multiroom__diagonal.png",
+      "collision_boxes": 43,
+      "world_sha256": "bd623326cead0c0b6e32710adcabd0026f03b23a2d47b97c732450cb29c2808a",
+      "ground_sha256": "6e80aad095db178e3c2343d803d854a2641da1db7b716b44ca9f51c43d72366a",
+      "safe_cells": 54760,
+      "reachable_safe_cells": 54760,
+      "spawn_distance_m": 15.934850275670989,
+      "voxel_count": 4300800,
+      "spawn_validated": true
+    }
+  ]
+}

@@ -85,6 +85,7 @@ source install/setup.bash
 - `empty`（无限开阔平地）
 - `hospital`（**全新新增**：医院病房与走廊医疗综合区，含普通双人病房、ICU急救室、分诊护士站、医生诊断室及贯通走廊，配有病床、医疗不锈钢柜等高精度 Fuel 官方模型，100% 水平平整地面）
 - `house`（**全新新增**：室内家庭生活环境，三室两厅套房户型，包含客厅、主卧、独立书房、餐厅与玄关，配有沙发茶几、大床衣柜、办公桌椅与书架等 Fuel 模型，通道规整，极度适合小车穿梭）
+- `classroom`（**全新新增**：中等复杂度教室场景，16m x 12m，包含讲台、白板、3x4 学生课桌与座椅、两侧高柜和阅读桌。桌面高于 2D 激光扫描面，适合验证 3D 点云对悬空障碍的可见性建模）
 - `warehouse`（TurtleBot4 默认，大型立体物流仓储）
 - `depot`（工业厂房与物流中转站世界）
 
@@ -185,6 +186,51 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 探索与地图合并包来自 [m-explore-ros2](https://github.com/robo-friends/m-explore-ros2)，放在 `src/m-explore-ros2`。
 
+## 360° 雷达双车体素探索：强基线与异步 V2
+
+本分支保留两套算法：**全候选强基线**和**最新版异步 V2（包含 R2 空闲任务补充修复）**。
+两者共享 5 cm 体素、5 m 有效探测距离、64×1024 / 10 Hz 全周雷达、前沿优先、孤立未知簇过滤和双车最大完成时间优化。
+
+| 算法 | 离线入口 | 参数 | 重规划期间 |
+| --- | --- | --- | --- |
+| 强基线 | `scripts/demo_voxel360_exploration.py` | `config/voxel360_planner_params.yaml` | 任一车到达后双车扫描、全候选求解；离线视频不计计算耗时 |
+| 异步 V2 | `scripts/demo_voxel360_async_v2.py` | `config/voxel360_async_v2_params.yaml` | 继续旧路线，实测计算耗时计入仿真；预测接入位置并校验新路线 |
+
+```bash
+source /opt/ros/lyrical/setup.bash
+# 默认运行到保留的可观测未知体素清空并通过稳定性检查
+python3 scripts/demo_voxel360_exploration.py
+python3 scripts/demo_voxel360_async_v2.py
+
+# 160 秒回归上限；达到上限会记为未完成
+python3 scripts/demo_voxel360_async_v2.py --duration 160 --simulation-rate 0 \
+  --output-dir maps/async_v2_new_run
+
+# 6 类室内布局 × 3 组出生点，结果另存
+python3 scripts/benchmark_indoor_suite.py --duration 160 --jobs 3 \
+  --output maps/indoor_async_v2_new_run
+
+# Gazebo / Nav2：强基线；替换 VOXEL_PARAMS 可切到异步 V2
+EXPLORATION_MODE=voxel360 WORLD=classroom USE_RVIZ=True \
+  ./scripts/tb3_multi_explore_slam.sh
+EXPLORATION_MODE=voxel360 WORLD=classroom USE_RVIZ=True \
+  VOXEL_PARAMS="$PWD/config/voxel360_async_v2_params.yaml" \
+  ./scripts/tb3_multi_explore_slam.sh
+```
+
+可视化包含当时观测得到的 2D 图、3D 点云、小车位置与规划路线；点云只记录点坐标和首次观测时间。
+
+| 保存的结果 | 视频 / 报告 | 最终画面 |
+| --- | --- | --- |
+| 强基线 160 秒 | [MP4](maps/classroom_voxel360_frontier_160s/exploration.mp4) | [PNG](maps/classroom_voxel360_frontier_160s/final.png) |
+| 强基线 1500 秒 | [MP4](maps/classroom_voxel360_frontier_1500s_rerun/exploration.mp4) | [PNG](maps/classroom_voxel360_frontier_1500s_rerun/final.png) |
+| 异步 V2 修复后 160 秒 | [MP4](maps/classroom_voxel360_async_v2_r2fix_160s/exploration.mp4) | [PNG](maps/classroom_voxel360_async_v2_r2fix_160s/final.png) |
+| 异步 V2：18 组室内测试 | [本地 HTML 视频索引](maps/indoor_async_v2_suite_160s/index.html) · [汇总 CSV](maps/indoor_async_v2_suite_160s/summary.csv) | [布局总览](maps/indoor_async_v2_suite_160s/overview.png) |
+
+18 组测试均通过归档核验；每组平均规划耗时 0.445–0.562 秒，P95 为 0.541–0.847 秒。
+全部在 160 秒测试上限结束，**尚未完成探索**。这些是有二维通行先验的离线回放，尚不等同于真车验证，双车轨迹避碰也尚未实现。
+实现、停止条件、数据解包与复现方法见 [算法说明](docs/voxel360_exploration.md)。
+
 ## 双机 3D 点云建图（无头）
 
 在原有 2D SLAM / frontier / Nav2 之上，双车链路额外增加一条并行的 3D 建图层：
@@ -194,7 +240,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 - `scripts/merge_pointclouds.py` 用 TF 把两车点云从 `robotX/base_scan` 变换到 `world`，体素降采样后发布 `/points_merged`
 - `octomap_server` 订阅 `/points_merged`，输出 `/octomap_binary`、`/octomap_full`、`/octomap_point_cloud_centers` 和 `/projected_map`
 
-2D SLAM、`/robotX/scan`、frontier 探索和 Nav2 规划逻辑都不变；3D 图只用于展示和存档，不参与后续导航。
+2D SLAM、`/robotX/scan` 和 Nav2 的底层导航逻辑不变。默认 `auction` 模式下 3D 图只用于展示和存档；`voxel360` 模式下 3D 点云参与体素更新、候选位置可见性判断和高层任务规划。
 
 ```bash
 # 默认无头：不启动 Gazebo GUI，也不启动 RViz
@@ -259,7 +305,7 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 
 1. [x] **共享合并地图 + 竞拍协商机制（已完成）**：实现 `scripts/multi_robot_coordinator.py`，统一订阅全局合并大地图 `/map`，基于边际效益（前沿增益减去距离/航向代价）进行多车竞拍协商调度，并通过 TF / 初始位姿矩阵逆变换下发 Nav2 导航目标，消除重复探索与航向冲突。详细配置见 `config/coordinator_params.yaml`。
 
-2. [x] **仿真 3D 点云建图（部分完成）**：TurtleBot3 实物使用单线激光雷达（LDS-01/02）。本次只在 **Gazebo 双机仿真**中增加 16 线 / 3 Hz 3D 雷达，沿用现有 `slam_toolbox` 的 2D 位姿，把两车点云合并后送入 `octomap_server`；桌/床等悬空物通过 Nav2 `PointCloud2` 观测源投影进 2D 代价地图。3D 图仅用于展示和存档，不用于后续导航；实车传感器升级、标定和 3D 重定位仍未实现。设计与验收流程见 `docs/3d_mapping_plan.md` 和 README 的“双机 3D 点云建图（无头）”章节。
+2. [x] **仿真 3D 点云建图（部分完成）**：TurtleBot3 实物使用单线激光雷达（LDS-01/02）。本次只在 **Gazebo 双机仿真**中增加 16 线 / 3 Hz 3D 雷达，沿用现有 `slam_toolbox` 的 2D 位姿，把两车点云合并后送入 `octomap_server`；桌/床等悬空物通过 Nav2 `PointCloud2` 观测源投影进 2D 代价地图。默认 `auction` 模式下 3D 图仅用于展示和存档；`voxel360` 模式已把 3D 点云用于观测任务规划。实车传感器升级、标定和 3D 重定位仍未实现。设计与验收流程见 `docs/3d_mapping_plan.md`、`docs/voxel360_exploration.md` 和 README 的“双机 3D 点云建图（无头）”章节。
 
 3. 现在使用的 TurtleBot3 Waffle 车头正前方安装了一颗 Intel RealSense 深度摄像头，但在 Nav2 官方的精简仿真包（nav2_minimal_tb3_sim）中，为了极大降低对 CPU/GPU 的算力消耗（特别是虚拟机环境），默认只启动了激光雷达和里程计的桥接，摄像头的图像渲染插件默认被精简关闭了。
 目标：在拥有独立显卡直通的高性能主机上开启摄像头的视频流展示

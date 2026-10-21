@@ -63,9 +63,22 @@ class PointCloudMerger(Node):
             self.declare_parameter("publish_rate", 3.0).value
         )
         self.min_z = float(self.declare_parameter("min_z", 0.05).value)
+        self.accumulate = bool(self.declare_parameter("accumulate", True).value)
+        self.accumulated_topic = str(
+            self.declare_parameter("accumulated_topic", "/map_cloud").value
+        )
+        self.accumulated_rate = float(
+            self.declare_parameter("accumulated_rate", 1.0).value
+        )
+        self.accumulated_voxel_size = float(
+            self.declare_parameter("accumulated_voxel_size", 0.05).value
+        )
+        self.max_accumulated_points = int(
+            self.declare_parameter("max_accumulated_points", 250000).value
+        )
         self.max_z = float(self.declare_parameter("max_z", 2.0).value)
         self.min_range = float(self.declare_parameter("min_range", 0.1).value)
-        self.max_range = float(self.declare_parameter("max_range", 12.0).value)
+        self.max_range = float(self.declare_parameter("max_range", 5.0).value)
         self.tf_timeout = float(self.declare_parameter("tf_timeout", 0.1).value)
 
         # Vehicle self-reflection box filter in sensor frame (base_scan)
@@ -99,6 +112,7 @@ class PointCloudMerger(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.latest = {robot: None for robot in self.robots}
+        self.accumulated = {}
         self.cloud_subscriptions = []
         for robot in self.robots:
             topic = f"/{robot}/points"
@@ -113,6 +127,16 @@ class PointCloudMerger(Node):
             self.get_logger().info(f"Subscribing to {topic}")
 
         self.publisher = self.create_publisher(PointCloud2, "/points_merged", 5)
+        self.accumulated_publisher = None
+        self.accumulated_timer = None
+        if self.accumulate:
+            self.accumulated_publisher = self.create_publisher(
+                PointCloud2, self.accumulated_topic, 2
+            )
+            self.accumulated_timer = self.create_timer(
+                1.0 / max(0.1, self.accumulated_rate),
+                self.publish_accumulated,
+            )
         self.timer = self.create_timer(1.0 / self.publish_rate, self.publish_merged)
 
         self.get_logger().info(
@@ -120,7 +144,7 @@ class PointCloudMerger(Node):
             f"voxel={self.voxel_size:.3f} m, rate={self.publish_rate:.1f} Hz, "
             f"box_filter=[x: ({self.footprint_x_min}, {self.footprint_x_max}), "
             f"y: ({self.footprint_y_min}, {self.footprint_y_max}), "
-            f"z<={self.footprint_z_max}]"
+            f"z<={self.footprint_z_max}], accumulate={self.accumulate}"
         )
 
     def cloud_callback(self, robot: str, msg: PointCloud2) -> None:
@@ -154,7 +178,7 @@ class PointCloudMerger(Node):
         points = np.asarray(points, dtype=np.float64).reshape(-1, 3)
 
         # Range/crop in the sensor frame before the transform.
-        ranges = np.linalg.norm(points[:, :2], axis=1)
+        ranges = np.linalg.norm(points, axis=1)
 
         # Reject self-reflections on robot's own chassis / camera / wheels
         is_self_body = (
@@ -168,7 +192,7 @@ class PointCloudMerger(Node):
         valid = (
             np.isfinite(points).all(axis=1)
             & (ranges >= self.min_range)
-            & (ranges <= self.max_range)
+            & (ranges < self.max_range - 1e-4)  # Finite max-range samples are misses.
             & (~is_self_body)
         )
         points = points[valid]
@@ -243,6 +267,15 @@ class PointCloudMerger(Node):
         if points.size == 0:
             return
 
+        if self.accumulate:
+            keys = np.floor(points / self.accumulated_voxel_size).astype(np.int64)
+            for key, point in zip(keys, points):
+                self.accumulated[(int(key[0]), int(key[1]), int(key[2]))] = point
+            if len(self.accumulated) > self.max_accumulated_points:
+                # Keep memory bounded; this only affects very large scenes.
+                items = list(self.accumulated.items())[-self.max_accumulated_points :]
+                self.accumulated = dict(items)
+
         header = Header()
         header.stamp = self.get_clock().now().to_msg()
         header.frame_id = self.world_frame
@@ -251,6 +284,25 @@ class PointCloudMerger(Node):
 
         self.get_logger().debug(
             f"Published {len(points)} points in {self.world_frame}"
+        )
+
+
+    def publish_accumulated(self) -> None:
+        if not self.accumulate or self.accumulated_publisher is None:
+            return
+        if not self.accumulated:
+            return
+        points = np.asarray(
+            list(self.accumulated.values()), dtype=np.float64
+        ).reshape(-1, 3)
+        header = Header()
+        header.stamp = self.get_clock().now().to_msg()
+        header.frame_id = self.world_frame
+        cloud = point_cloud2.create_cloud_xyz32(header, points)
+        self.accumulated_publisher.publish(cloud)
+        self.get_logger().debug(
+            f"Published {len(points)} accumulated points on "
+            f"{self.accumulated_topic}"
         )
 
 

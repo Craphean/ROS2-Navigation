@@ -1,0 +1,10 @@
+{
+  "mp4_decodes": true,
+  "video_frames": 15000,
+  "video_fps": 10.0,
+  "video_seconds": 1500.0,
+  "simulated_seconds": 1500.0,
+  "point_storage_bytes": 1804260,
+  "final_unknown": 130486,
+  "planning_time_model": "instantaneous"
+}

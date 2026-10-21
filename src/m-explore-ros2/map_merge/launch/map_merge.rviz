@@ -277,6 +277,171 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /robot2/plan
       Value: false
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Rolling Observation Markers
+      Namespaces: {}
+      Topic:
+        Depth: 10
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /observation/markers
+      Value: true
+    - Alpha: 0.8
+      Class: rviz_default_plugins/PointCloud2
+      Color Transformer: RGB8
+      Enabled: true
+      Name: Fine Exploration Voxels (5 cm)
+      Position Transformer: XYZ
+      Queue Size: 1
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.05
+      Style: Boxes
+      Topic:
+        Depth: 1
+        Durability Policy: Volatile
+        Filter size: 1
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /observation/voxels
+      Value: true
+    - Alpha: 0.75
+      Class: rviz_default_plugins/PointCloud2
+      Color Transformer: FlatColor
+      Color: 255; 255; 180
+      Enabled: true
+      Name: Merged 3D Cloud
+      Point Size: 0.02
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.02
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /points_merged
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 255; 60; 60
+      Enabled: true
+      Head Diameter: 0.1
+      Head Length: 0.15
+      Length: 0.3
+      Line Style: Lines
+      Line Width: 0.08
+      Name: Robot1 Rolling Route (World)
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 60; 60
+      Pose Style: None
+      Radius: 0.03
+      Shaft Diameter: 0.05
+      Shaft Length: 0.1
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot1/route_world
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 0; 180; 255
+      Enabled: true
+      Head Diameter: 0.1
+      Head Length: 0.15
+      Length: 0.3
+      Line Style: Lines
+      Line Width: 0.08
+      Name: Robot2 Rolling Route (World)
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 0; 180; 255
+      Pose Style: None
+      Radius: 0.03
+      Shaft Diameter: 0.05
+      Shaft Length: 0.1
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot2/route_world
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Pose
+      Color: 255; 60; 60
+      Enabled: true
+      Head Length: 0.25
+      Head Radius: 0.08
+      Name: Robot1 Observation Goal (World)
+      Shaft Length: 0.45
+      Shaft Radius: 0.04
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot1/observation_goal_world
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Pose
+      Color: 0; 180; 255
+      Enabled: true
+      Head Length: 0.25
+      Head Radius: 0.08
+      Name: Robot2 Observation Goal (World)
+      Shaft Length: 0.45
+      Shaft Radius: 0.04
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot2/observation_goal_world
+      Value: true
+    - Alpha: 0.9
+      Class: rviz_default_plugins/PointCloud2
+      Color Transformer: FlatColor
+      Color: 255; 220; 120
+      Enabled: true
+      Name: Accumulated 3D Map
+      Point Size: 0.015
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.015
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /map_cloud
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

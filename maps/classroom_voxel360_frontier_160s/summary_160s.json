@@ -1,0 +1,97 @@
+{
+  "simulated_seconds": 160.0,
+  "complete": false,
+  "stop_reason": "user_requested_160s_prefix",
+  "last_original_recorded_seconds": 163.4,
+  "source_directory": "/home/administrator/ROS2-Navigation/maps/classroom_voxel360_frontier_1500s",
+  "sensor_replay_not_gazebo": true,
+  "world": "/home/administrator/ROS2-Navigation/worlds/classroom.sdf.xacro",
+  "voxel_resolution": 0.05,
+  "voxel_count": 4300800,
+  "initial_unknown": 3456065,
+  "final_unknown": 152190,
+  "newly_known_voxels": 3303875,
+  "initial_unknown_resolved_percent": 95.59643698830895,
+  "known_roi_percent": 96.46135602678572,
+  "known_2d_cells": 74021,
+  "total_2d_cells": 76800,
+  "known_2d_percent": 96.38151041666667,
+  "robot_distance_m": [
+    31.812990257669572,
+    25.01887770797417
+  ],
+  "total_distance_m": 56.83186796564374,
+  "robot_poses": [
+    [
+      -6.725,
+      1.3186854249492406,
+      1.5707963267948966
+    ],
+    [
+      3.5469999999999993,
+      -5.475,
+      0.0
+    ]
+  ],
+  "arrival_events": 30,
+  "total_plans_including_initial": 31,
+  "arrival_replans": 30,
+  "last_plan_stamp": 159.9,
+  "last_plan_selection_phase": "detail",
+  "ignored_small_unknown_at_last_plan": 94,
+  "ignored_small_unknown_stamp": 159.9,
+  "classification_fresh": false,
+  "observable_unknown_remaining": null,
+  "observable_unknown_note": "Not audited at cutoff; final_unknown includes all raw unknowns.",
+  "target_policy": "frontier",
+  "replan_policy": "arrival_cycle",
+  "planning_time_model": "instantaneous",
+  "planning_wall_seconds": 484.3518197670055,
+  "planning_mean_seconds": 15.624252250548565,
+  "planning_median_seconds": 17.039552974005346,
+  "planning_max_seconds": 23.898465831000067,
+  "sensor_range": 5.0,
+  "scan_hz": 10.0,
+  "scheduled_scans_per_robot_including_initial": 1601,
+  "observation_model": "lidar360",
+  "lidar_profile": {
+    "name": "os0_64_1024x10",
+    "horizontal_fov_deg": 360.0,
+    "horizontal_samples": 1024,
+    "vertical_samples": 64,
+    "horizontal_step_deg": 0.3515625,
+    "vertical_fov_deg": [
+      -45.0,
+      45.0
+    ],
+    "scan_hz": 10.0,
+    "rays_per_scan": 65536,
+    "rays_per_second": 655360.0,
+    "sensor_offset": [
+      0.0,
+      0.0
+    ],
+    "sensor_height": 0.22,
+    "observation_heading_required": false,
+    "offline_azimuth_phase": "world_fixed",
+    "source": "https://data.ouster.io/downloads/datasheets/datasheet-revd-v2p1-os0.pdf"
+  },
+  "point_format": "xyz_first_seen_v1",
+  "point_record_bytes": 20,
+  "saved_points": 85342,
+  "point_storage_bytes": 1706840,
+  "record_period": 2,
+  "playback_speed": 1,
+  "gif_is_accelerated_preview": true,
+  "recovery": {
+    "sources_hash_verified": true,
+    "progress_source": "Exact original 160.0 s log entry",
+    "point_source": "Original archive filtered by first_seen <= 160.0",
+    "final_pose_and_2d_source": "Replay 159.9 -> 160.0 from newly accepted saved path",
+    "final_3d_occupancy_snapshot_available": false,
+    "original_stop_time_is_not_160": true
+  },
+  "video_seconds": 160.0,
+  "video_frames": 1600,
+  "video_fps": 10.0
+}

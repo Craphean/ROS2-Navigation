@@ -10,10 +10,12 @@
 #   RANDOM_SPAWN=false     (set RANDOM_SPAWN=true to randomly pick 2 non-overlapping inspection stations)
 #
 # 3D point-cloud mapping (headless by default):
-#   - Each robot gets a 16-line / 3 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
+#   - Each robot gets a 24-line / 5 Hz / 5 m 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
 #   - /robotX/points feeds Nav2 costmaps and scripts/merge_pointclouds.py.
 #   - The merged cloud is published as /points_merged in the world frame and fed to
 #     octomap_server (3D map + projected_map + octomap_point_cloud_centers).
+#   - EXPLORATION_MODE=voxel360 uses 64x1024 / 10 Hz full-circle position observations
+#     with the strong baseline or async V2 selected by VOXEL_PARAMS.
 #   - Archive after exploration:
 #       ros2 run octomap_server octomap_saver_node --ros-args \
 #         -p octomap_path:="$PWD/maps/tb3_3d_map.bt" -p full:=true
@@ -85,6 +87,11 @@ USE_RVIZ="${USE_RVIZ:-False}"
 KNOWN_INIT_POSES="${KNOWN_INIT_POSES:-true}"
 EXPLORATION_MODE="${EXPLORATION_MODE:-auction}"
 RANDOM_SPAWN="${RANDOM_SPAWN:-false}"
+DISPATCH_GOALS="${DISPATCH_GOALS:-true}"
+case "${EXPLORATION_MODE,,}" in
+  auction|legacy|voxel360) ;;
+  *) echo "Unsupported EXPLORATION_MODE: ${EXPLORATION_MODE}; use auction, legacy or voxel360." >&2; exit 1 ;;
+esac
 
 # Parse optional command-line arguments
 for arg in "$@"; do
@@ -104,6 +111,9 @@ done
 # If random spawn is requested and WORLD is not explicitly specified, target warehouse
 if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ && -z "${WORLD:-}" ]]; then
   WORLD="warehouse"
+fi
+if [[ "${EXPLORATION_MODE,,}" == "voxel360" && -z "${WORLD:-}" ]]; then
+  WORLD="classroom"
 fi
 
 SIM_SHARE="$(ros2 pkg prefix nav2_minimal_tb3_sim)/share/nav2_minimal_tb3_sim"
@@ -220,6 +230,14 @@ case "${WORLD:-sandbox}" in
       echo "[tb3_multi_explore_slam]   Spawn Distance: ${sep_dist}m"
     fi
     ;;
+  classroom|tb3_classroom|school)
+    WORLD_FILE="${ROOT_DIR}/worlds/classroom.sdf.xacro"
+    DEFAULT_R1_X="-6.50"; DEFAULT_R1_Y="4.80"; DEFAULT_R1_YAW="3.14"
+    DEFAULT_R2_X="6.50";  DEFAULT_R2_Y="4.80"; DEFAULT_R2_YAW="3.14"
+    if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
+      echo "[tb3_multi_explore_slam] Note: Random inspection stations are calibrated for warehouse/hospital/house. Using default poses for classroom."
+    fi
+    ;;
   house|tb3_house|home)
     WORLD_FILE="${ROOT_DIR}/worlds/house.sdf.xacro"
     DEFAULT_R1_X="0.00"; DEFAULT_R1_Y="-0.50"; DEFAULT_R1_YAW="1.57"
@@ -300,7 +318,7 @@ esac
 
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb3_multi_explore_slam] World not found: ${WORLD_FILE}" >&2
-  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house (or full path to .sdf/.sdf.xacro)" >&2
+  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house | classroom (or full path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 
@@ -314,10 +332,29 @@ ROBOT2_Y="${ROBOT2_Y:-${DEFAULT_R2_Y}}"
 ROBOT2_YAW="${ROBOT2_YAW:-${DEFAULT_R2_YAW}}"
 
 PARAMS_FILE="${PARAMS_FILE:-${ROOT_DIR}/config/nav2_multirobot_slam_params.yaml}"
+SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
+LIDAR360_PROFILE="${LIDAR360_PROFILE:-${ROOT_DIR}/config/lidar360_os0.yaml}"
+if [[ "${EXPLORATION_MODE,,}" == "voxel360" ]]; then
+  VOXEL360_ASSETS="$(mktemp -d /tmp/tb3-voxel360.XXXXXX)"
+  python3 "${ROOT_DIR}/scripts/prepare_voxel360_sim.py" \
+    --profile "${LIDAR360_PROFILE}" --nav-params "${PARAMS_FILE}" --output-dir "${VOXEL360_ASSETS}"
+  SDF_XACRO="${VOXEL360_ASSETS}/robot.sdf.xacro"
+  PARAMS_FILE="${VOXEL360_ASSETS}/nav2.yaml"
+  echo "[tb3_multi_explore_slam] 360-degree sensor and position-only Nav2 assets: ${VOXEL360_ASSETS}"
+fi
 EXPLORE_PARAMS="${EXPLORE_PARAMS:-${ROOT_DIR}/config/explore_params.yaml}"
 COORDINATOR_PARAMS="${COORDINATOR_PARAMS:-${ROOT_DIR}/config/coordinator_params.yaml}"
 MAP_MERGE_PARAMS="${MAP_MERGE_PARAMS:-${ROOT_DIR}/src/m-explore-ros2/map_merge/config/params.yaml}"
-RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_merge.rviz}"
+if [[ "${EXPLORATION_MODE,,}" == "voxel360" ]]; then
+  RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/config/voxel_observation.rviz}"
+else
+  RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_merge.rviz}"
+fi
+
+if [[ "${EXPLORATION_MODE,,}" == "voxel360" && -z "${VOXEL_PARAMS:-}" && "${WORLD_FILE}" != "${ROOT_DIR}/worlds/classroom.sdf.xacro" ]]; then
+  echo "Voxel mode requires VOXEL_PARAMS with exploration_bounds for this world (default ROI is classroom)." >&2
+  exit 1
+fi
 
 echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} known_init_poses=${KNOWN_INIT_POSES}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
@@ -333,6 +370,7 @@ OCTOMAP_LOG="/tmp/tb3_multi_octomap.log"
 EXPLORE1_LOG="/tmp/tb3_multi_explore1.log"
 EXPLORE2_LOG="/tmp/tb3_multi_explore2.log"
 COORDINATOR_LOG="/tmp/tb3_multi_coordinator.log"
+VOXEL_LOG="/tmp/tb3_multi_voxel_planner.log"
 
 # 1. Launch Gazebo server + robot1 (Nav2 + slam_toolbox in /robot1)
 setsid bash -c "
@@ -355,7 +393,7 @@ exec ros2 launch nav2_bringup tb3_simulation_launch.py \
   use_speed_zones:=False \
   use_simulator:=True \
   use_rviz:=False \
-  robot_sdf:='${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro' \
+  robot_sdf:='${SDF_XACRO}' \
   headless:='${HEADLESS}' \
   use_composition:='${USE_COMPOSITION}' \
   use_respawn:=True \
@@ -388,7 +426,6 @@ sleep 4
 # preventing duplicate /clock jumps that clear tf2 buffers.
 BRIDGE_NO_CLOCK="${ROOT_DIR}/config/tb3_bridge_no_clock.yaml"
 URDF_FILE="${SIM_SHARE}/urdf/turtlebot3_waffle.urdf"
-SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
 
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
@@ -447,12 +484,25 @@ OCTOMAP_PID=""
 EXP1_PID=""
 EXP2_PID=""
 COORD_PID=""
+VOXEL_PID=""
 RVIZ_PID=""
 RELAY_PID=""
+LIDAR_TF_PIDS=()
+if [[ "${EXPLORATION_MODE,,}" == "voxel360" ]]; then
+  read -r LIDAR_TF_X LIDAR_TF_Y LIDAR_TF_Z < "${VOXEL360_ASSETS}/lidar_tf.xyz"
+  for robot in robot1 robot2; do
+    ros2 run tf2_ros static_transform_publisher \
+      --x "${LIDAR_TF_X}" --y "${LIDAR_TF_Y}" --z "${LIDAR_TF_Z}" \
+      --yaw 0 --pitch 0 --roll 0 --frame-id base_scan --child-frame-id lidar360 \
+      --ros-args -r __ns:="/${robot}" -r /tf:=tf -r /tf_static:=tf_static \
+      >"/tmp/tb3_${robot}_lidar360_tf.log" 2>&1 &
+    LIDAR_TF_PIDS+=("$!")
+  done
+fi
 
 cleanup() {
   echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & 3D mapping..."
-  for pid in "${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${R2_PID}" "${R1_PID}"; do
+  for pid in "${LIDAR_TF_PIDS[@]}" "${RELAY_PID}" "${VOXEL_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${R2_PID}" "${R1_PID}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
     fi
@@ -569,10 +619,42 @@ if [[ "${EXPLORATION_MODE,,}" == "auction" ]]; then
     >"${COORDINATOR_LOG}" 2>&1 &
   COORD_PID=$!
 
+  # The auction coordinator plans in each robot's local map frame.  Relay the
+  # local plans to /world so the same visualization style can show both robots.
+  python3 "${ROOT_DIR}/scripts/multi_robot_plan_relay.py" --ros-args \
+    -p use_sim_time:=true \
+    -p robot_namespaces:="['robot1', 'robot2']" \
+    -p robot1_init_pose:="[${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}]" \
+    -p robot2_init_pose:="[${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW}]" \
+    >/tmp/tb3_multi_plan_relay.log 2>&1 &
+  RELAY_PID=$!
+
   echo "[tb3_multi_explore_slam] Dual-robot auction exploration running!"
   echo "  - Coordinator log:    ${COORDINATOR_LOG}"
   echo "  - Merged map topic:   /map (frame_id: world)"
   echo "  - Markers topic:      /exploration/markers"
+  echo "  - map_merge log:      ${MERGE_LOG}"
+elif [[ "${EXPLORATION_MODE,,}" == "voxel360" ]]; then
+  PLANNER_SCRIPT="${ROOT_DIR}/scripts/voxel_exploration_planner.py"
+  VOXEL_PARAMS="${VOXEL_PARAMS:-${ROOT_DIR}/config/voxel360_planner_params.yaml}"
+  LIDAR_PLANNER_ARGS=(-p "lidar_profile:=${LIDAR360_PROFILE}")
+  echo "[tb3_multi_explore_slam] Starting 360-degree voxel planner ..."
+  python3 "${PLANNER_SCRIPT}" --ros-args \
+    --params-file "${VOXEL_PARAMS}" \
+    "${LIDAR_PLANNER_ARGS[@]}" \
+    -p use_sim_time:=true \
+    -p robot_namespaces:="['robot1', 'robot2']" \
+    -p robot1_init_pose:="[${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}]" \
+    -p robot2_init_pose:="[${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW}]" \
+    -p dispatch_goals:="${DISPATCH_GOALS,,}" \
+    >"${VOXEL_LOG}" 2>&1 &
+  VOXEL_PID=$!
+
+  echo "[tb3_multi_explore_slam] 360-degree dual-robot voxel planning running!"
+  echo "  - Planner log:        ${VOXEL_LOG}"
+  echo "  - Requirements:       /observation/markers"
+  echo "  - Robot routes:       /robot1/route_world, /robot2/route_world"
+  echo "  - Merged map topic:   /map (frame_id: world)"
   echo "  - map_merge log:      ${MERGE_LOG}"
 else
   echo "[tb3_multi_explore_slam] Starting legacy explore_lite for /robot1 and /robot2 ..."

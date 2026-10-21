@@ -1,0 +1,290 @@
+{
+  "planned": 18,
+  "verified": 18,
+  "actual_exploration_completions": 0,
+  "total_simulated_seconds": 2880.0,
+  "by_layout": [
+    {
+      "layout": "classroom",
+      "verified": 3,
+      "unknown_reduction_percent_range": [
+        95.55772605590114,
+        96.1367858886655
+      ],
+      "final_unknown_range": [
+        147223,
+        152270
+      ],
+      "mean_planning_seconds": 0.5523225100032841,
+      "worst_case_p95_seconds": 0.8472633371499966,
+      "max_post_startup_idle_seconds": 0.0,
+      "minimum_sampled_separation_m": 1.2999999999999998
+    },
+    {
+      "layout": "office",
+      "verified": 3,
+      "unknown_reduction_percent_range": [
+        95.67982177898277,
+        96.1598440545809
+      ],
+      "final_unknown_range": [
+        140285,
+        143613
+      ],
+      "mean_planning_seconds": 0.5104593731049096,
+      "worst_case_p95_seconds": 0.6565113723999842,
+      "max_post_startup_idle_seconds": 0.0,
+      "minimum_sampled_separation_m": 1.2999999999999998
+    },
+    {
+      "layout": "meeting",
+      "verified": 3,
+      "unknown_reduction_percent_range": [
+        95.68675237676526,
+        96.55074916165724
+      ],
+      "final_unknown_range": [
+        123888,
+        135780
+      ],
+      "mean_planning_seconds": 0.5395394189666147,
+      "worst_case_p95_seconds": 0.7112686549500153,
+      "max_post_startup_idle_seconds": 0.0,
+      "minimum_sampled_separation_m": 1.2999999999999998
+    },
+    {
+      "layout": "library",
+      "verified": 3,
+      "unknown_reduction_percent_range": [
+        92.67052462436354,
+        93.13331931489512
+      ],
+      "final_unknown_range": [
+        244677,
+        259611
+      ],
+      "mean_planning_seconds": 0.5116833447466377,
+      "worst_case_p95_seconds": 0.6300914950001243,
+      "max_post_startup_idle_seconds": 0.0,
+      "minimum_sampled_separation_m": 1.2999999999999998
+    },
+    {
+      "layout": "laboratory",
+      "verified": 3,
+      "unknown_reduction_percent_range": [
+        94.9153436492852,
+        95.26966372861328
+      ],
+      "final_unknown_range": [
+        164820,
+        177108
+      ],
+      "mean_planning_seconds": 0.47543287484224367,
+      "worst_case_p95_seconds": 0.6346165313997517,
+      "max_post_startup_idle_seconds": 0.0,
+      "minimum_sampled_separation_m": 1.2999999999999998
+    },
+    {
+      "layout": "multiroom",
+      "verified": 3,
+      "unknown_reduction_percent_range": [
+        91.83220494704528,
+        94.39756824681074
+      ],
+      "final_unknown_range": [
+        198243,
+        307418
+      ],
+      "mean_planning_seconds": 0.48383748899687534,
+      "worst_case_p95_seconds": 0.595987839000145,
+      "max_post_startup_idle_seconds": 0.0,
+      "minimum_sampled_separation_m": 1.2999999999999998
+    }
+  ],
+  "motion_attention_cases": [],
+  "progress_milestones": [
+    {
+      "id": "classroom__front_split",
+      "first_recorded_90_percent_reduction_seconds": 88.1563134139,
+      "checkpoint_time": 79.8381315957,
+      "unknown_at_checkpoint": 449992,
+      "reduction_at_checkpoint_percent": 86.97964303333416
+    },
+    {
+      "id": "classroom__rear_together",
+      "first_recorded_90_percent_reduction_seconds": 126.1,
+      "checkpoint_time": 79.6,
+      "unknown_at_checkpoint": 1480874,
+      "reduction_at_checkpoint_percent": 61.292476039023434
+    },
+    {
+      "id": "classroom__diagonal",
+      "first_recorded_90_percent_reduction_seconds": 87.3,
+      "checkpoint_time": 80.3,
+      "unknown_at_checkpoint": 449085,
+      "reduction_at_checkpoint_percent": 86.44940943884016
+    },
+    {
+      "id": "office__front_split",
+      "first_recorded_90_percent_reduction_seconds": 97.4,
+      "checkpoint_time": 80.3,
+      "unknown_at_checkpoint": 676146,
+      "reduction_at_checkpoint_percent": 80.23530113318472
+    },
+    {
+      "id": "office__rear_together",
+      "first_recorded_90_percent_reduction_seconds": 104.4,
+      "checkpoint_time": 79.9,
+      "unknown_at_checkpoint": 1033698,
+      "reduction_at_checkpoint_percent": 72.35931621463352
+    },
+    {
+      "id": "office__diagonal",
+      "first_recorded_90_percent_reduction_seconds": 75.7597223623,
+      "checkpoint_time": 80.3,
+      "unknown_at_checkpoint": 218581,
+      "reduction_at_checkpoint_percent": 93.26863972820925
+    },
+    {
+      "id": "meeting__front_split",
+      "first_recorded_90_percent_reduction_seconds": 93.0,
+      "checkpoint_time": 79.9,
+      "unknown_at_checkpoint": 554525,
+      "reduction_at_checkpoint_percent": 84.06858731370855
+    },
+    {
+      "id": "meeting__rear_together",
+      "first_recorded_90_percent_reduction_seconds": 96.5,
+      "checkpoint_time": 80.5,
+      "unknown_at_checkpoint": 671571,
+      "reduction_at_checkpoint_percent": 81.93319891153314
+    },
+    {
+      "id": "meeting__diagonal",
+      "first_recorded_90_percent_reduction_seconds": 100.2,
+      "checkpoint_time": 79.9,
+      "unknown_at_checkpoint": 697941,
+      "reduction_at_checkpoint_percent": 77.82889704368775
+    },
+    {
+      "id": "library__front_split",
+      "first_recorded_90_percent_reduction_seconds": 117.4627448202,
+      "checkpoint_time": 79.9426739671,
+      "unknown_at_checkpoint": 990901,
+      "reduction_at_checkpoint_percent": 71.8070819946761
+    },
+    {
+      "id": "library__rear_together",
+      "first_recorded_90_percent_reduction_seconds": 119.0,
+      "checkpoint_time": 80.2,
+      "unknown_at_checkpoint": 1278947,
+      "reduction_at_checkpoint_percent": 66.17200094690583
+    },
+    {
+      "id": "library__diagonal",
+      "first_recorded_90_percent_reduction_seconds": 106.9,
+      "checkpoint_time": 79.8,
+      "unknown_at_checkpoint": 732404,
+      "reduction_at_checkpoint_percent": 78.22230257156212
+    },
+    {
+      "id": "laboratory__front_split",
+      "first_recorded_90_percent_reduction_seconds": 106.8,
+      "checkpoint_time": 80.4,
+      "unknown_at_checkpoint": 650298,
+      "reduction_at_checkpoint_percent": 81.10253656291192
+    },
+    {
+      "id": "laboratory__rear_together",
+      "first_recorded_90_percent_reduction_seconds": 122.0,
+      "checkpoint_time": 79.6,
+      "unknown_at_checkpoint": 1033252,
+      "reduction_at_checkpoint_percent": 72.40311328069392
+    },
+    {
+      "id": "laboratory__diagonal",
+      "first_recorded_90_percent_reduction_seconds": 83.3,
+      "checkpoint_time": 80.3,
+      "unknown_at_checkpoint": 359973,
+      "reduction_at_checkpoint_percent": 88.89492172954824
+    },
+    {
+      "id": "multiroom__front_split",
+      "first_recorded_90_percent_reduction_seconds": 83.2,
+      "checkpoint_time": 80.1859086397,
+      "unknown_at_checkpoint": 396110,
+      "reduction_at_checkpoint_percent": 88.80576241402824
+    },
+    {
+      "id": "multiroom__rear_together",
+      "first_recorded_90_percent_reduction_seconds": 148.7,
+      "checkpoint_time": 79.8,
+      "unknown_at_checkpoint": 2172510,
+      "reduction_at_checkpoint_percent": 42.2785379174458
+    },
+    {
+      "id": "multiroom__diagonal",
+      "first_recorded_90_percent_reduction_seconds": 79.9,
+      "checkpoint_time": 79.9,
+      "unknown_at_checkpoint": 344239,
+      "reduction_at_checkpoint_percent": 90.10052494057248
+    }
+  ],
+  "spawn_sensitivity": [
+    {
+      "layout": "classroom",
+      "fastest": "classroom__diagonal",
+      "slowest": "classroom__rear_together",
+      "time_to_90_percent_range": [
+        87.3,
+        126.1
+      ]
+    },
+    {
+      "layout": "office",
+      "fastest": "office__diagonal",
+      "slowest": "office__rear_together",
+      "time_to_90_percent_range": [
+        75.7597223623,
+        104.4
+      ]
+    },
+    {
+      "layout": "meeting",
+      "fastest": "meeting__front_split",
+      "slowest": "meeting__diagonal",
+      "time_to_90_percent_range": [
+        93.0,
+        100.2
+      ]
+    },
+    {
+      "layout": "library",
+      "fastest": "library__diagonal",
+      "slowest": "library__rear_together",
+      "time_to_90_percent_range": [
+        106.9,
+        119.0
+      ]
+    },
+    {
+      "layout": "laboratory",
+      "fastest": "laboratory__diagonal",
+      "slowest": "laboratory__rear_together",
+      "time_to_90_percent_range": [
+        83.3,
+        122.0
+      ]
+    },
+    {
+      "layout": "multiroom",
+      "fastest": "multiroom__diagonal",
+      "slowest": "multiroom__rear_together",
+      "time_to_90_percent_range": [
+        79.9,
+        148.7
+      ]
+    }
+  ],
+  "analysis_source_sha256": "89058732c326c8adfc9ef4ce038acb1ae62f3db685cd2db43b739f7c23ce7fcf"
+}

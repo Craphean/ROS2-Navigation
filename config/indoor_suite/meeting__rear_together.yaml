@@ -1,0 +1,85 @@
+rolling_observation_planner:
+  ros__parameters:
+    use_sim_time: true
+    robot_namespaces:
+    - robot1
+    - robot2
+    robot1_init_pose:
+    - 5.5
+    - -5.3
+    - 1.5707963267948966
+    robot2_init_pose:
+    - 6.8
+    - -5.3
+    - 1.5707963267948966
+    world_frame: world
+    map_topic: /map
+    points_suffix: points
+    dispatch_goals: true
+    decision_mode: baseline
+    observation_model: lidar360
+    lidar_profile: config/lidar360_os0.yaml
+    candidate_ownership: nearest
+    target_policy: frontier
+    candidate_evaluation: incremental_frontier
+    fast_view_budget: 32
+    fast_audit_budget: 24
+    fast_cluster_size: 1.5
+    fast_cache_mb: 64.0
+    fast_recovery_limit: 192
+    fast_ray_workers: 2
+    min_unknown_component_volume: 0.005
+    frontier_support_radius: 0.4
+    frontier_unknown_fraction: 0.35
+    min_frontier_area: 0.1
+    frontier_task_limit: 8
+    frontier_fill_detail_tasks: true
+    frontier_separation: 0.75
+    frontier_view_distance: 1.0
+    audit_when_idle: true
+    replan_policy: async_v2
+    async_commit_seconds: 1.5
+    async_refill_margin: 0.4
+    async_refill_interval: 2.0
+    async_initial_latency: 1.0
+    async_latency_window: 20
+    async_idle_search_seconds: 5.0
+    fast_incremental_targets: true
+    integration_rate: 10.0
+    control_rate: 10.0
+    exploration_bounds:
+    - -8.0
+    - 8.0
+    - -6.0
+    - 6.0
+    - 0.05
+    - 2.85
+    voxel_resolution: 0.05
+    voxel_snapshot: ''
+    snapshot_output: ''
+    voxel_display_z_max: 1.2
+    voxel_display_all: false
+    observation_z: 0.22
+    sensor_offset_x: 0.0
+    sensor_offset_y: 0.0
+    sensor_min_range: 0.3
+    sensor_max_range: 5.0
+    max_obs_range: 5.0
+    sensor_vfov_min: -0.7853981633974483
+    sensor_vfov_max: 0.7853981633974483
+    robot_body_z_min: 0.06
+    robot_body_z_max: 0.4
+    min_clearance: 0.25
+    candidate_position_stride: 0.25
+    robot_speeds:
+    - 0.22
+    - 0.22
+    observation_time: 1.0
+    observation_dwell: 1.0
+    exact_candidate_limit: 10
+    scan_wait_timeout: 15.0
+    task_timeout: 180.0
+    failed_view_cooldown: 30.0
+    completion_stable_seconds: 8.0
+    idle_replan_period: 5.0
+    tf_timeout: 0.15

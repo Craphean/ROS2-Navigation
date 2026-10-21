@@ -1,0 +1,6457 @@
+{
+  "world": "/home/administrator/ROS2-Navigation/worlds/indoor_suite/meeting.sdf",
+  "world_sha256": "fdccf399287f096884dd7b8f5b4ac4a06988447b175d9540d8e60782db17b5d0",
+  "collision_boxes": 32,
+  "voxel_resolution": 0.05,
+  "voxel_count": 4300800,
+  "candidate_stride": 0.25,
+  "sensor_range": 5.0,
+  "planar_range": 5.0,
+  "scan_hz": 10.0,
+  "scan_counts": [
+    1601,
+    1601
+  ],
+  "maximum_return_distance": [
+    4.999999766110532,
+    4.999999957349671
+  ],
+  "requested_duration": 160.0,
+  "simulated_seconds": 160.0,
+  "video_seconds": 160.0,
+  "playback_speed": 1.0,
+  "record_period": 1.0,
+  "simulation_rate": 0.0,
+  "initial_unknown": 3717155,
+  "final_unknown": 128214,
+  "robot_distance_m": [
+    34.897277603059045,
+    34.897277603059045
+  ],
+  "robot_tasks": [
+    15,
+    15
+  ],
+  "skipped_observed_views": [
+    0,
+    0
+  ],
+  "complete": false,
+  "stop_reason": "duration_limit",
+  "events": [
+    {
+      "event": 1,
+      "time": 8.4490382458,
+      "replan_requested_time": 8.4490382458,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          4.025,
+          -5.225
+        ],
+        [
+          7.525,
+          -3.975
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          4.025,
+          -5.225
+        ],
+        [
+          7.476040764008567,
+          -4.023959235991435
+        ]
+      ],
+      "unknown_remaining": 3356965,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          3.2750000000000004,
+          -5.225
+        ],
+        [
+          7.525,
+          -3.975
+        ]
+      ]
+    },
+    {
+      "event": 2,
+      "time": 8.7637601346,
+      "replan_requested_time": 8.7637601346,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          3.2750000000000004,
+          -5.225
+        ],
+        [
+          7.525,
+          -3.975
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          3.955761184457489,
+          -5.225
+        ],
+        [
+          7.525,
+          -3.975
+        ]
+      ],
+      "unknown_remaining": 3346803,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          3.2750000000000004,
+          -5.225
+        ],
+        [
+          6.775,
+          -3.725
+        ]
+      ]
+    },
+    {
+      "event": 3,
+      "time": 17.4358872512,
+      "replan_requested_time": 17.4358872512,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          2.2750000000000004,
+          -4.725
+        ],
+        [
+          7.525,
+          -2.2249999999999996
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          2.2750000000000004,
+          -4.725
+        ],
+        [
+          7.525,
+          -2.2621067811735114
+        ]
+      ],
+      "unknown_remaining": 2955499,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          2.0250000000000004,
+          -3.975
+        ],
+        [
+          7.525,
+          -2.2249999999999996
+        ]
+      ]
+    },
+    {
+      "event": 4,
+      "time": 17.6045544384,
+      "replan_requested_time": 17.6045544384,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          2.0250000000000004,
+          -3.975
+        ],
+        [
+          7.525,
+          -2.2249999999999996
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          2.2750000000000004,
+          -4.6878932188264875
+        ],
+        [
+          7.525,
+          -2.2249999999999996
+        ]
+      ],
+      "unknown_remaining": 2945507,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          2.0250000000000004,
+          -3.975
+        ],
+        [
+          6.775,
+          -2.4749999999999996
+        ]
+      ]
+    },
+    {
+      "event": 5,
+      "time": 25.8611299358,
+      "replan_requested_time": 25.8611299358,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          2.0250000000000004,
+          -2.9749999999999996
+        ],
+        [
+          5.775,
+          -2.4749999999999996
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          2.0250000000000004,
+          -2.9749999999999996
+        ],
+        [
+          5.873629150093583,
+          -2.4749999999999996
+        ]
+      ],
+      "unknown_remaining": 2694831,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          1.2750000000000004,
+          -3.2249999999999996
+        ],
+        [
+          5.775,
+          -2.4749999999999996
+        ]
+      ]
+    },
+    {
+      "event": 6,
+      "time": 26.3094442544,
+      "replan_requested_time": 26.3094442544,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          1.2750000000000004,
+          -3.2249999999999996
+        ],
+        [
+          5.775,
+          -2.4749999999999996
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          1.9406139982054895,
+          -3.0093860017945113
+        ],
+        [
+          5.775,
+          -2.4749999999999996
+        ]
+      ],
+      "unknown_remaining": 2683481,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          1.2750000000000004,
+          -3.2249999999999996
+        ],
+        [
+          6.025,
+          -1.7249999999999996
+        ]
+      ]
+    },
+    {
+      "event": 7,
+      "time": 34.8445190118,
+      "replan_requested_time": 34.8445190118,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          0.5250000000000004,
+          -2.2249999999999996
+        ],
+        [
+          4.525,
+          -1.4749999999999996
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          0.5250000000000004,
+          -2.2249999999999996
+        ],
+        [
+          4.606873375209803,
+          -1.5568733752098023
+        ]
+      ],
+      "unknown_remaining": 2320129,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -0.22499999999999964,
+          -2.2249999999999996
+        ],
+        [
+          4.525,
+          -1.4749999999999996
+        ]
+      ]
+    },
+    {
+      "event": 8,
+      "time": 35.370821001,
+      "replan_requested_time": 35.370821001,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -0.22499999999999964,
+          -2.2249999999999996
+        ],
+        [
+          4.525,
+          -1.4749999999999996
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          0.4092135623810363,
+          -2.2249999999999996
+        ],
+        [
+          4.525,
+          -1.4749999999999996
+        ]
+      ],
+      "unknown_remaining": 2292739,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -0.22499999999999964,
+          -2.2249999999999996
+        ],
+        [
+          5.275,
+          -0.9749999999999996
+        ]
+      ]
+    },
+    {
+      "event": 9,
+      "time": 43.5327979038,
+      "replan_requested_time": 43.5327979038,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          0.27500000000000036,
+          -0.7249999999999996
+        ],
+        [
+          3.2750000000000004,
+          -0.7249999999999996
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          0.27500000000000036,
+          -0.7249999999999996
+        ],
+        [
+          3.4343398282223467,
+          -0.7249999999999996
+        ]
+      ],
+      "unknown_remaining": 2049840,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -1.4749999999999996,
+          -1.9749999999999996
+        ],
+        [
+          3.2750000000000004,
+          -0.7249999999999996
+        ]
+      ]
+    },
+    {
+      "event": 10,
+      "time": 44.2570698503,
+      "replan_requested_time": 44.2570698503,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -1.4749999999999996,
+          -1.9749999999999996
+        ],
+        [
+          3.2750000000000004,
+          -0.7249999999999996
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          0.11566017177765384,
+          -0.7249999999999996
+        ],
+        [
+          3.2750000000000004,
+          -0.7249999999999996
+        ]
+      ],
+      "unknown_remaining": 2043261,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -1.4749999999999996,
+          -1.9749999999999996
+        ],
+        [
+          4.025,
+          0.025000000000000355
+        ]
+      ]
+    },
+    {
+      "event": 11,
+      "time": 52.1301677049,
+      "replan_requested_time": 52.1301677049,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          0.025000000000000355,
+          0.7750000000000004
+        ],
+        [
+          4.525,
+          0.5250000000000004
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          0.025000000000000355,
+          0.7750000000000004
+        ],
+        [
+          4.479055915908683,
+          0.47905591590868196
+        ]
+      ],
+      "unknown_remaining": 1553796,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -0.9749999999999996,
+          0.5250000000000004
+        ],
+        [
+          4.525,
+          0.5250000000000004
+        ]
+      ]
+    },
+    {
+      "event": 12,
+      "time": 52.4255074632,
+      "replan_requested_time": 52.4255074632,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -0.9749999999999996,
+          0.5250000000000004
+        ],
+        [
+          4.525,
+          0.5250000000000004
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -0.03997474683275183,
+          0.7750000000000004
+        ],
+        [
+          4.525,
+          0.5250000000000004
+        ]
+      ],
+      "unknown_remaining": 1537406,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -0.9749999999999996,
+          0.5250000000000004
+        ],
+        [
+          3.7750000000000004,
+          0.7750000000000004
+        ]
+      ]
+    },
+    {
+      "event": 13,
+      "time": 60.7533803467,
+      "replan_requested_time": 60.7533803467,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -0.22499999999999964,
+          2.2750000000000004
+        ],
+        [
+          3.2750000000000004,
+          1.7750000000000004
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -0.17499999999999982,
+          1.5528679656554223
+        ],
+        [
+          3.2750000000000004,
+          1.7750000000000004
+        ]
+      ],
+      "unknown_remaining": 1251589,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -0.22499999999999964,
+          2.2750000000000004
+        ],
+        [
+          4.525,
+          2.2750000000000004
+        ]
+      ]
+    },
+    {
+      "event": 14,
+      "time": 68.584254011,
+      "replan_requested_time": 68.584254011,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -1.7249999999999996,
+          2.2750000000000004
+        ],
+        [
+          4.525,
+          2.7750000000000004
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -1.3063708498870956,
+          2.2750000000000004
+        ],
+        [
+          4.525,
+          2.7750000000000004
+        ]
+      ],
+      "unknown_remaining": 1022468,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -1.7249999999999996,
+          2.2750000000000004
+        ],
+        [
+          0.025000000000000355,
+          3.0250000000000004
+        ]
+      ]
+    },
+    {
+      "event": 15,
+      "time": 79.4245891662,
+      "replan_requested_time": 79.4245891662,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -3.2249999999999996,
+          1.2750000000000004
+        ],
+        [
+          -1.4749999999999996,
+          3.7750000000000004
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -3.2249999999999996,
+          1.2750000000000004
+        ],
+        [
+          2.1401262658584903,
+          2.7750000000000004
+        ]
+      ],
+      "unknown_remaining": 673794,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -2.2249999999999996,
+          1.0250000000000004
+        ],
+        [
+          -1.4749999999999996,
+          3.7750000000000004
+        ]
+      ]
+    },
+    {
+      "event": 16,
+      "time": 89.449743284,
+      "replan_requested_time": 89.449743284,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -4.725,
+          0.7750000000000004
+        ],
+        [
+          0.27500000000000036,
+          3.5250000000000004
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -4.644137802853436,
+          0.8250000000000002
+        ],
+        [
+          0.27500000000000036,
+          3.5250000000000004
+        ]
+      ],
+      "unknown_remaining": 494665,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -4.725,
+          0.7750000000000004
+        ],
+        [
+          -3.7249999999999996,
+          3.0250000000000004
+        ]
+      ]
+    },
+    {
+      "event": 17,
+      "time": 89.9114381716,
+      "replan_requested_time": 89.9114381716,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -4.725,
+          0.7750000000000004
+        ],
+        [
+          -3.7249999999999996,
+          3.0250000000000004
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -4.725,
+          0.7750000000000004
+        ],
+        [
+          0.17342712473478145,
+          3.5250000000000004
+        ]
+      ],
+      "unknown_remaining": 485149,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -4.725,
+          -0.22499999999999964
+        ],
+        [
+          -3.7249999999999996,
+          3.0250000000000004
+        ]
+      ]
+    },
+    {
+      "event": 18,
+      "time": 98.2183219045,
+      "replan_requested_time": 98.2183219045,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -3.9749999999999996,
+          -0.7249999999999996
+        ],
+        [
+          -1.4749999999999996,
+          4.025
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -3.9749999999999996,
+          -0.7249999999999996
+        ],
+        [
+          -1.441045096759384,
+          3.991045096759385
+        ]
+      ],
+      "unknown_remaining": 339386,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -4.725,
+          -0.9749999999999996
+        ],
+        [
+          -1.4749999999999996,
+          4.025
+        ]
+      ]
+    },
+    {
+      "event": 19,
+      "time": 98.4365922894,
+      "replan_requested_time": 98.4365922894,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -4.725,
+          -0.9749999999999996
+        ],
+        [
+          -1.4749999999999996,
+          4.025
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -4.023019484671944,
+          -0.7249999999999996
+        ],
+        [
+          -1.4749999999999994,
+          4.025
+        ]
+      ],
+      "unknown_remaining": 337041,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -4.725,
+          -0.9749999999999996
+        ],
+        [
+          -2.7249999999999996,
+          -0.7249999999999996
+        ]
+      ]
+    },
+    {
+      "event": 20,
+      "time": 106.5198927988,
+      "replan_requested_time": 106.5198927988,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -3.2249999999999996,
+          -1.9749999999999996
+        ],
+        [
+          -2.7249999999999996,
+          4.775
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -3.2249999999999996,
+          -1.9749999999999994
+        ],
+        [
+          -2.5789130624034207,
+          4.628913062403421
+        ]
+      ],
+      "unknown_remaining": 232417,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -3.9749999999999996,
+          -3.2249999999999996
+        ],
+        [
+          -2.7249999999999996,
+          4.775
+        ]
+      ]
+    },
+    {
+      "event": 21,
+      "time": 107.4589752008,
+      "replan_requested_time": 107.4589752008,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -3.9749999999999996,
+          -3.2249999999999996
+        ],
+        [
+          -2.7249999999999996,
+          4.775
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -3.2650209204185967,
+          -2.165020920418597
+        ],
+        [
+          -2.7249999999999996,
+          4.775
+        ]
+      ],
+      "unknown_remaining": 221561,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -3.9749999999999996,
+          -3.2249999999999996
+        ],
+        [
+          -4.225,
+          2.7750000000000004
+        ]
+      ]
+    },
+    {
+      "event": 22,
+      "time": 114.9451354833,
+      "replan_requested_time": 114.9451354833,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -3.4749999999999996,
+          -3.725
+        ],
+        [
+          -4.225,
+          4.775
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -3.4749999999999996,
+          -3.725
+        ],
+        [
+          -4.170533905921311,
+          4.775
+        ]
+      ],
+      "unknown_remaining": 153037,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -4.725,
+          -2.7249999999999996
+        ],
+        [
+          -4.225,
+          4.775
+        ]
+      ]
+    },
+    {
+      "event": 23,
+      "time": 115.1927086382,
+      "replan_requested_time": 115.1927086382,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -4.725,
+          -2.7249999999999996
+        ],
+        [
+          -4.225,
+          4.775
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -3.529466094078688,
+          -3.725
+        ],
+        [
+          -4.225,
+          4.775
+        ]
+      ],
+      "unknown_remaining": 151892,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": true,
+      "next_goals": [
+        [
+          -4.725,
+          -2.7249999999999996
+        ],
+        [
+          -6.225,
+          2.5250000000000004
+        ]
+      ]
+    },
+    {
+      "event": 24,
+      "time": 118.6017995473,
+      "replan_requested_time": 118.6017995473,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -2.7249999999999996,
+          -5.225
+        ],
+        [
+          -4.975,
+          4.775
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -3.914268401462766,
+          -3.885731598537234
+        ],
+        [
+          -4.975,
+          4.775
+        ]
+      ],
+      "unknown_remaining": 142884,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -2.7249999999999996,
+          -5.225
+        ],
+        [
+          -6.225,
+          4.775
+        ]
+      ]
+    },
+    {
+      "event": 25,
+      "time": 124.7543149591,
+      "replan_requested_time": 124.7543149591,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -2.7249999999999996,
+          -5.225
+        ],
+        [
+          -6.225,
+          4.525
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -2.9749999999999996,
+          -4.850227278536131
+        ],
+        [
+          -6.225,
+          4.525
+        ]
+      ],
+      "unknown_remaining": 139704,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -2.7249999999999996,
+          -5.225
+        ],
+        [
+          4.525,
+          4.775
+        ]
+      ]
+    },
+    {
+      "event": 26,
+      "time": 128.9003696607,
+      "replan_requested_time": 128.9003696607,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -4.725,
+          -5.475
+        ],
+        [
+          -5.725,
+          4.025
+        ]
+      ],
+      "finished_robots": [
+        2
+      ],
+      "arrived_robots": [
+        2
+      ],
+      "robot_positions": [
+        [
+          -3.4002272785361303,
+          -5.125
+        ],
+        [
+          -5.725,
+          4.025
+        ]
+      ],
+      "unknown_remaining": 137610,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -4.725,
+          -5.475
+        ],
+        [
+          -5.725,
+          2.7750000000000004
+        ]
+      ]
+    },
+    {
+      "event": 27,
+      "time": 136.2942270915,
+      "replan_requested_time": 136.2942270915,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -4.975,
+          -5.225
+        ],
+        [
+          4.525,
+          4.275
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -4.975,
+          -5.225
+        ],
+        [
+          -4.581194077701116,
+          3.4250000000000007
+        ]
+      ],
+      "unknown_remaining": 132424,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -5.225,
+          -4.475
+        ],
+        [
+          4.525,
+          4.275
+        ]
+      ]
+    },
+    {
+      "event": 28,
+      "time": 143.5212702445,
+      "replan_requested_time": 143.5212702445,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -6.225,
+          -4.475
+        ],
+        [
+          1.2750000000000004,
+          4.775
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -6.225,
+          -4.475
+        ],
+        [
+          -3.038856428637755,
+          3.4250000000000007
+        ]
+      ],
+      "unknown_remaining": 130037,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -5.475,
+          -3.2249999999999996
+        ],
+        [
+          1.2750000000000004,
+          4.775
+        ]
+      ]
+    },
+    {
+      "event": 29,
+      "time": 150.9042887386,
+      "replan_requested_time": 150.9042887386,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -6.225,
+          -2.9749999999999996
+        ],
+        [
+          1.0250000000000004,
+          5.025
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -6.225,
+          -2.9749999999999996
+        ],
+        [
+          -1.4468795026503285,
+          3.4250000000000007
+        ]
+      ],
+      "unknown_remaining": 129117,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -5.475,
+          -2.2249999999999996
+        ],
+        [
+          1.0250000000000004,
+          5.025
+        ]
+      ]
+    },
+    {
+      "event": 30,
+      "time": 158.9395930703,
+      "replan_requested_time": 158.9395930703,
+      "trigger": "arrival",
+      "task_positions": [
+        [
+          -6.975,
+          -1.7249999999999996
+        ],
+        [
+          1.0250000000000004,
+          5.025
+        ]
+      ],
+      "finished_robots": [
+        1
+      ],
+      "arrived_robots": [
+        1
+      ],
+      "robot_positions": [
+        [
+          -6.975,
+          -1.7249999999999996
+        ],
+        [
+          -0.044024535286305747,
+          4.305975464713694
+        ]
+      ],
+      "unknown_remaining": 128429,
+      "newly_known_this_scan": 0,
+      "skipped_observed_views": [
+        0,
+        0
+      ],
+      "replan_pending": false,
+      "next_goals": [
+        [
+          -6.225,
+          -1.2249999999999996
+        ],
+        [
+          1.0250000000000004,
+          5.025
+        ]
+      ]
+    }
+  ],
+  "replans": [
+    {
+      "request_time": 0.0,
+      "accepted_time": 1.376010895,
+      "event": 0,
+      "revision": 2,
+      "planning_seconds": 1.3760108950000358,
+      "map_age_seconds": 1.376010895
+    },
+    {
+      "request_time": 8.4490382458,
+      "accepted_time": 9.9490382458,
+      "event": 1,
+      "revision": 144,
+      "planning_seconds": 0.6226149619999433,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 9.9490382458,
+      "accepted_time": 11.4490382458,
+      "event": 2,
+      "revision": 174,
+      "planning_seconds": 0.5837946490000832,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 17.4358872512,
+      "accepted_time": 18.9358872512,
+      "event": 3,
+      "revision": 324,
+      "planning_seconds": 0.6104184929999974,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 18.9358872512,
+      "accepted_time": 20.4358872512,
+      "event": 4,
+      "revision": 354,
+      "planning_seconds": 0.5660467190000418,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 25.8611299358,
+      "accepted_time": 27.3611299358,
+      "event": 5,
+      "revision": 492,
+      "planning_seconds": 0.5810521549999521,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 27.3611299358,
+      "accepted_time": 28.8611299358,
+      "event": 6,
+      "revision": 522,
+      "planning_seconds": 0.5704839699999411,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 34.8445190118,
+      "accepted_time": 36.3445190118,
+      "event": 7,
+      "revision": 672,
+      "planning_seconds": 0.583839234999914,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 36.3445190118,
+      "accepted_time": 37.8445190118,
+      "event": 8,
+      "revision": 702,
+      "planning_seconds": 0.5491699189999508,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 43.5327979038,
+      "accepted_time": 45.0327979038,
+      "event": 9,
+      "revision": 846,
+      "planning_seconds": 0.586707042999933,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 45.0327979038,
+      "accepted_time": 46.5327979038,
+      "event": 10,
+      "revision": 876,
+      "planning_seconds": 0.5219953450000503,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 52.1301677049,
+      "accepted_time": 53.6301677049,
+      "event": 11,
+      "revision": 1018,
+      "planning_seconds": 0.5909900900001048,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 53.6301677049,
+      "accepted_time": 55.1301677049,
+      "event": 12,
+      "revision": 1048,
+      "planning_seconds": 0.5577723100000185,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 60.7533803467,
+      "accepted_time": 62.2533803467,
+      "event": 13,
+      "revision": 1190,
+      "planning_seconds": 0.5647884869999871,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 68.584254011,
+      "accepted_time": 70.084254011,
+      "event": 14,
+      "revision": 1346,
+      "planning_seconds": 0.5838759549999395,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 79.4245891662,
+      "accepted_time": 80.9245891662,
+      "event": 15,
+      "revision": 1564,
+      "planning_seconds": 0.5700416189999942,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 89.449743284,
+      "accepted_time": 90.949743284,
+      "event": 16,
+      "revision": 1763,
+      "planning_seconds": 0.4398541129999103,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 90.949743284,
+      "accepted_time": 92.449743284,
+      "event": 17,
+      "revision": 1793,
+      "planning_seconds": 0.40781389299991133,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 98.2183219045,
+      "accepted_time": 99.7183219045,
+      "event": 18,
+      "revision": 1939,
+      "planning_seconds": 0.4493664850001551,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 99.7183219045,
+      "accepted_time": 101.2183219045,
+      "event": 19,
+      "revision": 1965,
+      "planning_seconds": 0.41068868199999997,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 106.5198927988,
+      "accepted_time": 108.0198927988,
+      "event": 20,
+      "revision": 2099,
+      "planning_seconds": 0.4009878760000447,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 108.0198927988,
+      "accepted_time": 109.5198927988,
+      "event": 21,
+      "revision": 2128,
+      "planning_seconds": 0.40450234900004034,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 114.9451354833,
+      "accepted_time": 116.4451354833,
+      "event": 22,
+      "revision": 2265,
+      "planning_seconds": 0.4164189760001591,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 116.4451354833,
+      "accepted_time": 117.9451354833,
+      "event": 23,
+      "revision": 2295,
+      "planning_seconds": 0.39169409100009034,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 118.6017995473,
+      "accepted_time": 120.1017995473,
+      "event": 24,
+      "revision": 2339,
+      "planning_seconds": 0.38826572399989345,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 124.7543149591,
+      "accepted_time": 126.2543149591,
+      "event": 25,
+      "revision": 2460,
+      "planning_seconds": 0.3751199800001359,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 128.9003696607,
+      "accepted_time": 130.4003696607,
+      "event": 26,
+      "revision": 2519,
+      "planning_seconds": 0.3779450900001393,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 136.2942270915,
+      "accepted_time": 137.7942270915,
+      "event": 27,
+      "revision": 2648,
+      "planning_seconds": 0.3736707390000902,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 143.5212702445,
+      "accepted_time": 145.0212702445,
+      "event": 28,
+      "revision": 2721,
+      "planning_seconds": 0.384500221000053,
+      "map_age_seconds": 1.5
+    },
+    {
+      "request_time": 150.9042887386,
+      "accepted_time": 152.4042887386,
+      "event": 29,
+      "revision": 2795,
+      "planning_seconds": 0.37920219299985547,
+      "map_age_seconds": 1.5
+    }
+  ],
+  "planning_requests": [
+    {
+      "request_id": 0,
+      "event": 0,
+      "request_time": 0.0,
+      "status": "accepted",
+      "planning_seconds": 1.3760108950000358,
+      "scan_times": [
+        0.0,
+        0.0
+      ],
+      "robot_positions": [
+        [
+          5.5,
+          -5.3
+        ],
+        [
+          6.8,
+          -5.3
+        ]
+      ],
+      "candidate_views": 8,
+      "actionable": 12690,
+      "selection_phase": "frontier",
+      "ignored_unknown": 6219,
+      "available_candidates": 32,
+      "frontier_candidates": 31,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 0,
+        "cached_views": 0,
+        "source_rejected_views": 2295,
+        "traced_views": 32,
+        "candidate_domain": 2476,
+        "untested_views": 149,
+        "ray_workers": 2,
+        "proxy_clusters": 7,
+        "cache_bytes": 1501112,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.27004955000006703,
+        "shortlist_seconds": 0.05848727099987627,
+        "visibility_seconds": 0.8958048810000037,
+        "audit_and_ownership_seconds": 0.01783561499996722,
+        "target_update": "full_components",
+        "changed_voxels": 4300800,
+        "support_updated_voxels": 4300800,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 1.250108396000087,
+        "route_solver_seconds": 0.1217942570001469
+      },
+      "claimed_voxels": 12690,
+      "ready_time": 1.3760108950000358,
+      "handoff_time": 1.3760108950000358,
+      "commit_until": 0.0,
+      "distance_at_request": [
+        0.0,
+        0.0
+      ],
+      "distance_during_planning": [
+        0.0,
+        0.0
+      ],
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            5.5,
+            -5.3
+          ],
+          [
+            6.8,
+            -5.3
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              4.025,
+              -5.225
+            ],
+            [
+              3.2750000000000004,
+              -5.225
+            ],
+            [
+              4.525,
+              -4.225
+            ],
+            [
+              4.525,
+              -3.4749999999999996
+            ]
+          ],
+          [
+            [
+              7.525,
+              -3.975
+            ],
+            [
+              6.775,
+              -3.725
+            ],
+            [
+              6.775,
+              -2.9749999999999996
+            ],
+            [
+              5.525,
+              -3.725
+            ]
+          ]
+        ],
+        "previous_goals": [
+          null,
+          null
+        ]
+      },
+      "accepted_event": 0,
+      "distance_until_handoff": [
+        0.0,
+        0.0
+      ],
+      "accepted_time": 1.376010895
+    },
+    {
+      "request_id": 1,
+      "event": 1,
+      "request_time": 8.4490382458,
+      "revision": 144,
+      "status": "accepted",
+      "scan_times": [
+        8.4,
+        8.4
+      ],
+      "robot_positions": [
+        [
+          4.025,
+          -5.225
+        ],
+        [
+          7.476040764008567,
+          -4.023959235991435
+        ]
+      ],
+      "distance_at_request": [
+        1.5560660171779828,
+        1.5560660171779828
+      ],
+      "distance_during_planning": [
+        0.13697529164649902,
+        0.13697529164649902
+      ],
+      "commit_until": 9.9490382458,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          3.6950000000000003,
+          -5.225
+        ],
+        [
+          7.325969337259202,
+          -3.8259693372592003
+        ]
+      ],
+      "remaining_route_seconds": [
+        14.382788919877704,
+        14.697510808707307
+      ],
+      "latency_p95_seconds": 1.3760108950000358,
+      "ready_time": 9.071653207799944,
+      "handoff_time": 9.9490382458,
+      "planning_seconds": 0.6226149619999433,
+      "candidate_views": 8,
+      "actionable": 9553,
+      "selection_phase": "frontier",
+      "ignored_unknown": 18,
+      "available_candidates": 32,
+      "frontier_candidates": 29,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 571,
+        "cached_views": 1756,
+        "source_rejected_views": 437,
+        "traced_views": 32,
+        "candidate_domain": 2475,
+        "untested_views": 250,
+        "ray_workers": 2,
+        "proxy_clusters": 9,
+        "cache_bytes": 1164328,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.11309829199990418,
+        "shortlist_seconds": 0.06089633800002048,
+        "visibility_seconds": 0.30089733799991336,
+        "audit_and_ownership_seconds": 0.01779786600013722,
+        "target_update": "incremental_components",
+        "changed_voxels": 360190,
+        "support_updated_voxels": 1549856,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.5006938259998606,
+        "route_solver_seconds": 0.11754223200000524
+      },
+      "claimed_voxels": 9553,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            3.6949999999935015,
+            -5.225
+          ],
+          [
+            7.325969337254606,
+            -3.825969337254605
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              2.0250000000000004,
+              -4.475
+            ],
+            [
+              2.7750000000000004,
+              -4.475
+            ],
+            [
+              3.7750000000000004,
+              -3.725
+            ],
+            [
+              3.7750000000000004,
+              -2.9749999999999996
+            ]
+          ],
+          [
+            [
+              7.525,
+              -2.4749999999999996
+            ],
+            [
+              6.775,
+              -2.7249999999999996
+            ],
+            [
+              6.025,
+              -3.4749999999999996
+            ],
+            [
+              5.025,
+              -3.725
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            15,
+            225
+          ],
+          [
+            45,
+            295
+          ]
+        ]
+      },
+      "accepted_event": 2,
+      "distance_until_handoff": [
+        0.3300000000064993,
+        0.3300000000064993
+      ],
+      "accepted_time": 9.9490382458
+    },
+    {
+      "request_id": 2,
+      "event": 2,
+      "request_time": 9.9490382458,
+      "revision": 174,
+      "status": "accepted",
+      "scan_times": [
+        9.9,
+        9.9
+      ],
+      "robot_positions": [
+        [
+          3.6949999999935015,
+          -5.225
+        ],
+        [
+          7.325969337254606,
+          -3.825969337254605
+        ]
+      ],
+      "distance_at_request": [
+        1.886066017184482,
+        1.886066017184482
+      ],
+      "distance_during_planning": [
+        0.1284348227800185,
+        0.1284348227800185
+      ],
+      "commit_until": 11.4490382458,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          3.3649999999935014,
+          -5.225
+        ],
+        [
+          7.325000000000001,
+          -3.4963708498919757
+        ]
+      ],
+      "remaining_route_seconds": [
+        21.778728834332473,
+        20.23627506969529
+      ],
+      "latency_p95_seconds": 1.3383410983500312,
+      "ready_time": 10.532832894800084,
+      "handoff_time": 11.4490382458,
+      "planning_seconds": 0.5837946490000832,
+      "candidate_views": 8,
+      "actionable": 12985,
+      "selection_phase": "frontier",
+      "ignored_unknown": 0,
+      "available_candidates": 32,
+      "frontier_candidates": 27,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 496,
+        "cached_views": 1729,
+        "source_rejected_views": 441,
+        "traced_views": 32,
+        "candidate_domain": 2474,
+        "untested_views": 272,
+        "ray_workers": 2,
+        "proxy_clusters": 12,
+        "cache_bytes": 1066712,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06681532899983722,
+        "shortlist_seconds": 0.06457762400009415,
+        "visibility_seconds": 0.3034733199999664,
+        "audit_and_ownership_seconds": 0.015108472000065376,
+        "target_update": "incremental_components",
+        "changed_voxels": 54959,
+        "support_updated_voxels": 1651328,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.45617589899984523,
+        "route_solver_seconds": 0.12345666999999594
+      },
+      "claimed_voxels": 12985,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            3.364999999993483,
+            -5.225
+          ],
+          [
+            7.325000000000001,
+            -3.4963708498919575
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              2.2750000000000004,
+              -4.725
+            ],
+            [
+              2.0250000000000004,
+              -3.975
+            ],
+            [
+              2.7750000000000004,
+              -3.975
+            ],
+            [
+              3.5250000000000004,
+              -3.725
+            ]
+          ],
+          [
+            [
+              7.525,
+              -2.2249999999999996
+            ],
+            [
+              6.775,
+              -2.4749999999999996
+            ],
+            [
+              6.025,
+              -2.9749999999999996
+            ],
+            [
+              5.025,
+              -3.4749999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            30,
+            200
+          ],
+          [
+            70,
+            310
+          ]
+        ]
+      },
+      "accepted_event": 2,
+      "distance_until_handoff": [
+        0.3300000000000176,
+        0.3300000000000176
+      ],
+      "accepted_time": 11.4490382458
+    },
+    {
+      "request_id": 3,
+      "event": 3,
+      "request_time": 17.4358872512,
+      "revision": 324,
+      "status": "accepted",
+      "scan_times": [
+        17.4,
+        17.4
+      ],
+      "robot_positions": [
+        [
+          2.2750000000000004,
+          -4.725
+        ],
+        [
+          7.525,
+          -2.2621067811735114
+        ]
+      ],
+      "distance_at_request": [
+        3.5331727983775583,
+        3.5331727983775583
+      ],
+      "distance_during_planning": [
+        0.13429206844951036,
+        0.13429206844951036
+      ],
+      "commit_until": 18.9358872512,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          2.0770101012677675,
+          -4.477010101267766
+        ],
+        [
+          7.303248557863562,
+          -2.396751442136438
+        ]
+      ],
+      "remaining_route_seconds": [
+        11.168667187211577,
+        13.885789700635822
+      ],
+      "latency_p95_seconds": 1.3006713017000264,
+      "ready_time": 18.046305744199998,
+      "handoff_time": 18.9358872512,
+      "planning_seconds": 0.6104184929999974,
+      "candidate_views": 8,
+      "actionable": 13587,
+      "selection_phase": "frontier",
+      "ignored_unknown": 0,
+      "available_candidates": 32,
+      "frontier_candidates": 29,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 745,
+        "cached_views": 1457,
+        "source_rejected_views": 578,
+        "traced_views": 32,
+        "candidate_domain": 2473,
+        "untested_views": 406,
+        "ray_workers": 2,
+        "proxy_clusters": 15,
+        "cache_bytes": 944192,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.08817517600004976,
+        "shortlist_seconds": 0.060460371999852214,
+        "visibility_seconds": 0.3087774350001382,
+        "audit_and_ownership_seconds": 0.01713458599988371,
+        "target_update": "incremental_components",
+        "changed_voxels": 346507,
+        "support_updated_voxels": 2285304,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4818696380000347,
+        "route_solver_seconds": 0.1245591219999369
+      },
+      "claimed_voxels": 13587,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            2.0770101012751843,
+            -4.477010101275183
+          ],
+          [
+            7.30324855787098,
+            -2.396751442129021
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              2.2750000000000004,
+              -3.2249999999999996
+            ],
+            [
+              1.5250000000000004,
+              -3.4749999999999996
+            ],
+            [
+              0.5250000000000004,
+              -3.975
+            ],
+            [
+              0.7750000000000004,
+              -4.725
+            ]
+          ],
+          [
+            [
+              6.025,
+              -2.2249999999999996
+            ],
+            [
+              6.275,
+              -1.4749999999999996
+            ],
+            [
+              6.525,
+              -0.7249999999999996
+            ],
+            [
+              7.525,
+              -0.7249999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            40,
+            200
+          ],
+          [
+            70,
+            295
+          ]
+        ]
+      },
+      "accepted_event": 4,
+      "distance_until_handoff": [
+        0.32999999998950935,
+        0.32999999998950935
+      ],
+      "accepted_time": 18.9358872512
+    },
+    {
+      "request_id": 4,
+      "event": 4,
+      "request_time": 18.9358872512,
+      "revision": 354,
+      "status": "accepted",
+      "scan_times": [
+        18.9,
+        18.9
+      ],
+      "robot_positions": [
+        [
+          2.0770101012751843,
+          -4.477010101275183
+        ],
+        [
+          7.30324855787098,
+          -2.396751442129021
+        ]
+      ],
+      "distance_at_request": [
+        3.8631727983670676,
+        3.8631727983670676
+      ],
+      "distance_during_planning": [
+        0.12453027818000839,
+        0.12453027818000839
+      ],
+      "commit_until": 20.4358872512,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          2.075000000000001,
+          -4.147842712485107
+        ],
+        [
+          7.025761184460037,
+          -2.375
+        ]
+      ],
+      "remaining_route_seconds": [
+        19.31772266969464,
+        18.63636363637522
+      ],
+      "latency_p95_seconds": 1.2630015050500216,
+      "ready_time": 19.501933970200042,
+      "handoff_time": 20.4358872512,
+      "planning_seconds": 0.5660467190000418,
+      "candidate_views": 8,
+      "actionable": 14368,
+      "selection_phase": "frontier",
+      "ignored_unknown": 0,
+      "available_candidates": 32,
+      "frontier_candidates": 28,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 643,
+        "cached_views": 1424,
+        "source_rejected_views": 585,
+        "traced_views": 32,
+        "candidate_domain": 2472,
+        "untested_views": 431,
+        "ray_workers": 2,
+        "proxy_clusters": 18,
+        "cache_bytes": 869400,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.0607946110001194,
+        "shortlist_seconds": 0.06151624399990396,
+        "visibility_seconds": 0.302421195000079,
+        "audit_and_ownership_seconds": 0.01654606099987177,
+        "target_update": "incremental_components",
+        "changed_voxels": 58924,
+        "support_updated_voxels": 2339008,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4476813989999755,
+        "route_solver_seconds": 0.11434457900008965
+      },
+      "claimed_voxels": 14368,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            2.075000000000001,
+            -4.147842712485097
+          ],
+          [
+            7.025761184460027,
+            -2.375
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              2.0250000000000004,
+              -2.9749999999999996
+            ],
+            [
+              1.2750000000000004,
+              -3.2249999999999996
+            ],
+            [
+              0.5250000000000004,
+              -3.725
+            ],
+            [
+              0.5250000000000004,
+              -4.725
+            ]
+          ],
+          [
+            [
+              5.775,
+              -2.4749999999999996
+            ],
+            [
+              6.025,
+              -1.7249999999999996
+            ],
+            [
+              5.775,
+              -0.7249999999999996
+            ],
+            [
+              7.525,
+              -0.7249999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            55,
+            205
+          ],
+          [
+            75,
+            280
+          ]
+        ]
+      },
+      "accepted_event": 4,
+      "distance_until_handoff": [
+        0.3300000000000076,
+        0.3300000000000076
+      ],
+      "accepted_time": 20.4358872512
+    },
+    {
+      "request_id": 5,
+      "event": 5,
+      "request_time": 25.8611299358,
+      "revision": 492,
+      "status": "accepted",
+      "scan_times": [
+        25.8,
+        25.8
+      ],
+      "robot_positions": [
+        [
+          2.0250000000000004,
+          -2.9749999999999996
+        ],
+        [
+          5.873629150093583,
+          -2.4749999999999996
+        ]
+      ],
+      "distance_at_request": [
+        5.3867261889708224,
+        5.3867261889708224
+      ],
+      "distance_during_planning": [
+        0.1278314741015727,
+        0.1278314741015727
+      ],
+      "commit_until": 27.3611299358,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          1.7770101012677668,
+          -3.1729898987322334
+        ],
+        [
+          5.9032485578783955,
+          -2.2967514421216046
+        ]
+      ],
+      "remaining_route_seconds": [
+        12.775728053544642,
+        17.298799687636954
+      ],
+      "latency_p95_seconds": 1.2253317084000173,
+      "ready_time": 26.442182090799953,
+      "handoff_time": 27.3611299358,
+      "planning_seconds": 0.5810521549999521,
+      "candidate_views": 8,
+      "actionable": 14964,
+      "selection_phase": "frontier",
+      "ignored_unknown": 5,
+      "available_candidates": 32,
+      "frontier_candidates": 31,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 702,
+        "cached_views": 1339,
+        "source_rejected_views": 549,
+        "traced_views": 32,
+        "candidate_domain": 2471,
+        "untested_views": 551,
+        "ray_workers": 2,
+        "proxy_clusters": 19,
+        "cache_bytes": 835144,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.07740955599979316,
+        "shortlist_seconds": 0.0616439000000355,
+        "visibility_seconds": 0.29065356000000975,
+        "audit_and_ownership_seconds": 0.016932199000166293,
+        "target_update": "incremental_components",
+        "changed_voxels": 201744,
+        "support_updated_voxels": 2311008,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.45408251399999244,
+        "route_solver_seconds": 0.12269030799984648
+      },
+      "claimed_voxels": 14964,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            1.7770101012666544,
+            -3.172989898733346
+          ],
+          [
+            5.903248557879508,
+            -2.296751442120492
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              0.7750000000000004,
+              -2.2249999999999996
+            ],
+            [
+              0.5250000000000004,
+              -3.2249999999999996
+            ],
+            [
+              -0.22499999999999964,
+              -3.2249999999999996
+            ],
+            [
+              0.27500000000000036,
+              -3.975
+            ]
+          ],
+          [
+            [
+              4.275,
+              -1.9749999999999996
+            ],
+            [
+              5.025,
+              -1.2249999999999996
+            ],
+            [
+              6.025,
+              -0.9749999999999996
+            ],
+            [
+              6.775,
+              -0.7249999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            55,
+            185
+          ],
+          [
+            85,
+            280
+          ]
+        ]
+      },
+      "accepted_event": 6,
+      "distance_until_handoff": [
+        0.33000000000157304,
+        0.33000000000157304
+      ],
+      "accepted_time": 27.3611299358
+    },
+    {
+      "request_id": 6,
+      "event": 6,
+      "request_time": 27.3611299358,
+      "revision": 522,
+      "status": "accepted",
+      "scan_times": [
+        27.3,
+        27.3
+      ],
+      "robot_positions": [
+        [
+          1.7770101012666544,
+          -3.172989898733346
+        ],
+        [
+          5.903248557879508,
+          -2.296751442120492
+        ]
+      ],
+      "distance_at_request": [
+        5.7167261889723955,
+        5.7167261889723955
+      ],
+      "distance_during_planning": [
+        0.12550647339998644,
+        0.12550647339998644
+      ],
+      "commit_until": 28.8611299358,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          1.5290202025344208,
+          -2.97902020253442
+        ],
+        [
+          5.625761184447974,
+          -2.275
+        ]
+      ],
+      "remaining_route_seconds": [
+        19.122753493215033,
+        21.921782755119416
+      ],
+      "latency_p95_seconds": 1.1876619117500127,
+      "ready_time": 27.931613905799942,
+      "handoff_time": 28.8611299358,
+      "planning_seconds": 0.5704839699999411,
+      "candidate_views": 8,
+      "actionable": 16216,
+      "selection_phase": "frontier",
+      "ignored_unknown": 13,
+      "available_candidates": 32,
+      "frontier_candidates": 29,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 624,
+        "cached_views": 1296,
+        "source_rejected_views": 577,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 564,
+        "ray_workers": 2,
+        "proxy_clusters": 21,
+        "cache_bytes": 749448,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06600507200005268,
+        "shortlist_seconds": 0.06825178100007179,
+        "visibility_seconds": 0.3007425299999795,
+        "audit_and_ownership_seconds": 0.01616382099996372,
+        "target_update": "incremental_components",
+        "changed_voxels": 37580,
+        "support_updated_voxels": 2374736,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4582341620000534,
+        "route_solver_seconds": 0.10793456599981255
+      },
+      "claimed_voxels": 16216,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            1.52902020253443,
+            -2.979020202534429
+          ],
+          [
+            5.6257611844479865,
+            -2.275
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              0.5250000000000004,
+              -2.2249999999999996
+            ],
+            [
+              -0.22499999999999964,
+              -2.2249999999999996
+            ],
+            [
+              0.27500000000000036,
+              -2.9749999999999996
+            ],
+            [
+              0.27500000000000036,
+              -3.975
+            ]
+          ],
+          [
+            [
+              4.525,
+              -1.4749999999999996
+            ],
+            [
+              5.275,
+              -0.9749999999999996
+            ],
+            [
+              6.025,
+              -0.7249999999999996
+            ],
+            [
+              6.775,
+              -0.7249999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            75,
+            175
+          ],
+          [
+            80,
+            245
+          ]
+        ]
+      },
+      "accepted_event": 6,
+      "distance_until_handoff": [
+        0.32999999999998675,
+        0.32999999999998675
+      ],
+      "accepted_time": 28.8611299358
+    },
+    {
+      "request_id": 7,
+      "event": 7,
+      "request_time": 34.8445190118,
+      "revision": 672,
+      "status": "accepted",
+      "scan_times": [
+        34.8,
+        34.8
+      ],
+      "robot_positions": [
+        [
+          0.5250000000000004,
+          -2.2249999999999996
+        ],
+        [
+          4.606873375209803,
+          -1.5568733752098023
+        ]
+      ],
+      "distance_at_request": [
+        7.363071785699874,
+        7.363071785699874
+      ],
+      "distance_during_planning": [
+        0.12844463169494524,
+        0.12844463169494524
+      ],
+      "commit_until": 36.3445190118,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          0.19500000000000034,
+          -2.2249999999999996
+        ],
+        [
+          4.676471862581759,
+          -1.323528137418242
+        ]
+      ],
+      "remaining_route_seconds": [
+        12.305030823575217,
+        12.165666406358117
+      ],
+      "latency_p95_seconds": 1.1499921151000074,
+      "ready_time": 35.42835824679992,
+      "handoff_time": 36.3445190118,
+      "planning_seconds": 0.583839234999914,
+      "candidate_views": 8,
+      "actionable": 17890,
+      "selection_phase": "frontier",
+      "ignored_unknown": 70,
+      "available_candidates": 32,
+      "frontier_candidates": 31,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 901,
+        "cached_views": 1004,
+        "source_rejected_views": 725,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 708,
+        "ray_workers": 2,
+        "proxy_clusters": 22,
+        "cache_bytes": 744856,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.09770931699995344,
+        "shortlist_seconds": 0.06524640200018439,
+        "visibility_seconds": 0.2763145739997981,
+        "audit_and_ownership_seconds": 0.015976581000131773,
+        "target_update": "incremental_components",
+        "changed_voxels": 337124,
+        "support_updated_voxels": 2846256,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4624028680000265,
+        "route_solver_seconds": 0.11713532499993562
+      },
+      "claimed_voxels": 17890,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            0.19500000000505513,
+            -2.2249999999999996
+          ],
+          [
+            4.676471862578184,
+            -1.3235281374218164
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -0.22499999999999964,
+              -0.9749999999999996
+            ],
+            [
+              -0.9749999999999996,
+              -2.2249999999999996
+            ],
+            [
+              -0.7249999999999996,
+              -3.2249999999999996
+            ],
+            [
+              0.025000000000000355,
+              -3.725
+            ]
+          ],
+          [
+            [
+              4.025,
+              -0.22499999999999964
+            ],
+            [
+              5.275,
+              -0.22499999999999964
+            ],
+            [
+              6.025,
+              0.025000000000000355
+            ],
+            [
+              6.025,
+              -0.7249999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            75,
+            155
+          ],
+          [
+            100,
+            265
+          ]
+        ]
+      },
+      "accepted_event": 8,
+      "distance_until_handoff": [
+        0.32999999999494367,
+        0.32999999999494367
+      ],
+      "accepted_time": 36.3445190118
+    },
+    {
+      "request_id": 8,
+      "event": 8,
+      "request_time": 36.3445190118,
+      "revision": 702,
+      "status": "accepted",
+      "scan_times": [
+        36.3,
+        36.3
+      ],
+      "robot_positions": [
+        [
+          0.19500000000505513,
+          -2.2249999999999996
+        ],
+        [
+          4.676471862578184,
+          -1.3235281374218164
+        ]
+      ],
+      "distance_at_request": [
+        7.693071785694817,
+        7.693071785694817
+      ],
+      "distance_during_planning": [
+        0.12081738217998872,
+        0.12081738217998872
+      ],
+      "commit_until": 37.8445190118,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          0.1750000000000007,
+          -1.915000000005054
+        ],
+        [
+          4.513837302905279,
+          -1.0638373029052777
+        ]
+      ],
+      "remaining_route_seconds": [
+        24.7722681242154,
+        19.203971518890015
+      ],
+      "latency_p95_seconds": 1.112322318450003,
+      "ready_time": 36.893688930799954,
+      "handoff_time": 37.8445190118,
+      "planning_seconds": 0.5491699189999508,
+      "candidate_views": 8,
+      "actionable": 16842,
+      "selection_phase": "frontier",
+      "ignored_unknown": 133,
+      "available_candidates": 32,
+      "frontier_candidates": 32,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 820,
+        "cached_views": 941,
+        "source_rejected_views": 757,
+        "traced_views": 32,
+        "candidate_domain": 2468,
+        "untested_views": 738,
+        "ray_workers": 2,
+        "proxy_clusters": 23,
+        "cache_bytes": 722712,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.07292110899993531,
+        "shortlist_seconds": 0.06662493799990443,
+        "visibility_seconds": 0.26150325300000077,
+        "audit_and_ownership_seconds": 0.01612579800007552,
+        "target_update": "incremental_components",
+        "changed_voxels": 79654,
+        "support_updated_voxels": 2986368,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.42417054399993503,
+        "route_solver_seconds": 0.12073409699996773
+      },
+      "claimed_voxels": 16842,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            0.1750000000000007,
+            -1.915000000005065
+          ],
+          [
+            4.513837302905286,
+            -1.0638373029052854
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              0.27500000000000036,
+              -0.7249999999999996
+            ],
+            [
+              -1.4749999999999996,
+              -1.9749999999999996
+            ],
+            [
+              -0.9749999999999996,
+              -3.2249999999999996
+            ],
+            [
+              0.025000000000000355,
+              -3.725
+            ]
+          ],
+          [
+            [
+              3.2750000000000004,
+              -0.7249999999999996
+            ],
+            [
+              4.025,
+              0.025000000000000355
+            ],
+            [
+              5.275,
+              0.5250000000000004
+            ],
+            [
+              5.775,
+              -0.22499999999999964
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            100,
+            155
+          ],
+          [
+            115,
+            240
+          ]
+        ]
+      },
+      "accepted_event": 8,
+      "distance_until_handoff": [
+        0.32999999999998764,
+        0.32999999999998764
+      ],
+      "accepted_time": 37.8445190118
+    },
+    {
+      "request_id": 9,
+      "event": 9,
+      "request_time": 43.5327979038,
+      "revision": 846,
+      "status": "accepted",
+      "scan_times": [
+        43.5,
+        43.5
+      ],
+      "robot_positions": [
+        [
+          0.27500000000000036,
+          -0.7249999999999996
+        ],
+        [
+          3.4343398282223467,
+          -0.7249999999999996
+        ]
+      ],
+      "distance_at_request": [
+        9.274493141927042,
+        9.274493141927042
+      ],
+      "distance_during_planning": [
+        0.12907554945998534,
+        0.12907554945998534
+      ],
+      "commit_until": 45.0327979038,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -0.05499999999999966,
+          -0.7249999999999996
+        ],
+        [
+          3.410319625683113,
+          -0.6396803743168874
+        ]
+      ],
+      "remaining_route_seconds": [
+        23.882559345610282,
+        16.652285837530037
+      ],
+      "latency_p95_seconds": 1.0746525217999985,
+      "ready_time": 44.119504946799935,
+      "handoff_time": 45.0327979038,
+      "planning_seconds": 0.586707042999933,
+      "candidate_views": 8,
+      "actionable": 17790,
+      "selection_phase": "frontier",
+      "ignored_unknown": 544,
+      "available_candidates": 32,
+      "frontier_candidates": 32,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 1020,
+        "cached_views": 710,
+        "source_rejected_views": 870,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 857,
+        "ray_workers": 2,
+        "proxy_clusters": 29,
+        "cache_bytes": 748928,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.08986800000002404,
+        "shortlist_seconds": 0.06792945999995936,
+        "visibility_seconds": 0.2750715660001788,
+        "audit_and_ownership_seconds": 0.01584761999993134,
+        "target_update": "incremental_components",
+        "changed_voxels": 190635,
+        "support_updated_voxels": 3175760,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4561282750000828,
+        "route_solver_seconds": 0.1256074569998873
+      },
+      "claimed_voxels": 17790,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -0.05499999999234695,
+            -0.7249999999999996
+          ],
+          [
+            3.4103196256777015,
+            -0.6396803743222989
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              0.025000000000000355,
+              0.7750000000000004
+            ],
+            [
+              -0.9749999999999996,
+              0.27500000000000036
+            ],
+            [
+              -1.2249999999999996,
+              -0.47499999999999964
+            ],
+            [
+              -1.4749999999999996,
+              -1.7249999999999996
+            ]
+          ],
+          [
+            [
+              4.525,
+              0.5250000000000004
+            ],
+            [
+              3.5250000000000004,
+              1.5250000000000004
+            ],
+            [
+              3.5250000000000004,
+              0.7750000000000004
+            ],
+            [
+              2.5250000000000004,
+              0.7750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            80,
+            130
+          ],
+          [
+            120,
+            240
+          ]
+        ]
+      },
+      "accepted_event": 10,
+      "distance_until_handoff": [
+        0.32999999999234575,
+        0.32999999999234575
+      ],
+      "accepted_time": 45.0327979038
+    },
+    {
+      "request_id": 10,
+      "event": 10,
+      "request_time": 45.0327979038,
+      "revision": 876,
+      "status": "accepted",
+      "scan_times": [
+        45.0,
+        45.0
+      ],
+      "robot_positions": [
+        [
+          -0.05499999999234695,
+          -0.7249999999999996
+        ],
+        [
+          3.4103196256777015,
+          -0.6396803743222989
+        ]
+      ],
+      "distance_at_request": [
+        9.604493141919388,
+        9.604493141919388
+      ],
+      "distance_during_planning": [
+        0.11483897590001035,
+        0.11483897590001035
+      ],
+      "commit_until": 46.5327979038,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -0.07499999999999929,
+          -0.41500000000765197
+        ],
+        [
+          3.608309524409935,
+          -0.3916904755900654
+        ]
+      ],
+      "remaining_route_seconds": [
+        22.616522357354803,
+        21.775498479321854
+      ],
+      "latency_p95_seconds": 1.0369827251499935,
+      "ready_time": 45.55479324880005,
+      "handoff_time": 46.5327979038,
+      "planning_seconds": 0.5219953450000503,
+      "candidate_views": 8,
+      "actionable": 18102,
+      "selection_phase": "frontier",
+      "ignored_unknown": 431,
+      "available_candidates": 32,
+      "frontier_candidates": 32,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 614,
+        "cached_views": 998,
+        "source_rejected_views": 574,
+        "traced_views": 32,
+        "candidate_domain": 2468,
+        "untested_views": 864,
+        "ray_workers": 2,
+        "proxy_clusters": 31,
+        "cache_bytes": 733104,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06812221300015153,
+        "shortlist_seconds": 0.0662529280000399,
+        "visibility_seconds": 0.263308817999814,
+        "audit_and_ownership_seconds": 0.016870354000047882,
+        "target_update": "incremental_components",
+        "changed_voxels": 19013,
+        "support_updated_voxels": 2540664,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.42210519800005386,
+        "route_solver_seconds": 0.09537667900008273
+      },
+      "claimed_voxels": 18102,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -0.07499999999999929,
+            -0.41500000000764103
+          ],
+          [
+            3.608309524409943,
+            -0.3916904755900577
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              0.025000000000000355,
+              0.7750000000000004
+            ],
+            [
+              -0.9749999999999996,
+              0.5250000000000004
+            ],
+            [
+              -1.4749999999999996,
+              -0.47499999999999964
+            ],
+            [
+              -1.4749999999999996,
+              -1.7249999999999996
+            ]
+          ],
+          [
+            [
+              4.525,
+              0.5250000000000004
+            ],
+            [
+              3.7750000000000004,
+              0.7750000000000004
+            ],
+            [
+              3.5250000000000004,
+              1.5250000000000004
+            ],
+            [
+              2.7750000000000004,
+              0.7750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            135,
+            160
+          ],
+          [
+            130,
+            250
+          ]
+        ]
+      },
+      "accepted_event": 10,
+      "distance_until_handoff": [
+        0.33000000000000895,
+        0.33000000000000895
+      ],
+      "accepted_time": 46.5327979038
+    },
+    {
+      "request_id": 11,
+      "event": 11,
+      "request_time": 52.1301677049,
+      "revision": 1018,
+      "status": "accepted",
+      "scan_times": [
+        52.1,
+        52.1
+      ],
+      "robot_positions": [
+        [
+          0.025000000000000355,
+          0.7750000000000004
+        ],
+        [
+          4.479055915908683,
+          0.47905591590868196
+        ]
+      ],
+      "distance_at_request": [
+        11.165914498164343,
+        11.165914498164343
+      ],
+      "distance_during_planning": [
+        0.13001781980677762,
+        0.13001781980677762
+      ],
+      "commit_until": 53.6301677049,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -0.2669238815542509,
+          0.6830761184457493
+        ],
+        [
+          4.322954185359086,
+          0.6770458146409165
+        ]
+      ],
+      "remaining_route_seconds": [
+        16.184818962635553,
+        12.876098635450548
+      ],
+      "latency_p95_seconds": 0.9993129284999895,
+      "ready_time": 52.72115779490011,
+      "handoff_time": 53.6301677049,
+      "planning_seconds": 0.5909900900001048,
+      "candidate_views": 8,
+      "actionable": 20480,
+      "selection_phase": "frontier",
+      "ignored_unknown": 762,
+      "available_candidates": 32,
+      "frontier_candidates": 29,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 991,
+        "cached_views": 613,
+        "source_rejected_views": 808,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 1016,
+        "ray_workers": 2,
+        "proxy_clusters": 28,
+        "cache_bytes": 846576,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.09978251699999419,
+        "shortlist_seconds": 0.06698961500001133,
+        "visibility_seconds": 0.2720587189999151,
+        "audit_and_ownership_seconds": 0.017896930999995675,
+        "target_update": "incremental_components",
+        "changed_voxels": 477031,
+        "support_updated_voxels": 3583440,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4660915859999477,
+        "route_solver_seconds": 0.11950541600003817
+      },
+      "claimed_voxels": 20480,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -0.2669238815590427,
+            0.6830761184409575
+          ],
+          [
+            4.322954185354294,
+            0.677045814645708
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -1.4749999999999996,
+              -0.47499999999999964
+            ],
+            [
+              -1.4749999999999996,
+              0.7750000000000004
+            ],
+            [
+              -1.2249999999999996,
+              1.5250000000000004
+            ],
+            [
+              0.025000000000000355,
+              2.2750000000000004
+            ]
+          ],
+          [
+            [
+              3.2750000000000004,
+              1.5250000000000004
+            ],
+            [
+              3.7750000000000004,
+              2.2750000000000004
+            ],
+            [
+              4.525,
+              2.0250000000000004
+            ],
+            [
+              5.775,
+              1.2750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            130,
+            140
+          ],
+          [
+            135,
+            235
+          ]
+        ]
+      },
+      "accepted_event": 12,
+      "distance_until_handoff": [
+        0.3300000000067769,
+        0.3300000000067769
+      ],
+      "accepted_time": 53.6301677049
+    },
+    {
+      "request_id": 12,
+      "event": 12,
+      "request_time": 53.6301677049,
+      "revision": 1048,
+      "status": "accepted",
+      "scan_times": [
+        53.6,
+        53.6
+      ],
+      "robot_positions": [
+        [
+          -0.2669238815590427,
+          0.6830761184409575
+        ],
+        [
+          4.322954185354294,
+          0.677045814645708
+        ]
+      ],
+      "distance_at_request": [
+        11.49591449817112,
+        11.49591449817112
+      ],
+      "distance_during_planning": [
+        0.12270990820000449,
+        0.12270990820000449
+      ],
+      "commit_until": 55.1301677049,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -0.514913780291276,
+          0.48508621970872406
+        ],
+        [
+          4.079055915913475,
+          0.8709440840865262
+        ]
+      ],
+      "remaining_route_seconds": [
+        25.658516973391542,
+        21.710432229067433
+      ],
+      "latency_p95_seconds": 0.9616431318499844,
+      "ready_time": 54.18794001490002,
+      "handoff_time": 55.1301677049,
+      "planning_seconds": 0.5577723100000185,
+      "candidate_views": 8,
+      "actionable": 18693,
+      "selection_phase": "frontier",
+      "ignored_unknown": 749,
+      "available_candidates": 32,
+      "frontier_candidates": 29,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 791,
+        "cached_views": 662,
+        "source_rejected_views": 738,
+        "traced_views": 32,
+        "candidate_domain": 2468,
+        "untested_views": 1036,
+        "ray_workers": 2,
+        "proxy_clusters": 30,
+        "cache_bytes": 773840,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06753557199999705,
+        "shortlist_seconds": 0.06581406300006165,
+        "visibility_seconds": 0.2821078540000599,
+        "audit_and_ownership_seconds": 0.017131779000010283,
+        "target_update": "incremental_components",
+        "changed_voxels": 54023,
+        "support_updated_voxels": 2485728,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.44058250800003407,
+        "route_solver_seconds": 0.11248318399998425
+      },
+      "claimed_voxels": 18693,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -0.5149137802912792,
+            0.48508621970872073
+          ],
+          [
+            4.079055915913472,
+            0.8709440840865296
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -0.22499999999999964,
+              2.2750000000000004
+            ],
+            [
+              -1.4749999999999996,
+              1.5250000000000004
+            ],
+            [
+              -1.4749999999999996,
+              0.5250000000000004
+            ],
+            [
+              -1.4749999999999996,
+              -0.47499999999999964
+            ],
+            [
+              -1.7249999999999996,
+              -2.2249999999999996
+            ]
+          ],
+          [
+            [
+              3.2750000000000004,
+              1.7750000000000004
+            ],
+            [
+              4.525,
+              2.2750000000000004
+            ],
+            [
+              5.775,
+              1.2750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            110,
+            130
+          ],
+          [
+            150,
+            225
+          ]
+        ]
+      },
+      "accepted_event": 12,
+      "distance_until_handoff": [
+        0.3300000000000036,
+        0.3300000000000036
+      ],
+      "accepted_time": 55.1301677049
+    },
+    {
+      "request_id": 13,
+      "event": 13,
+      "request_time": 60.7533803467,
+      "revision": 1190,
+      "status": "accepted",
+      "scan_times": [
+        60.7,
+        60.7
+      ],
+      "robot_positions": [
+        [
+          -0.17499999999999982,
+          1.5528679656554223
+        ],
+        [
+          3.2750000000000004,
+          1.7750000000000004
+        ]
+      ],
+      "distance_at_request": [
+        13.06302127936227,
+        13.06302127936227
+      ],
+      "distance_during_planning": [
+        0.12425346713999552,
+        0.12425346713999552
+      ],
+      "commit_until": 62.2533803467,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -0.17499999999999982,
+          1.8828679656554224
+        ],
+        [
+          3.6050000000000004,
+          1.7750000000000004
+        ]
+      ],
+      "remaining_route_seconds": [
+        28.785419118747267,
+        14.18781974345292
+      ],
+      "latency_p95_seconds": 0.9239733351999793,
+      "ready_time": 61.318168833699985,
+      "handoff_time": 62.2533803467,
+      "planning_seconds": 0.5647884869999871,
+      "candidate_views": 8,
+      "actionable": 15356,
+      "selection_phase": "frontier",
+      "ignored_unknown": 957,
+      "available_candidates": 32,
+      "frontier_candidates": 28,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 803,
+        "cached_views": 629,
+        "source_rejected_views": 646,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 1162,
+        "ray_workers": 2,
+        "proxy_clusters": 28,
+        "cache_bytes": 690496,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.07651432900001964,
+        "shortlist_seconds": 0.06859110100003818,
+        "visibility_seconds": 0.27362185199990563,
+        "audit_and_ownership_seconds": 0.016739618999963568,
+        "target_update": "incremental_components",
+        "changed_voxels": 248184,
+        "support_updated_voxels": 2577960,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.4431037080000806,
+        "route_solver_seconds": 0.11714390499992078
+      },
+      "claimed_voxels": 15356,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -0.17499999999999982,
+            1.8828679656554184
+          ],
+          [
+            3.6049999999999973,
+            1.7750000000000004
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -1.7249999999999996,
+              2.2750000000000004
+            ],
+            [
+              -1.7249999999999996,
+              1.0250000000000004
+            ],
+            [
+              -2.4749999999999996,
+              1.0250000000000004
+            ],
+            [
+              -1.9749999999999996,
+              -0.22499999999999964
+            ],
+            [
+              -1.4749999999999996,
+              -1.7249999999999996
+            ]
+          ],
+          [
+            [
+              4.525,
+              2.7750000000000004
+            ],
+            [
+              0.025000000000000355,
+              3.0250000000000004
+            ],
+            [
+              -0.9749999999999996,
+              2.7750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            165,
+            155
+          ],
+          [
+            165,
+            250
+          ]
+        ]
+      },
+      "accepted_event": 13,
+      "distance_until_handoff": [
+        0.32999999999999474,
+        0.32999999999999474
+      ],
+      "accepted_time": 62.2533803467
+    },
+    {
+      "request_id": 14,
+      "event": 14,
+      "request_time": 68.584254011,
+      "revision": 1346,
+      "status": "accepted",
+      "scan_times": [
+        68.5,
+        68.5
+      ],
+      "robot_positions": [
+        [
+          -1.3063708498870956,
+          2.2750000000000004
+        ],
+        [
+          4.525,
+          2.7750000000000004
+        ]
+      ],
+      "distance_at_request": [
+        14.785813485498045,
+        14.785813485498045
+      ],
+      "distance_during_planning": [
+        0.12845271009998527,
+        0.12845271009998527
+      ],
+      "commit_until": 70.084254011,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -1.6363708498870957,
+          2.2750000000000004
+        ],
+        [
+          4.195,
+          2.7750000000000004
+        ]
+      ],
+      "remaining_route_seconds": [
+        27.1718975423481,
+        25.941394459938856
+      ],
+      "latency_p95_seconds": 0.8863035385499753,
+      "ready_time": 69.16812996599994,
+      "handoff_time": 70.084254011,
+      "planning_seconds": 0.5838759549999395,
+      "candidate_views": 8,
+      "actionable": 13103,
+      "selection_phase": "frontier",
+      "ignored_unknown": 273,
+      "available_candidates": 32,
+      "frontier_candidates": 22,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 768,
+        "cached_views": 539,
+        "source_rejected_views": 534,
+        "traced_views": 32,
+        "candidate_domain": 2470,
+        "untested_views": 1365,
+        "ray_workers": 2,
+        "proxy_clusters": 37,
+        "cache_bytes": 533984,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.07896443899994665,
+        "shortlist_seconds": 0.0706875939999918,
+        "visibility_seconds": 0.30048449400010213,
+        "audit_and_ownership_seconds": 0.014953562999835412,
+        "target_update": "incremental_components",
+        "changed_voxels": 229121,
+        "support_updated_voxels": 2700096,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.47201989599989247,
+        "route_solver_seconds": 0.10786423800004741
+      },
+      "claimed_voxels": 13103,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -1.6363708498870821,
+            2.2750000000000004
+          ],
+          [
+            4.195000000000013,
+            2.7750000000000004
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -3.2249999999999996,
+              1.2750000000000004
+            ],
+            [
+              -2.2249999999999996,
+              1.0250000000000004
+            ],
+            [
+              -1.9749999999999996,
+              -0.22499999999999964
+            ],
+            [
+              -1.4749999999999996,
+              -1.7249999999999996
+            ],
+            [
+              -1.7249999999999996,
+              -3.2249999999999996
+            ]
+          ],
+          [
+            [
+              -1.4749999999999996,
+              3.7750000000000004
+            ],
+            [
+              -2.4749999999999996,
+              3.2750000000000004
+            ],
+            [
+              -2.7249999999999996,
+              2.2750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            165,
+            125
+          ],
+          [
+            180,
+            160
+          ]
+        ]
+      },
+      "accepted_event": 14,
+      "distance_until_handoff": [
+        0.32999999999998586,
+        0.32999999999998586
+      ],
+      "accepted_time": 70.084254011
+    },
+    {
+      "request_id": 15,
+      "event": 15,
+      "request_time": 79.4245891662,
+      "revision": 1564,
+      "status": "accepted",
+      "scan_times": [
+        79.4,
+        79.4
+      ],
+      "robot_positions": [
+        [
+          -3.2249999999999996,
+          1.2750000000000004
+        ],
+        [
+          2.1401262658584903,
+          2.7750000000000004
+        ]
+      ],
+      "distance_at_request": [
+        17.170687219639543,
+        17.170687219639543
+      ],
+      "distance_during_planning": [
+        0.12540915617999815,
+        0.12540915617999815
+      ],
+      "commit_until": 80.9245891662,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -2.9330761184457486,
+          1.1830761184457492
+        ],
+        [
+          1.8101262658584902,
+          2.7750000000000004
+        ]
+      ],
+      "remaining_route_seconds": [
+        27.447625595841018,
+        28.81818181823367
+      ],
+      "latency_p95_seconds": 0.8486337418999702,
+      "ready_time": 79.99463078519999,
+      "handoff_time": 80.9245891662,
+      "planning_seconds": 0.5700416189999942,
+      "candidate_views": 8,
+      "actionable": 13079,
+      "selection_phase": "frontier",
+      "ignored_unknown": 25,
+      "available_candidates": 32,
+      "frontier_candidates": 23,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 826,
+        "cached_views": 279,
+        "source_rejected_views": 615,
+        "traced_views": 32,
+        "candidate_domain": 2471,
+        "untested_views": 1545,
+        "ray_workers": 2,
+        "proxy_clusters": 37,
+        "cache_bytes": 471272,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.08380623800007925,
+        "shortlist_seconds": 0.06926594099991235,
+        "visibility_seconds": 0.2811337870000443,
+        "audit_and_ownership_seconds": 0.013711003000025812,
+        "target_update": "incremental_components",
+        "changed_voxels": 348674,
+        "support_updated_voxels": 3566080,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.45458402600002046,
+        "route_solver_seconds": 0.111557318999985
+      },
+      "claimed_voxels": 13079,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -2.933076118445751,
+            1.1830761184457517
+          ],
+          [
+            1.8101262658584911,
+            2.7750000000000004
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -4.725,
+              0.7750000000000004
+            ],
+            [
+              -4.725,
+              -0.22499999999999964
+            ],
+            [
+              -3.9749999999999996,
+              0.025000000000000355
+            ],
+            [
+              -2.7249999999999996,
+              -0.47499999999999964
+            ],
+            [
+              -1.4749999999999996,
+              -1.7249999999999996
+            ]
+          ],
+          [
+            [
+              0.27500000000000036,
+              3.5250000000000004
+            ],
+            [
+              -3.7249999999999996,
+              3.0250000000000004
+            ],
+            [
+              -4.475,
+              2.0250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            140,
+            115
+          ],
+          [
+            195,
+            130
+          ]
+        ]
+      },
+      "accepted_event": 15,
+      "distance_until_handoff": [
+        0.32999999999999474,
+        0.32999999999999474
+      ],
+      "accepted_time": 80.9245891662
+    },
+    {
+      "request_id": 16,
+      "event": 16,
+      "request_time": 89.449743284,
+      "revision": 1763,
+      "status": "accepted",
+      "scan_times": [
+        89.4,
+        89.4
+      ],
+      "robot_positions": [
+        [
+          -4.644137802853436,
+          0.8250000000000002
+        ],
+        [
+          0.27500000000000036,
+          3.5250000000000004
+        ]
+      ],
+      "distance_at_request": [
+        19.37622112556086,
+        19.37622112556086
+      ],
+      "distance_during_planning": [
+        0.096767904859977,
+        0.096767904859977
+      ],
+      "commit_until": 90.949743284,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -4.725,
+          0.5465728752652188
+        ],
+        [
+          -0.05499999999999966,
+          3.5250000000000004
+        ]
+      ],
+      "remaining_route_seconds": [
+        25.996999219234485,
+        25.08075887711986
+      ],
+      "latency_p95_seconds": 0.8109639452499664,
+      "ready_time": 89.8895973969999,
+      "handoff_time": 90.949743284,
+      "planning_seconds": 0.4398541129999103,
+      "candidate_views": 8,
+      "actionable": 9790,
+      "selection_phase": "frontier",
+      "ignored_unknown": 12,
+      "available_candidates": 32,
+      "frontier_candidates": 22,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 622,
+        "cached_views": 304,
+        "source_rejected_views": 419,
+        "traced_views": 32,
+        "candidate_domain": 2471,
+        "untested_views": 1716,
+        "ray_workers": 2,
+        "proxy_clusters": 38,
+        "cache_bytes": 334752,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.0729285869999785,
+        "shortlist_seconds": 0.0702048199998444,
+        "visibility_seconds": 0.16631619600002523,
+        "audit_and_ownership_seconds": 0.012276357000018834,
+        "target_update": "incremental_components",
+        "changed_voxels": 179129,
+        "support_updated_voxels": 2552480,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.3274806360000184,
+        "route_solver_seconds": 0.10876959799998076
+      },
+      "claimed_voxels": 9790,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -4.725,
+            0.5465728752720012
+          ],
+          [
+            -0.054999999993217696,
+            3.5250000000000004
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -4.725,
+              -0.7249999999999996
+            ],
+            [
+              -2.7249999999999996,
+              -0.7249999999999996
+            ],
+            [
+              -2.2249999999999996,
+              -2.2249999999999996
+            ],
+            [
+              -1.4749999999999996,
+              -1.7249999999999996
+            ],
+            [
+              -1.4749999999999996,
+              -3.2249999999999996
+            ]
+          ],
+          [
+            [
+              -1.2249999999999996,
+              4.025
+            ],
+            [
+              -5.975,
+              1.5250000000000004
+            ],
+            [
+              -5.975,
+              0.27500000000000036
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            115,
+            65
+          ],
+          [
+            180,
+            85
+          ]
+        ]
+      },
+      "accepted_event": 17,
+      "distance_until_handoff": [
+        0.32999999999321616,
+        0.32999999999321616
+      ],
+      "accepted_time": 90.949743284
+    },
+    {
+      "request_id": 17,
+      "event": 17,
+      "request_time": 90.949743284,
+      "revision": 1793,
+      "status": "accepted",
+      "scan_times": [
+        90.9,
+        90.9
+      ],
+      "robot_positions": [
+        [
+          -4.725,
+          0.5465728752720012
+        ],
+        [
+          -0.054999999993217696,
+          3.5250000000000004
+        ]
+      ],
+      "distance_at_request": [
+        19.706221125554077,
+        19.706221125554077
+      ],
+      "distance_during_planning": [
+        0.08971905645998035,
+        0.08971905645998035
+      ],
+      "commit_until": 92.449743284,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -4.725,
+          0.21657287527200114
+        ],
+        [
+          -0.3820710678070696,
+          3.53207106780707
+        ]
+      ],
+      "remaining_route_seconds": [
+        34.864095512253904,
+        38.23927585057304
+      ],
+      "latency_p95_seconds": 0.7732941485999613,
+      "ready_time": 91.3575571769999,
+      "handoff_time": 92.449743284,
+      "planning_seconds": 0.40781389299991133,
+      "candidate_views": 8,
+      "actionable": 10646,
+      "selection_phase": "frontier",
+      "ignored_unknown": 17,
+      "available_candidates": 33,
+      "frontier_candidates": 22,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 474,
+        "cached_views": 281,
+        "source_rejected_views": 420,
+        "traced_views": 32,
+        "candidate_domain": 2472,
+        "untested_views": 1739,
+        "ray_workers": 2,
+        "proxy_clusters": 39,
+        "cache_bytes": 331192,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06057444999987638,
+        "shortlist_seconds": 0.07109965400013607,
+        "visibility_seconds": 0.1522404820000247,
+        "audit_and_ownership_seconds": 0.012385962999815092,
+        "target_update": "incremental_components",
+        "changed_voxels": 32426,
+        "support_updated_voxels": 2260272,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.30182055299997046,
+        "route_solver_seconds": 0.1021404519999578
+      },
+      "claimed_voxels": 10646,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -4.725,
+            0.21657287527202307
+          ],
+          [
+            -0.38207106780705413,
+            3.5320710678070544
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -3.9749999999999996,
+              -0.7249999999999996
+            ],
+            [
+              -4.725,
+              -0.9749999999999996
+            ],
+            [
+              -4.725,
+              -1.7249999999999996
+            ],
+            [
+              -6.225,
+              -0.22499999999999964
+            ],
+            [
+              -6.225,
+              0.5250000000000004
+            ],
+            [
+              -5.975,
+              1.5250000000000004
+            ]
+          ],
+          [
+            [
+              -1.4749999999999996,
+              4.025
+            ],
+            [
+              -2.7249999999999996,
+              -0.7249999999999996
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            105,
+            65
+          ],
+          [
+            200,
+            135
+          ]
+        ]
+      },
+      "accepted_event": 17,
+      "distance_until_handoff": [
+        0.329999999999977,
+        0.329999999999977
+      ],
+      "accepted_time": 92.449743284
+    },
+    {
+      "request_id": 18,
+      "event": 18,
+      "request_time": 98.2183219045,
+      "revision": 1939,
+      "status": "accepted",
+      "scan_times": [
+        98.2,
+        98.2
+      ],
+      "robot_positions": [
+        [
+          -3.9749999999999996,
+          -0.7249999999999996
+        ],
+        [
+          -1.441045096759384,
+          3.991045096759385
+        ]
+      ],
+      "distance_at_request": [
+        21.305308422061845,
+        21.305308422061845
+      ],
+      "distance_during_planning": [
+        0.09886062669398044,
+        0.09886062669398044
+      ],
+      "commit_until": 99.7183219045,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -4.222989898732233,
+          -0.9229898987322329
+        ],
+        [
+          -1.4749999999999996,
+          3.7430194846719447
+        ]
+      ],
+      "remaining_route_seconds": [
+        25.3564869306645,
+        24.162665625628698
+      ],
+      "latency_p95_seconds": 0.7356243519499561,
+      "ready_time": 98.66768838950016,
+      "handoff_time": 99.7183219045,
+      "planning_seconds": 0.4493664850001551,
+      "candidate_views": 8,
+      "actionable": 9557,
+      "selection_phase": "frontier",
+      "ignored_unknown": 1,
+      "available_candidates": 32,
+      "frontier_candidates": 18,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 486,
+        "cached_views": 247,
+        "source_rejected_views": 346,
+        "traced_views": 32,
+        "candidate_domain": 2471,
+        "untested_views": 1846,
+        "ray_workers": 2,
+        "proxy_clusters": 36,
+        "cache_bytes": 297744,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.07419644099991274,
+        "shortlist_seconds": 0.0734419830000661,
+        "visibility_seconds": 0.1618189359999178,
+        "audit_and_ownership_seconds": 0.013160449999986668,
+        "target_update": "incremental_components",
+        "changed_voxels": 122853,
+        "support_updated_voxels": 2876160,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.32847923600002105,
+        "route_solver_seconds": 0.11733177800010708
+      },
+      "claimed_voxels": 9557,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -4.222989898727976,
+            -0.9229898987279759
+          ],
+          [
+            -1.4749999999999996,
+            3.743019484677965
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -2.9749999999999996,
+              -1.9749999999999996
+            ],
+            [
+              -4.725,
+              -1.9749999999999996
+            ],
+            [
+              -5.475,
+              -1.2249999999999996
+            ],
+            [
+              -6.225,
+              -0.9749999999999996
+            ],
+            [
+              -6.225,
+              -1.7249999999999996
+            ]
+          ],
+          [
+            [
+              -2.7249999999999996,
+              4.775
+            ],
+            [
+              -4.225,
+              2.7750000000000004
+            ],
+            [
+              -6.225,
+              2.5250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            100,
+            65
+          ],
+          [
+            105,
+            105
+          ]
+        ]
+      },
+      "accepted_event": 19,
+      "distance_until_handoff": [
+        0.32999999999398,
+        0.32999999999398
+      ],
+      "accepted_time": 99.7183219045
+    },
+    {
+      "request_id": 19,
+      "event": 19,
+      "request_time": 99.7183219045,
+      "revision": 1965,
+      "status": "accepted",
+      "scan_times": [
+        99.7,
+        99.7
+      ],
+      "robot_positions": [
+        [
+          -4.222989898727976,
+          -0.9229898987279759
+        ],
+        [
+          -1.4749999999999996,
+          3.743019484677965
+        ]
+      ],
+      "distance_at_request": [
+        21.635308422055825,
+        21.635308422055825
+      ],
+      "distance_during_planning": [
+        0.09035151003999786,
+        0.09035151003999786
+      ],
+      "commit_until": 101.2183219045,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.9790202025397905,
+          -1.1209797974602094
+        ],
+        [
+          -1.710248198922958,
+          3.910248198922959
+        ]
+      ],
+      "remaining_route_seconds": [
+        27.736275069752203,
+        30.548684900618554
+      ],
+      "latency_p95_seconds": 0.6979545552999509,
+      "ready_time": 100.1290105865,
+      "handoff_time": 101.2183219045,
+      "planning_seconds": 0.41068868199999997,
+      "candidate_views": 8,
+      "actionable": 10027,
+      "selection_phase": "frontier",
+      "ignored_unknown": 0,
+      "available_candidates": 32,
+      "frontier_candidates": 20,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 341,
+        "cached_views": 284,
+        "source_rejected_views": 290,
+        "traced_views": 32,
+        "candidate_domain": 2471,
+        "untested_views": 1865,
+        "ray_workers": 2,
+        "proxy_clusters": 38,
+        "cache_bytes": 315760,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.05392077100009374,
+        "shortlist_seconds": 0.07117627599996013,
+        "visibility_seconds": 0.17248427699996682,
+        "audit_and_ownership_seconds": 0.018057035000083488,
+        "target_update": "incremental_components",
+        "changed_voxels": 31368,
+        "support_updated_voxels": 2714880,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.32130670800006556,
+        "route_solver_seconds": 0.08544168499997795
+      },
+      "claimed_voxels": 10027,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -3.9790202025397905,
+            -1.1209797974602094
+          ],
+          [
+            -1.710248198922958,
+            3.910248198922959
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -3.2249999999999996,
+              -1.9749999999999996
+            ],
+            [
+              -3.9749999999999996,
+              -3.2249999999999996
+            ],
+            [
+              -4.975,
+              -2.2249999999999996
+            ],
+            [
+              -5.725,
+              -0.9749999999999996
+            ],
+            [
+              -6.225,
+              0.5250000000000004
+            ]
+          ],
+          [
+            [
+              -2.7249999999999996,
+              4.775
+            ],
+            [
+              -4.225,
+              2.7750000000000004
+            ],
+            [
+              -6.225,
+              2.5250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            80,
+            100
+          ],
+          [
+            215,
+            105
+          ]
+        ]
+      },
+      "accepted_event": 19,
+      "distance_until_handoff": [
+        0.3299999999999983,
+        0.3299999999999983
+      ],
+      "accepted_time": 101.2183219045
+    },
+    {
+      "request_id": 20,
+      "event": 20,
+      "request_time": 106.5198927988,
+      "revision": 2099,
+      "status": "accepted",
+      "scan_times": [
+        106.5,
+        106.5
+      ],
+      "robot_positions": [
+        [
+          -3.2249999999999996,
+          -1.9749999999999994
+        ],
+        [
+          -2.5789130624034207,
+          4.628913062403421
+        ]
+      ],
+      "distance_at_request": [
+        23.131654018790897,
+        23.131654018790897
+      ],
+      "distance_during_planning": [
+        0.08821733272000998,
+        0.08821733272000998
+      ],
+      "commit_until": 108.0198927988,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.3522792206135783,
+          -2.2522792206135778
+        ],
+        [
+          -2.7249999999999996,
+          4.651598128434634
+        ]
+      ],
+      "remaining_route_seconds": [
+        28.375639486905843,
+        23.747114006368196
+      ],
+      "latency_p95_seconds": 0.6602847586499484,
+      "ready_time": 106.92088067480005,
+      "handoff_time": 108.0198927988,
+      "planning_seconds": 0.4009878760000447,
+      "candidate_views": 8,
+      "actionable": 6408,
+      "selection_phase": "frontier",
+      "ignored_unknown": 0,
+      "available_candidates": 32,
+      "frontier_candidates": 14,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 361,
+        "cached_views": 245,
+        "source_rejected_views": 253,
+        "traced_views": 32,
+        "candidate_domain": 2470,
+        "untested_views": 1940,
+        "ray_workers": 2,
+        "proxy_clusters": 37,
+        "cache_bytes": 199216,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06792188899999019,
+        "shortlist_seconds": 0.0708707339999819,
+        "visibility_seconds": 0.15430806399990615,
+        "audit_and_ownership_seconds": 0.010646645999941029,
+        "target_update": "incremental_components",
+        "changed_voxels": 75601,
+        "support_updated_voxels": 2701440,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.30840039999998226,
+        "route_solver_seconds": 0.08883819299990137
+      },
+      "claimed_voxels": 6408,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -3.3522792206097844,
+            -2.2522792206097844
+          ],
+          [
+            -2.7249999999999996,
+            4.65159812844
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -2.9749999999999996,
+              -3.4749999999999996
+            ],
+            [
+              -3.9749999999999996,
+              -3.2249999999999996
+            ],
+            [
+              -4.725,
+              -2.7249999999999996
+            ],
+            [
+              -5.725,
+              -1.4749999999999996
+            ]
+          ],
+          [
+            [
+              -3.9749999999999996,
+              5.025
+            ],
+            [
+              -4.725,
+              4.775
+            ],
+            [
+              -6.225,
+              2.5250000000000004
+            ],
+            [
+              -4.225,
+              2.7750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            55,
+            80
+          ],
+          [
+            175,
+            75
+          ]
+        ]
+      },
+      "accepted_event": 21,
+      "distance_until_handoff": [
+        0.32999999999463725,
+        0.32999999999463725
+      ],
+      "accepted_time": 108.0198927988
+    },
+    {
+      "request_id": 21,
+      "event": 21,
+      "request_time": 108.0198927988,
+      "revision": 2128,
+      "status": "accepted",
+      "scan_times": [
+        108.0,
+        108.0
+      ],
+      "robot_positions": [
+        [
+          -3.3522792206097844,
+          -2.2522792206097844
+        ],
+        [
+          -2.7249999999999996,
+          4.65159812844
+        ]
+      ],
+      "distance_at_request": [
+        23.461654018785534,
+        23.461654018785534
+      ],
+      "distance_during_planning": [
+        0.08899051678000802,
+        0.08899051678000802
+      ],
+      "commit_until": 109.5198927988,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.375,
+          -2.57286796563867
+        ],
+        [
+          -3.031598128439999,
+          4.675000000000001
+        ]
+      ],
+      "remaining_route_seconds": [
+        23.284959970288565,
+        34.53761638960417
+      ],
+      "latency_p95_seconds": 0.6110283164499947,
+      "ready_time": 108.42439514780004,
+      "handoff_time": 109.5198927988,
+      "planning_seconds": 0.40450234900004034,
+      "candidate_views": 8,
+      "actionable": 5384,
+      "selection_phase": "frontier",
+      "ignored_unknown": 3,
+      "available_candidates": 35,
+      "frontier_candidates": 14,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 278,
+        "cached_views": 252,
+        "source_rejected_views": 229,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 1956,
+        "ray_workers": 2,
+        "proxy_clusters": 35,
+        "cache_bytes": 181120,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.05644500800008245,
+        "shortlist_seconds": 0.07089475599991601,
+        "visibility_seconds": 0.17873369400012962,
+        "audit_and_ownership_seconds": 0.01042156900007285,
+        "target_update": "incremental_components",
+        "changed_voxels": 17714,
+        "support_updated_voxels": 2002560,
+        "selected_frontier_tasks": 8,
+        "selected_detail_tasks": 0,
+        "evaluation_seconds": 0.3206092790001094,
+        "route_solver_seconds": 0.08064690199989855
+      },
+      "claimed_voxels": 5384,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -3.375,
+            -2.5728679656386793
+          ],
+          [
+            -3.031598128440008,
+            4.675000000000001
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -3.4749999999999996,
+              -3.725
+            ],
+            [
+              -4.725,
+              -2.7249999999999996
+            ],
+            [
+              -6.225,
+              -2.2249999999999996
+            ],
+            [
+              -5.725,
+              -1.4749999999999996
+            ],
+            [
+              -6.225,
+              1.0250000000000004
+            ]
+          ],
+          [
+            [
+              -4.225,
+              4.775
+            ],
+            [
+              -6.225,
+              2.5250000000000004
+            ],
+            [
+              -4.225,
+              2.7750000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            50,
+            100
+          ],
+          [
+            220,
+            80
+          ]
+        ]
+      },
+      "accepted_event": 21,
+      "distance_until_handoff": [
+        0.33000000000000895,
+        0.33000000000000895
+      ],
+      "accepted_time": 109.5198927988
+    },
+    {
+      "request_id": 22,
+      "event": 22,
+      "request_time": 114.9451354833,
+      "revision": 2265,
+      "status": "accepted",
+      "scan_times": [
+        114.9,
+        114.9
+      ],
+      "robot_positions": [
+        [
+          -3.4749999999999996,
+          -3.725
+        ],
+        [
+          -4.170533905921311,
+          4.775
+        ]
+      ],
+      "distance_at_request": [
+        24.985207409384167,
+        24.985207409384167
+      ],
+      "distance_during_planning": [
+        0.0916121747207228,
+        0.0916121747207228
+      ],
+      "commit_until": 116.4451354833,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.7376345596729053,
+          -3.562365440327094
+        ],
+        [
+          -4.500533905921311,
+          4.775
+        ]
+      ],
+      "remaining_route_seconds": [
+        31.979699572421538,
+        26.730962230944307
+      ],
+      "latency_p95_seconds": 0.5919615101500995,
+      "ready_time": 115.36155445930017,
+      "handoff_time": 116.4451354833,
+      "planning_seconds": 0.4164189760001591,
+      "candidate_views": 8,
+      "actionable": 2695,
+      "selection_phase": "frontier+detail",
+      "ignored_unknown": 1,
+      "available_candidates": 37,
+      "frontier_candidates": 3,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 295,
+        "cached_views": 218,
+        "source_rejected_views": 144,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 2075,
+        "ray_workers": 2,
+        "proxy_clusters": 38,
+        "cache_bytes": 91496,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.06266353800015168,
+        "shortlist_seconds": 0.07530347199985954,
+        "visibility_seconds": 0.1544455780001499,
+        "audit_and_ownership_seconds": 0.010323794999976599,
+        "target_update": "incremental_components",
+        "changed_voxels": 61666,
+        "support_updated_voxels": 2298240,
+        "selected_frontier_tasks": 3,
+        "selected_detail_tasks": 5,
+        "evaluation_seconds": 0.30736580999996477,
+        "route_solver_seconds": 0.10566367299998092
+      },
+      "claimed_voxels": 2695,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -3.737634559673419,
+            -3.5623654403265803
+          ],
+          [
+            -4.500533905922038,
+            4.775
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -4.725,
+              -4.725
+            ],
+            [
+              -4.725,
+              -4.475
+            ],
+            [
+              -4.975,
+              -2.9749999999999996
+            ],
+            [
+              -5.725,
+              -0.9749999999999996
+            ],
+            [
+              -5.475,
+              3.0250000000000004
+            ],
+            [
+              -5.725,
+              4.275
+            ]
+          ],
+          [
+            [
+              -4.975,
+              4.775
+            ],
+            [
+              4.525,
+              4.775
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            65,
+            65
+          ],
+          [
+            170,
+            35
+          ]
+        ]
+      },
+      "accepted_event": 23,
+      "distance_until_handoff": [
+        0.33000000000072305,
+        0.33000000000072305
+      ],
+      "accepted_time": 116.4451354833
+    },
+    {
+      "request_id": 23,
+      "event": 23,
+      "request_time": 116.4451354833,
+      "revision": 2295,
+      "status": "accepted",
+      "scan_times": [
+        116.4,
+        116.4
+      ],
+      "robot_positions": [
+        [
+          -3.737634559673419,
+          -3.5623654403265803
+        ],
+        [
+          -4.500533905922038,
+          4.775
+        ]
+      ],
+      "distance_at_request": [
+        25.31520740938489,
+        25.31520740938489
+      ],
+      "distance_during_planning": [
+        0.08617270002001831,
+        0.08617270002001831
+      ],
+      "commit_until": 117.9451354833,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.945710678118141,
+          -3.795710678118141
+        ],
+        [
+          -4.830533905922038,
+          4.775
+        ]
+      ],
+      "remaining_route_seconds": [
+        50.92455396171591,
+        45.33848224580891
+      ],
+      "latency_p95_seconds": 0.5919615101500995,
+      "ready_time": 116.8368295743001,
+      "handoff_time": 117.9451354833,
+      "planning_seconds": 0.39169409100009034,
+      "candidate_views": 8,
+      "actionable": 1680,
+      "selection_phase": "frontier+detail",
+      "ignored_unknown": 0,
+      "available_candidates": 39,
+      "frontier_candidates": 2,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 187,
+        "cached_views": 207,
+        "source_rejected_views": 136,
+        "traced_views": 32,
+        "candidate_domain": 2468,
+        "untested_views": 2093,
+        "ray_workers": 2,
+        "proxy_clusters": 38,
+        "cache_bytes": 72768,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.056702267999980904,
+        "shortlist_seconds": 0.07526621800002431,
+        "visibility_seconds": 0.1565340180000021,
+        "audit_and_ownership_seconds": 0.009374097999852893,
+        "target_update": "incremental_components",
+        "changed_voxels": 5484,
+        "support_updated_voxels": 2352000,
+        "selected_frontier_tasks": 2,
+        "selected_detail_tasks": 6,
+        "evaluation_seconds": 0.3021506640000098,
+        "route_solver_seconds": 0.08638978900012262
+      },
+      "claimed_voxels": 1680,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -3.9457106781181563,
+            -3.7957106781181564
+          ],
+          [
+            -4.83053390592206,
+            4.775
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -2.7249999999999996,
+              -5.225
+            ],
+            [
+              -4.725,
+              -4.725
+            ],
+            [
+              -4.975,
+              -4.475
+            ],
+            [
+              -5.225,
+              -2.9749999999999996
+            ],
+            [
+              -6.225,
+              -1.4749999999999996
+            ]
+          ],
+          [
+            [
+              -4.975,
+              4.775
+            ],
+            [
+              -6.225,
+              4.775
+            ],
+            [
+              -5.475,
+              3.0250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            25,
+            65
+          ],
+          [
+            215,
+            60
+          ]
+        ]
+      },
+      "accepted_event": 23,
+      "distance_until_handoff": [
+        0.3300000000000196,
+        0.3300000000000196
+      ],
+      "accepted_time": 117.9451354833
+    },
+    {
+      "request_id": 24,
+      "event": 24,
+      "request_time": 118.6017995473,
+      "revision": 2339,
+      "status": "accepted",
+      "scan_times": [
+        118.6,
+        118.6
+      ],
+      "robot_positions": [
+        [
+          -3.914268401462766,
+          -3.885731598537234
+        ],
+        [
+          -4.975,
+          4.775
+        ]
+      ],
+      "distance_at_request": [
+        25.78967350346285,
+        25.78967350346285
+      ],
+      "distance_during_planning": [
+        0.08541845927997826,
+        0.08541845927997826
+      ],
+      "commit_until": 120.1017995473,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.6809231636712054,
+          -4.119076836328794
+        ],
+        [
+          -5.305,
+          4.775
+        ]
+      ],
+      "remaining_route_seconds": [
+        35.95593921543911,
+        15.048455326271915
+      ],
+      "latency_p95_seconds": 0.5869211953499416,
+      "ready_time": 118.9900652712999,
+      "handoff_time": 120.1017995473,
+      "planning_seconds": 0.38826572399989345,
+      "candidate_views": 8,
+      "actionable": 1222,
+      "selection_phase": "frontier+detail",
+      "ignored_unknown": 0,
+      "available_candidates": 40,
+      "frontier_candidates": 1,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 185,
+        "cached_views": 190,
+        "source_rejected_views": 113,
+        "traced_views": 32,
+        "candidate_domain": 2467,
+        "untested_views": 2132,
+        "ray_workers": 2,
+        "proxy_clusters": 38,
+        "cache_bytes": 57064,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.04577568500008056,
+        "shortlist_seconds": 0.07597516700002416,
+        "visibility_seconds": 0.1625212129999909,
+        "audit_and_ownership_seconds": 0.008494177999864405,
+        "target_update": "incremental_components",
+        "changed_voxels": 4669,
+        "support_updated_voxels": 2325120,
+        "selected_frontier_tasks": 1,
+        "selected_detail_tasks": 7,
+        "evaluation_seconds": 0.29700905200002126,
+        "route_solver_seconds": 0.08800547100008771
+      },
+      "claimed_voxels": 1222,
+      "handoff": {
+        "filtered_tasks": 1,
+        "live_positions": [
+          [
+            -3.680923163671221,
+            -4.119076836328779
+          ],
+          [
+            -5.3049999999999775,
+            4.775
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -2.7249999999999996,
+              -5.225
+            ],
+            [
+              -4.725,
+              -5.225
+            ],
+            [
+              -5.225,
+              -4.475
+            ],
+            [
+              -5.225,
+              -2.2249999999999996
+            ],
+            [
+              -5.475,
+              3.0250000000000004
+            ]
+          ],
+          [
+            [
+              -6.225,
+              4.525
+            ],
+            [
+              4.525,
+              4.775
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            15,
+            105
+          ],
+          [
+            215,
+            35
+          ]
+        ]
+      },
+      "accepted_event": 24,
+      "distance_until_handoff": [
+        0.329999999999977,
+        0.329999999999977
+      ],
+      "accepted_time": 120.1017995473
+    },
+    {
+      "request_id": 25,
+      "event": 25,
+      "request_time": 124.7543149591,
+      "revision": 2460,
+      "status": "accepted",
+      "scan_times": [
+        124.7,
+        124.7
+      ],
+      "robot_positions": [
+        [
+          -2.9749999999999996,
+          -4.850227278536131
+        ],
+        [
+          -6.225,
+          4.525
+        ]
+      ],
+      "distance_at_request": [
+        27.14322689405612,
+        27.14322689405612
+      ],
+      "distance_during_planning": [
+        0.08252639560002706,
+        0.08252639560002706
+      ],
+      "commit_until": 126.2543149591,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -2.8298823996626408,
+          -5.120117600337359
+        ],
+        [
+          -5.895,
+          4.525
+        ]
+      ],
+      "remaining_route_seconds": [
+        50.17721038107711,
+        49.334333593605784
+      ],
+      "latency_p95_seconds": 0.5869211953499416,
+      "ready_time": 125.12943493910014,
+      "handoff_time": 126.2543149591,
+      "planning_seconds": 0.3751199800001359,
+      "candidate_views": 8,
+      "actionable": 950,
+      "selection_phase": "frontier+detail",
+      "ignored_unknown": 0,
+      "available_candidates": 37,
+      "frontier_candidates": 1,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 86,
+        "cached_views": 249,
+        "source_rejected_views": 12,
+        "traced_views": 32,
+        "candidate_domain": 2468,
+        "untested_views": 2175,
+        "ray_workers": 2,
+        "proxy_clusters": 33,
+        "cache_bytes": 44528,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.046146973000077196,
+        "shortlist_seconds": 0.06860704999985501,
+        "visibility_seconds": 0.15617099100018095,
+        "audit_and_ownership_seconds": 0.008654717999888817,
+        "target_update": "incremental_components",
+        "changed_voxels": 3180,
+        "support_updated_voxels": 2244480,
+        "selected_frontier_tasks": 1,
+        "selected_detail_tasks": 7,
+        "evaluation_seconds": 0.28336502999991353,
+        "route_solver_seconds": 0.08883886500007065
+      },
+      "claimed_voxels": 950,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -2.829882399662619,
+            -5.12011760033738
+          ],
+          [
+            -5.8949999999999685,
+            4.525
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -4.725,
+              -5.475
+            ],
+            [
+              -5.225,
+              -4.475
+            ],
+            [
+              -5.225,
+              -2.2249999999999996
+            ],
+            [
+              -5.975,
+              1.5250000000000004
+            ],
+            [
+              -6.975,
+              3.2750000000000004
+            ]
+          ],
+          [
+            [
+              -5.725,
+              4.025
+            ],
+            [
+              -5.725,
+              2.7750000000000004
+            ],
+            [
+              4.525,
+              4.525
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            15,
+            105
+          ],
+          [
+            215,
+            250
+          ]
+        ]
+      },
+      "accepted_event": 25,
+      "distance_until_handoff": [
+        0.33000000000003027,
+        0.33000000000003027
+      ],
+      "accepted_time": 126.2543149591
+    },
+    {
+      "request_id": 26,
+      "event": 26,
+      "request_time": 128.9003696607,
+      "revision": 2519,
+      "status": "accepted",
+      "scan_times": [
+        128.9,
+        128.9
+      ],
+      "robot_positions": [
+        [
+          -3.4002272785361303,
+          -5.125
+        ],
+        [
+          -5.725,
+          4.025
+        ]
+      ],
+      "distance_at_request": [
+        28.05535892841208,
+        28.05535892841208
+      ],
+      "distance_during_planning": [
+        0.08314791980003022,
+        0.08314791980003022
+      ],
+      "commit_until": 130.4003696607,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -3.7302272785361303,
+          -5.125
+        ],
+        [
+          -5.725,
+          3.6950000000000003
+        ]
+      ],
+      "remaining_route_seconds": [
+        50.68967265288144,
+        55.56760788251326
+      ],
+      "latency_p95_seconds": 0.5869211953499416,
+      "ready_time": 129.27831475070013,
+      "handoff_time": 130.4003696607,
+      "planning_seconds": 0.3779450900001393,
+      "candidate_views": 8,
+      "actionable": 1006,
+      "selection_phase": "frontier+detail",
+      "ignored_unknown": 0,
+      "available_candidates": 42,
+      "frontier_candidates": 1,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 42,
+        "cached_views": 251,
+        "source_rejected_views": 15,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 2171,
+        "ray_workers": 2,
+        "proxy_clusters": 31,
+        "cache_bytes": 56048,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.04462846600017656,
+        "shortlist_seconds": 0.07025560399983988,
+        "visibility_seconds": 0.15953935300012745,
+        "audit_and_ownership_seconds": 0.00882859900002586,
+        "target_update": "incremental_components",
+        "changed_voxels": 2094,
+        "support_updated_voxels": 2177280,
+        "selected_frontier_tasks": 1,
+        "selected_detail_tasks": 7,
+        "evaluation_seconds": 0.28729486700012785,
+        "route_solver_seconds": 0.08751960599988706
+      },
+      "claimed_voxels": 1006,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -3.730227278536162,
+            -5.125
+          ],
+          [
+            -5.725,
+            3.694999999999969
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -4.975,
+              -5.225
+            ],
+            [
+              -5.225,
+              -4.475
+            ],
+            [
+              -5.225,
+              -2.9749999999999996
+            ],
+            [
+              -5.975,
+              1.7750000000000004
+            ],
+            [
+              -5.725,
+              2.7750000000000004
+            ],
+            [
+              -5.725,
+              3.6750000000000007
+            ]
+          ],
+          [
+            [
+              4.525,
+              4.275
+            ],
+            [
+              6.025,
+              3.0250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            10,
+            65
+          ],
+          [
+            175,
+            45
+          ]
+        ]
+      },
+      "accepted_event": 26,
+      "distance_until_handoff": [
+        0.3300000000000267,
+        0.3300000000000267
+      ],
+      "accepted_time": 130.4003696607
+    },
+    {
+      "request_id": 27,
+      "event": 27,
+      "request_time": 136.2942270915,
+      "revision": 2648,
+      "status": "accepted",
+      "scan_times": [
+        136.2,
+        136.2
+      ],
+      "robot_positions": [
+        [
+          -4.975,
+          -5.225
+        ],
+        [
+          -4.581194077701116,
+          3.4250000000000007
+        ]
+      ],
+      "distance_at_request": [
+        29.68200756318557,
+        29.68200756318557
+      ],
+      "distance_during_planning": [
+        0.08220756258001671,
+        0.08220756258001671
+      ],
+      "commit_until": 137.7942270915,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -5.172989898732233,
+          -4.9770101012677666
+        ],
+        [
+          -4.251194077701116,
+          3.4250000000000007
+        ]
+      ],
+      "remaining_route_seconds": [
+        42.80803160439259,
+        52.16382981220279
+      ],
+      "latency_p95_seconds": 0.5869211953499416,
+      "ready_time": 136.6678978305001,
+      "handoff_time": 137.7942270915,
+      "planning_seconds": 0.3736707390000902,
+      "candidate_views": 8,
+      "actionable": 907,
+      "selection_phase": "detail",
+      "ignored_unknown": 0,
+      "available_candidates": 48,
+      "frontier_candidates": 0,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 105,
+        "cached_views": 193,
+        "source_rejected_views": 39,
+        "traced_views": 32,
+        "candidate_domain": 2468,
+        "untested_views": 2204,
+        "ray_workers": 2,
+        "proxy_clusters": 26,
+        "cache_bytes": 64912,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.04752946200005681,
+        "shortlist_seconds": 0.07163383900001463,
+        "visibility_seconds": 0.15162887599990427,
+        "audit_and_ownership_seconds": 0.009144695000031788,
+        "target_update": "incremental_components",
+        "changed_voxels": 5186,
+        "support_updated_voxels": 1898456,
+        "selected_frontier_tasks": 0,
+        "selected_detail_tasks": 8,
+        "evaluation_seconds": 0.28414854399989053,
+        "route_solver_seconds": 0.08658600600006139
+      },
+      "claimed_voxels": 907,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -5.172989898732246,
+            -4.977010101267753
+          ],
+          [
+            -4.251194077701098,
+            3.4250000000000007
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -6.225,
+              -4.475
+            ],
+            [
+              -5.475,
+              -3.2249999999999996
+            ],
+            [
+              -5.225,
+              -2.2249999999999996
+            ],
+            [
+              -5.725,
+              -1.4749999999999996
+            ],
+            [
+              -6.225,
+              2.0250000000000004
+            ]
+          ],
+          [
+            [
+              1.2750000000000004,
+              4.775
+            ],
+            [
+              4.525,
+              4.275
+            ],
+            [
+              6.025,
+              3.5250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            30,
+            55
+          ],
+          [
+            205,
+            250
+          ]
+        ]
+      },
+      "accepted_event": 27,
+      "distance_until_handoff": [
+        0.33000000000001606,
+        0.33000000000001606
+      ],
+      "accepted_time": 137.7942270915
+    },
+    {
+      "request_id": 28,
+      "event": 28,
+      "request_time": 143.5212702445,
+      "revision": 2721,
+      "status": "accepted",
+      "scan_times": [
+        143.5,
+        143.5
+      ],
+      "robot_positions": [
+        [
+          -6.225,
+          -4.475
+        ],
+        [
+          -3.038856428637755,
+          3.4250000000000007
+        ]
+      ],
+      "distance_at_request": [
+        31.271957056846727,
+        31.271957056846727
+      ],
+      "distance_during_planning": [
+        0.08459004862001152,
+        0.08459004862001152
+      ],
+      "commit_until": 145.0212702445,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -6.097720779386421,
+          -4.197720779386421
+        ],
+        [
+          -2.708856428637755,
+          3.4250000000000007
+        ]
+      ],
+      "remaining_route_seconds": [
+        33.311032385209955,
+        46.094598594580916
+      ],
+      "latency_p95_seconds": 0.5869211953499416,
+      "ready_time": 143.90577046550004,
+      "handoff_time": 145.0212702445,
+      "planning_seconds": 0.384500221000053,
+      "candidate_views": 8,
+      "actionable": 652,
+      "selection_phase": "detail",
+      "ignored_unknown": 0,
+      "available_candidates": 59,
+      "frontier_candidates": 0,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 77,
+        "cached_views": 187,
+        "source_rejected_views": 16,
+        "traced_views": 32,
+        "candidate_domain": 2469,
+        "untested_views": 2234,
+        "ray_workers": 2,
+        "proxy_clusters": 23,
+        "cache_bytes": 76016,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.048646476999920196,
+        "shortlist_seconds": 0.0802489500001684,
+        "visibility_seconds": 0.1601376749999872,
+        "audit_and_ownership_seconds": 0.00908190699988154,
+        "target_update": "incremental_components",
+        "changed_voxels": 2387,
+        "support_updated_voxels": 820000,
+        "selected_frontier_tasks": 0,
+        "selected_detail_tasks": 8,
+        "evaluation_seconds": 0.30216180699994766,
+        "route_solver_seconds": 0.07926494899993486
+      },
+      "claimed_voxels": 652,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -6.0977207793864165,
+            -4.197720779386416
+          ],
+          [
+            -2.7088564286377497,
+            3.4250000000000007
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -6.225,
+              -2.9749999999999996
+            ],
+            [
+              -5.475,
+              -2.2249999999999996
+            ],
+            [
+              -6.225,
+              -1.7249999999999996
+            ],
+            [
+              -6.225,
+              2.0250000000000004
+            ]
+          ],
+          [
+            [
+              1.0250000000000004,
+              5.025
+            ],
+            [
+              3.0250000000000004,
+              4.275
+            ],
+            [
+              4.525,
+              4.275
+            ],
+            [
+              6.025,
+              3.5250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            55,
+            50
+          ],
+          [
+            215,
+            185
+          ]
+        ]
+      },
+      "accepted_event": 28,
+      "distance_until_handoff": [
+        0.3300000000000054,
+        0.3300000000000054
+      ],
+      "accepted_time": 145.0212702445
+    },
+    {
+      "request_id": 29,
+      "event": 29,
+      "request_time": 150.9042887386,
+      "revision": 2795,
+      "status": "accepted",
+      "scan_times": [
+        150.9,
+        150.9
+      ],
+      "robot_positions": [
+        [
+          -6.225,
+          -2.9749999999999996
+        ],
+        [
+          -1.4468795026503285,
+          3.4250000000000007
+        ]
+      ],
+      "distance_at_request": [
+        32.896221125558654,
+        32.896221125558654
+      ],
+      "distance_during_planning": [
+        0.08342448245996792,
+        0.08342448245996792
+      ],
+      "commit_until": 152.4042887386,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -5.991654762208439,
+          -2.741654762208439
+        ],
+        [
+          -1.1168795026503284,
+          3.4250000000000007
+        ]
+      ],
+      "remaining_route_seconds": [
+        26.217122513483496,
+        39.79973430003147
+      ],
+      "latency_p95_seconds": 0.5869211953499416,
+      "ready_time": 151.28349093159986,
+      "handoff_time": 152.4042887386,
+      "planning_seconds": 0.37920219299985547,
+      "candidate_views": 8,
+      "actionable": 509,
+      "selection_phase": "detail",
+      "ignored_unknown": 0,
+      "available_candidates": 61,
+      "frontier_candidates": 0,
+      "planning_stats": {
+        "candidate_evaluation": "incremental_frontier",
+        "map_changed": true,
+        "invalidated_views": 54,
+        "cached_views": 181,
+        "source_rejected_views": 5,
+        "traced_views": 32,
+        "candidate_domain": 2470,
+        "untested_views": 2252,
+        "ray_workers": 2,
+        "proxy_clusters": 20,
+        "cache_bytes": 91032,
+        "audit_views": 0,
+        "audit_complete": false,
+        "recovery_views": 0,
+        "search_pending": false,
+        "ownership_scope": "evaluated_candidate_pool",
+        "target_seconds": 0.041488210000125036,
+        "shortlist_seconds": 0.0731296100000236,
+        "visibility_seconds": 0.15143716499983384,
+        "audit_and_ownership_seconds": 0.008669368000028044,
+        "target_update": "incremental_components",
+        "changed_voxels": 920,
+        "support_updated_voxels": 881888,
+        "selected_frontier_tasks": 0,
+        "selected_detail_tasks": 8,
+        "evaluation_seconds": 0.27974208499995257,
+        "route_solver_seconds": 0.0963361280000754
+      },
+      "claimed_voxels": 509,
+      "handoff": {
+        "filtered_tasks": 0,
+        "live_positions": [
+          [
+            -5.991654762208461,
+            -2.741654762208461
+          ],
+          [
+            -1.1168795026503608,
+            3.4250000000000007
+          ]
+        ],
+        "execution_goals": [
+          [
+            [
+              -6.975,
+              -1.7249999999999996
+            ],
+            [
+              -6.225,
+              -1.2249999999999996
+            ],
+            [
+              -6.225,
+              1.5250000000000004
+            ]
+          ],
+          [
+            [
+              1.0250000000000004,
+              5.025
+            ],
+            [
+              3.7750000000000004,
+              5.025
+            ],
+            [
+              4.275,
+              4.275
+            ],
+            [
+              5.275,
+              4.025
+            ],
+            [
+              6.025,
+              3.5250000000000004
+            ]
+          ]
+        ],
+        "previous_goals": [
+          [
+            75,
+            50
+          ],
+          [
+            220,
+            180
+          ]
+        ]
+      },
+      "accepted_event": 29,
+      "distance_until_handoff": [
+        0.3299999999999699,
+        0.3299999999999699
+      ],
+      "accepted_time": 152.4042887386
+    },
+    {
+      "request_id": 30,
+      "event": 30,
+      "request_time": 158.9395930703,
+      "revision": 2903,
+      "status": "computing",
+      "scan_times": [
+        158.9,
+        158.9
+      ],
+      "robot_positions": [
+        [
+          -6.975,
+          -1.7249999999999996
+        ],
+        [
+          -0.044024535286305747,
+          4.305975464713694
+        ]
+      ],
+      "distance_at_request": [
+        34.663988078525016,
+        34.663988078525016
+      ],
+      "distance_during_planning": [
+        0.08914784164002754,
+        0.08914784164002754
+      ],
+      "commit_until": 160.4395930703,
+      "prediction_seconds": 1.5,
+      "predicted_positions": [
+        [
+          -6.741654762208439,
+          -1.4916547622084388
+        ],
+        [
+          0.18932070250525487,
+          4.539320702505255
+        ]
+      ],
+      "remaining_route_seconds": [
+        16.850485369029762,
+        32.43009637476034
+      ],
+      "latency_p95_seconds": 0.5842316617499478,
+      "ready_time": 159.3448105323001,
+      "handoff_time": 160.4395930703,
+      "planning_seconds": 0.40521746200010966
+    }
+  ],
+  "discarded_replans": 0,
+  "replan_policy": "async_v2",
+  "cycle_phase": "PLANNING",
+  "planning_time_model": "measured_latency",
+  "motion_during_planning_m": [
+    3.2227445414940403,
+    3.2227445414940403
+  ],
+  "idle_during_planning_seconds": [
+    1.3760108950000358,
+    1.3760108950000358
+  ],
+  "idle_total_seconds": [
+    1.3760108950000358,
+    1.3760108950000358
+  ],
+  "goal_switches": [
+    27,
+    25
+  ],
+  "early_refill_events": [],
+  "idle_search_events": [],
+  "planning_wall_seconds": 16.024849720000475,
+  "candidate_ownership": "nearest",
+  "candidate_evaluation": "incremental_frontier",
+  "planning_stats": {
+    "candidate_evaluation": "incremental_frontier",
+    "map_changed": true,
+    "invalidated_views": 54,
+    "cached_views": 181,
+    "source_rejected_views": 5,
+    "traced_views": 32,
+    "candidate_domain": 2470,
+    "untested_views": 2252,
+    "ray_workers": 2,
+    "proxy_clusters": 20,
+    "cache_bytes": 91032,
+    "audit_views": 0,
+    "audit_complete": false,
+    "recovery_views": 0,
+    "search_pending": false,
+    "ownership_scope": "evaluated_candidate_pool",
+    "target_seconds": 0.041488210000125036,
+    "shortlist_seconds": 0.0731296100000236,
+    "visibility_seconds": 0.15143716499983384,
+    "audit_and_ownership_seconds": 0.008669368000028044,
+    "target_update": "incremental_components",
+    "changed_voxels": 920,
+    "support_updated_voxels": 881888,
+    "selected_frontier_tasks": 0,
+    "selected_detail_tasks": 8,
+    "evaluation_seconds": 0.27974208499995257,
+    "route_solver_seconds": 0.0963361280000754
+  },
+  "target_policy": "frontier",
+  "selection_phase": "detail",
+  "ignored_unknown": 0,
+  "stopping_policy": "all_retained_observable_unknowns_resolved",
+  "completion_stable_seconds": 8.0,
+  "classification_revision": 2795,
+  "current_revision": 2925,
+  "classification_fresh": false,
+  "classification_complete": false,
+  "actionable": 509,
+  "deferred": 128608,
+  "excluded": 0,
+  "pending_replan_at_stop": true,
+  "known_2d_ground_prior": true,
+  "sensor_replay_not_gazebo": true,
+  "display_2d": "measured_planar_lidar_only",
+  "display_3d": "measured_returns_only",
+  "gif_is_accelerated_preview": true,
+  "point_format": "xyz_first_seen_v1",
+  "point_record_bytes": 20,
+  "saved_points": 77201,
+  "point_storage_bytes": 1544020,
+  "observation_model": "lidar360",
+  "lidar_profile": {
+    "name": "os0_64_1024x10",
+    "horizontal_fov_deg": 360.0,
+    "horizontal_samples": 1024,
+    "vertical_samples": 64,
+    "horizontal_step_deg": 0.3515625,
+    "vertical_fov_deg": [
+      -45.0,
+      45.0
+    ],
+    "scan_hz": 10.0,
+    "rays_per_scan": 65536,
+    "rays_per_second": 655360.0,
+    "sensor_offset": [
+      0.0,
+      0.0
+    ],
+    "sensor_height": 0.22,
+    "observation_heading_required": false,
+    "offline_azimuth_phase": "world_fixed",
+    "source": "https://data.ouster.io/downloads/datasheets/datasheet-revd-v2p1-os0.pdf"
+  },
+  "frontier_policy": {
+    "frontier_fill_detail_tasks": true,
+    "min_unknown_component_volume": 0.005,
+    "frontier_support_radius": 0.4,
+    "frontier_unknown_fraction": 0.35,
+    "min_frontier_area": 0.1,
+    "frontier_task_limit": 8,
+    "frontier_separation": 0.75,
+    "frontier_view_distance": 1.0
+  },
+  "fast_policy": {
+    "fast_incremental_targets": true,
+    "fast_view_budget": 32,
+    "fast_audit_budget": 24,
+    "fast_cluster_size": 1.5,
+    "fast_cache_mb": 64.0,
+    "fast_recovery_limit": 192,
+    "fast_ray_workers": 2
+  }
+}

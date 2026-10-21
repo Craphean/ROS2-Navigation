@@ -1,0 +1,16 @@
+{
+  "reconstruction_checked_against_later_original_frame": true,
+  "map_exact_match": true,
+  "pose_max_abs_error": 0.0,
+  "reference_frame": "frame_0154.npz",
+  "reference_time": 161.0363636364,
+  "video_decodes": true,
+  "video_fps": 10.0,
+  "video_frames": 1600,
+  "video_seconds": 160.0,
+  "frame_files": 155,
+  "point_records": 85342,
+  "point_bytes": 1706840,
+  "last_point_stamp": 160.0,
+  "no_cumulative_point_arrays_in_frames": true
+}

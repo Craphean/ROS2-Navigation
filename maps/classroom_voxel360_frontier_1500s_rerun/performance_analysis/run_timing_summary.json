@@ -1,0 +1,33 @@
+{
+  "total_plans": 416,
+  "arrival_events": 231,
+  "planning_total_seconds": 13330.760734866111,
+  "planning_mean_seconds": 32.04509792035123,
+  "planning_p95_seconds": 50.71783554025387,
+  "planning_max_seconds": 53.60472855599801,
+  "by_phase": {
+    "frontier": {
+      "count": 37,
+      "mean_seconds": 16.218884890432417,
+      "total_seconds": 600.0987409459995
+    },
+    "detail": {
+      "count": 194,
+      "mean_seconds": 20.02071490392794,
+      "total_seconds": 3884.01869136202
+    },
+    "idle": {
+      "count": 185,
+      "mean_seconds": 47.81969352734104,
+      "total_seconds": 8846.643302558092
+    }
+  },
+  "unchanged_map_audits": 185,
+  "unchanged_map_since": 579.9,
+  "unchanged_map_revision": 4454,
+  "unchanged_audits_percent_total_planning_time": 66.36262909902827,
+  "final_unknown": 130486,
+  "final_excluded": 128596,
+  "final_deferred": 1890,
+  "complete": false
+}

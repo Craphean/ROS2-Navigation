@@ -30,6 +30,7 @@ kill_matching() {
 kill_matching TERM \
   'tb3_simulation_launch' \
   'tb4_simulation_launch' \
+  'bringup_launch.py' \
   'gz-sim-main' \
   'gz-sim-gui-client' \
   '/lib/rviz2/rviz2' \
@@ -44,6 +45,8 @@ kill_matching TERM \
   '/lib/explore_lite/explore' \
   '/lib/multirobot_map_merge/map_merge' \
   'multi_robot_coordinator.py' \
+  'voxel_exploration_planner.py' \
+  'merge_pointclouds.py' \
   'multi_robot_plan_relay.py' \
   'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
@@ -53,9 +56,12 @@ kill_matching KILL \
   'gz-sim-gui-client' \
   'tb3_simulation_launch' \
   'tb4_simulation_launch' \
+  'bringup_launch.py' \
   '/lib/rviz2/rviz2' \
   '/lib/multirobot_map_merge/map_merge' \
   'multi_robot_coordinator.py' \
+  'voxel_exploration_planner.py' \
+  'merge_pointclouds.py' \
   'multi_robot_plan_relay.py' \
   'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'

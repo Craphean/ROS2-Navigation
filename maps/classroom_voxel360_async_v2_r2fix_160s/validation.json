@@ -1,0 +1,55 @@
+{
+  "verified": true,
+  "simulated_seconds": 160.0,
+  "video_seconds": 160.0,
+  "accepted_plans": 34,
+  "requested_plans": 34,
+  "arrivals": 33,
+  "planning_mean_seconds": 0.48798744332281574,
+  "planning_p95_seconds": 0.6330920304528262,
+  "planning_max_seconds": 1.3483951369998977,
+  "planning_total_seconds": 16.591573072975734,
+  "motion_during_planning_m": [
+    3.353499145951858,
+    3.353499145951858
+  ],
+  "idle_during_planning_seconds": [
+    1.3483951369998977,
+    1.3483951369998977
+  ],
+  "handoffs_after_additional_arrivals": 13,
+  "removed_obsolete_or_unreachable_tasks": 1,
+  "final_unknown": 145742,
+  "robot_distance_m": [
+    34.90335306985244,
+    34.90335306985244
+  ],
+  "complete": false,
+  "stop_reason": "duration_limit",
+  "saved_frames": 342,
+  "frames_during_planning": 102,
+  "point_bytes": 1721100,
+  "checks": [
+    "archived source hashes",
+    "serialized/coalesced requests",
+    "measured computation latency",
+    "motion along the previous route during planning",
+    "actual arrivals",
+    "no pose jump at handoff",
+    "fresh frame timestamps",
+    "incremental point records",
+    "final voxel count",
+    "MP4 last frame"
+  ],
+  "replan_policy": "async_v2",
+  "idle_total_seconds": [
+    1.3483951369998977,
+    1.3483951369998977
+  ],
+  "early_refills": 0,
+  "goal_switches": [
+    26,
+    30
+  ],
+  "ready_plan_commit_wait_seconds": 34.25682206402426
+}

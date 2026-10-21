@@ -1,0 +1,19 @@
+# Sampling reference, not a calibrated hardware/reflectance emulator.
+# Ouster OS0 uniform 64-channel, 1024x10 mode:
+# https://data.ouster.io/downloads/datasheets/datasheet-revd-v2p1-os0.pdf
+name: os0_64_1024x10
+horizontal_samples: 1024
+vertical_samples: 64
+vertical_min_deg: -45.0
+vertical_max_deg: 45.0
+scan_hz: 10.0
+min_range: 0.30
+# Classroom software/simulation cap, NOT the manufacturer's maximum range.
+max_range: 5.0
+# Center-mounted virtual 3D sensor: source position does not depend on heading.
+height: 0.22
+offset_x: 0.0
+offset_y: 0.0
+# One full sweep, no duplicated -pi/+pi column. The offline sweep uses a fixed
+# world azimuth phase; ROS observations always use the actual acquisition TF.
+azimuth_phase_deg: -180.0

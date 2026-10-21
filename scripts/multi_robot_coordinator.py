@@ -148,7 +148,7 @@ class MultiRobotCoordinator(Node):
             # Global goal pose publisher in 'world' frame for RViz display
             robot.goal_pub = self.create_publisher(
                 PoseStamped,
-                f'/{ns}/goal_pose',
+                f'/{ns}/assigned_goal_world',
                 10
             )
 
