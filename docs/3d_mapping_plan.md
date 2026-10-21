@@ -24,7 +24,11 @@
 
 **实施范围：只改双机链路。** 单车脚本和单车参数（`tb3_explore_slam.sh`、`tb3_slam_gazebo.sh`、`tb3_nav_gazebo.sh`、`nav2_params_vmware.yaml`、`nav2_params_rl.yaml`）保持原样，不纳入本次改动。
 
-**运行/验收环境：无独立显卡，全程无头模式。** 验收时设置 `HEADLESS=True`、不启动 RViz、不启动 Gazebo GUI；所有检查通过 ROS 2 CLI、TF、topic 数值和存档文件离线完成。为避免 VMware 软件渲染把宿主机拖死，3D LiDAR 默认降到 16 线、3 Hz（有独显时再改回 24 线、5 Hz）。本计划的完整版本保存在 `/home/qing/.claude/plans/turtlebot3-2d-lidar-lds-01-02-breezy-hickey.md`；批准后第一步会复制到仓库内 `docs/3d_mapping_plan.md`，作为长期文档。
+**运行/验收环境：无独立显卡，全程无头模式。** 验收时设置 `HEADLESS=True`、不启动 RViz、不启动 Gazebo GUI；所有检查通过 ROS 2 CLI、TF、topic 数值和存档文件离线完成。本计划的完整版本保存在 `/home/qing/.claude/plans/turtlebot3-2d-lidar-lds-01-02-breezy-hickey.md`；批准后第一步会复制到仓库内 `docs/3d_mapping_plan.md`，作为长期文档。
+
+> **2026-10 实现更新（TARE 化探索改造）**：3D 建图链路已落地，雷达模型当前为 **32 线 / 720 水平点 / 5 Hz**（无独显时可临时降线）。更重要的是，`multi_robot_coordinator.py` 已消费 `/octomap_point_cloud_centers`：用 0.1 m 柱状体素统计计算 3D 信息增益，2D 前沿闭合后做残差补盲，并用“2D 前沿空 + 残差增益阈值 + 体素增长阈值”判定收敛；近场 Local TSP + `NavigateThroughPoses` 与 Global ROI 竞拍也已接入。仍然**不做** 3D SLAM/重定位和射线级 NBV，本文档的 3D 建图/存档流程继续有效。详见 `README.md` 的“TARE 化调度与 A/B 开关”和 `scripts/exploration_3d.py`。
+>
+> **2026-10-21 无头验证（VMware，house，每轮 4 min sim）**：默认配置下发 4 条 2 点 `NavigateThroughPoses` tour（共 8 个航点）全部成功，0 次 `Navigation failed` / `Goal timed out` / TF 错误；2D 前沿闭合后残差阶段检出 1 处盲点，到达后拉黑，约 110 s 判定收敛（体素增长 1 < 25 连续 6 周期）。关闭全部开关的 2D-only 基线下发 6 个单点目标全部成功，约 46 s 前沿闭合，0 异常。3D 索引构建通常 17–135 ms，个别周期超过 `cycle_time_budget_ms=150` 时按设计跳过该周期 3D 评分并保留旧索引；两轮均无残留进程。
 
 ## 先回答三个核心问题
 
@@ -40,12 +44,12 @@
 
 ### 2. 三维建图的前端/探索怎么办？
 
-**继续用 2D frontier，不做 3D frontier/NBV。** 理由：
+**主线仍然用 2D frontier，不做射线级 3D frontier/NBV；但 3D 占据体素已参与候选评分、补盲和收敛。** 理由：
 
 - TurtleBot3 是地面机器人，可通行空间本质上是 2.5D；3D 未知体素大多在机器人不可达的高度
-- 现有 `explore_lite` / 竞拍协调器在 2D 上成熟稳定，改 3D 前端会同时动探索、调度、Nav2 goal 三个层面
+- 现有 `explore_lite` / 竞拍协调器在 2D 上成熟稳定；完全改成 3D 前端会同时动探索、调度、Nav2 goal 三个层面
 - 3D frontier/NBV 在 ROS 2 Lyrical 上没有成熟可直接用的包；`fkie-nbv-planner` 只有 ROS 1，`ADVRHumanoids/robot_exploration` 可作未来参考但依赖较重
-- 3D LiDAR 是 360° 的，机器人探索过程中自然会扫到家具；必要时在终点加一次原地旋转即可补盲
+- 因此采用折中方案：2D frontier 负责可达性主循环，`VoxelColumnIndex` 用占据体素统计提供 3D 结构增益；2D 前沿闭合后，用遮挡口袋/未知区结构的残差检测补盲。没有射线未知体素计数，也没有 C++ OctoMap 查询节点
 
 ### 3. 二维图建好，三维图就算建好了吗？
 
@@ -433,7 +437,7 @@ python3 scripts/check_3d_map.py pcd --input maps/tb3_3d_map.pcd --json
 - **把本计划完整复制到仓库** `docs/3d_mapping_plan.md`（批准后第一步执行；若 `docs/` 不存在则创建），作为长期文档；同时保留 `.claude/plans/` 下的工作副本
 - 更新 `README.md`：
   - 新增“双机 3D 点云建图（无头）”章节，写清 `HEADLESS=True USE_RVIZ=False`、运行命令、存档命令、参数含义
-  - 把 TODO #2 标记为“仿真 3D 点云部分完成”，说明“不用于后续导航”
+  - 把 TODO #2 标记为“仿真 3D 点云部分完成”；后续 TARE 化改造已让 3D 参与增益/补盲/收敛，README 已同步
   - 明确写下 2D 完成 ≠ 3D 完成，以及 3D 完成判据
 - 在 `scripts/tb3_multi_explore_slam.sh` 的 usage 注释里增加 `SAVE_3D=true` 或 `--save-3d` 的用法（可选）
 - 增加清理逻辑：把 merger、octomap_server 的 PID 加入现有 `cleanup()`
@@ -463,7 +467,7 @@ python3 scripts/check_3d_map.py pcd --input maps/tb3_3d_map.pcd --json
 
 - **所有单车脚本和参数**：`scripts/tb3_explore_slam.sh`、`scripts/tb3_slam_gazebo.sh`、`scripts/tb3_nav_gazebo.sh`、`config/nav2_params_vmware.yaml`、`config/nav2_params_rl.yaml`
 - `slam_toolbox` 参数与 2D SLAM 逻辑
-- `explore_lite` / `multi_robot_coordinator.py` 的 frontier 逻辑
+- `explore_lite` 的 frontier 逻辑（`multi_robot_coordinator.py` 已在独立的 TARE 化改造中扩展，见 README）
 - `multirobot_map_merge` 的 2D 地图合并逻辑
 - 现有 2D 地图存档/加载流程
 
@@ -472,14 +476,14 @@ python3 scripts/check_3d_map.py pcd --input maps/tb3_3d_map.pcd --json
 | 风险 | 应对 |
 |---|---|
 | GZ 10.5 的 `<ray><vertical>` 不生效 | 改用 SDF 1.9+ 的 `<lidar><scan><vertical>`；或在 `gpu_lidar` 中启用 `ogre` 渲染引擎 |
-| 无独显 + VMware 软件渲染导致卡顿/死机 | 默认 16 线、360 水平、3 Hz；必要时降到 12 线或 240 水平点；全程无头，不启动 RViz/Gazebo GUI；先跑 `free -h`/`top` 观察余量 |
+| 无独显 + VMware 软件渲染导致卡顿/死机 | 当前模型为 32 线 / 720 水平点 / 5 Hz；卡顿时降到 16 线或 240 水平点；全程无头，不启动 RViz/Gazebo GUI；先跑 `free -h`/`top` 观察余量 |
 | 3D 点云 + 双车 + OctoMap 内存占用过高 | 体素 0.05 m；merger 只保留每车最新帧；`octomap_server` 不做 free-space 发布；必要时把 3D 图分辨率降到 0.08–0.10 m |
 | `ros_gz_bridge` 点云 frame_id 带 model 前缀 | 在 merger 里统一规范成 `robotX/base_scan`；代价图侧用 robot 局部 TF，不受影响 |
 | `octomap_server` 的 `projected_map` 把地板标成占据 | 必须设 `point_cloud_min_z` 和 `occupancy_min_z`；先用小世界验证 |
 | 3D 点云让代价图出现毛刺/抖动 | 提高 `min_obstacle_height`、减小 `max_range`、加 `pcl_ros` VoxelGrid，或把 `mark_threshold` 调到 1 |
 | 双机 2D SLAM 漂移导致 3D 重影 | 3D 图继承 2D 拼合精度；低精度要求下可接受。后续可按 README TODO #13 做动态 SE(2) 配准，或换 3D LIO |
 | 桌子投影导致无法钻桌底 | 这是当前需求的预期行为；如果以后要钻桌底，把 costmap 的高度带改成机器人高度带 |
-| 以后要 3D frontier / NBV | 再看 `ADVRHumanoids/robot_exploration`（ROS2 分支）或移植 `fkie-nbv-planner`（ROS1）；当前不做 |
+| 以后要射线级 3D frontier / NBV | 当前已用占据体素做增益/补盲/收敛，但没有射线未知体素计数；若确实需要完整 NBV，再看 `ADVRHumanoids/robot_exploration`（ROS2 分支）或移植 `fkie-nbv-planner`（ROS1） |
 
 ## 可直接复用/参考的开源项目
 
@@ -490,6 +494,6 @@ python3 scripts/check_3d_map.py pcd --input maps/tb3_3d_map.pcd --json
 - **现有 `m-explore-ros2`**：2D frontier、竞价、地图合并全部复用，不改
 - **`Taeyoung96/Multi-turtlebot3-Gazebo-ROS2`**：TurtleBot3 + VLP-16 的 GZ 仿真参考（本项目直接用 GZ 内置 vertical lidar，不引入该仓库）
 - **`CMU-cabot/livox_laser_simulation_ros2`**：只有切回 Gazebo Classic 才需要；当前 GZ Sim 方案不用
-- **`ADVRHumanoids/robot_exploration`**：未来若真要做 3D OctoMap frontier，可作为起点；本次不做
+- **`ADVRHumanoids/robot_exploration`**：未来若真要做射线级 3D OctoMap frontier/NBV，可作为起点；当前只做占据体素统计，不引入该依赖
 
 **不推荐当前引入**：RTAB-Map（更重，且本需求不需要 3D 闭环/重定位）、nvblox（需要 GPU，VMware 环境不合适）、FAST-LIO/GLIM（已知初始位姿 + 平地 + 2D 栈已够；换 3D LIO 会同时改 TF、地图和探索链路）。

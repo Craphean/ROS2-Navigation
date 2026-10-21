@@ -316,6 +316,9 @@ ROBOT2_YAW="${ROBOT2_YAW:-${DEFAULT_R2_YAW}}"
 PARAMS_FILE="${PARAMS_FILE:-${ROOT_DIR}/config/nav2_multirobot_slam_params.yaml}"
 EXPLORE_PARAMS="${EXPLORE_PARAMS:-${ROOT_DIR}/config/explore_params.yaml}"
 COORDINATOR_PARAMS="${COORDINATOR_PARAMS:-${ROOT_DIR}/config/coordinator_params.yaml}"
+# Extra coordinator overrides for A/B runs, e.g.:
+#   COORDINATOR_ARGS="-p use_3d_gain:=false -p local_scheduling_enable:=false"
+COORDINATOR_ARGS="${COORDINATOR_ARGS:-}"
 MAP_MERGE_PARAMS="${MAP_MERGE_PARAMS:-${ROOT_DIR}/src/m-explore-ros2/map_merge/config/params.yaml}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_merge.rviz}"
 
@@ -449,15 +452,24 @@ EXP2_PID=""
 COORD_PID=""
 RVIZ_PID=""
 RELAY_PID=""
+DASH_PID=""
 
 cleanup() {
   echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & 3D mapping..."
-  for pid in "${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${R2_PID}" "${R1_PID}"; do
+  local pids=("${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${DASH_PID}" "${R2_PID}" "${R1_PID}")
+  for pid in "${pids[@]}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
     fi
   done
   sleep 1
+  # Some children (notably the dashboard) may ignore SIGTERM; make sure no
+  # orphan is left behind when the script is stopped by timeout/CI.
+  for pid in "${pids[@]}"; do
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+      kill -9 "${pid}" 2>/dev/null || true
+    fi
+  done
   "${ROOT_DIR}/scripts/kill_nav2_sim.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -566,6 +578,7 @@ if [[ "${EXPLORATION_MODE,,}" == "auction" ]]; then
     -p robot_namespaces:="['robot1', 'robot2']" \
     -p robot1_init_pose:="[${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}]" \
     -p robot2_init_pose:="[${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW}]" \
+    ${COORDINATOR_ARGS} \
     >"${COORDINATOR_LOG}" 2>&1 &
   COORD_PID=$!
 
@@ -617,7 +630,12 @@ if [[ "${DASHBOARD,,}" == "true" && -f "${ROOT_DIR}/scripts/monitor_dashboard.py
   echo "[tb3_multi_explore_slam] Starting live exploration dashboard..."
   echo "[tb3_multi_explore_slam] Press Ctrl-C to stop simulation and clean up."
   sleep 1
-  python3 "${ROOT_DIR}/scripts/monitor_dashboard.py" || true
+  # Run in the background and wait, so a SIGTERM to this script (e.g. from
+  # `timeout`, CI, or a service manager) can reach the cleanup trap instead of
+  # blocking on the dashboard's foreground wait loop.
+  python3 "${ROOT_DIR}/scripts/monitor_dashboard.py" &
+  DASH_PID=$!
+  wait "${DASH_PID}" || true
 else
   echo "Press Ctrl-C to stop."
   wait "${MERGE_PID}"

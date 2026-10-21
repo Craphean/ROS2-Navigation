@@ -23,6 +23,7 @@ import re
 import sys
 import threading
 import time
+import traceback
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -79,6 +80,10 @@ class RobotState:
         self.goal_y: Optional[float] = None
         self.action_status: int = 0  # action_msgs/GoalStatus code
         self.action_status_text: str = "IDLE"
+        # Latest status per action source: (header_stamp, goal_stamp, status).
+        # ``status is None`` means that source published an empty status list.
+        self.status_by_source: Dict[str, Tuple[float, float, Optional[int]]] = {}
+        self.last_status_goal_stamp: float = -1.0
         self.last_move_time: float = time.time()
         self.last_pos: Tuple[float, float] = (0.0, 0.0)
         self.stall_duration: float = 0.0
@@ -173,10 +178,14 @@ class TelemetryCollector:
         elif "Goal timed out" in line:
             r_match = re.search(r'\[(robot\d+)\]', line)
             r_ns = r_match.group(1) if r_match else "robot"
-            msg = f"[{r_ns}] Goal TIMED OUT after 90s sim time! Cancelling..."
+            t_match = re.search(r'after\s+([\d.]+)s', line)
+            limit_str = (
+                f"{float(t_match.group(1)):.1f}s" if t_match else "the limit"
+            )
+            msg = f"[{r_ns}] Goal TIMED OUT after {limit_str}! Cancelling..."
             self._add_critical_incident(CriticalIncident(now_str, "TIMEOUT", r_ns, msg))
             if r_ns in self.robots:
-                self.robots[r_ns].last_stop_cause = "Timed out (90s limit)"
+                self.robots[r_ns].last_stop_cause = f"Timed out ({limit_str} limit)"
                 self.robots[r_ns].last_stop_time = now_str
 
         # 3. FAILED: navigation failed
@@ -294,6 +303,21 @@ class TelemetryCollector:
 
         node = Node('exploration_dashboard_observer')
 
+        def safe_callback(cb):
+            """Keep one malformed message from killing the whole listener.
+
+            rclpy's executor lets callback exceptions escape ``spin()``; the
+            thread then exits silently, freezing pose/status telemetry at its
+            startup values (which used to show both robots as stalled at 0,0
+            even while Nav2 was driving them).
+            """
+            def wrapped(msg):
+                try:
+                    cb(msg)
+                except Exception:
+                    traceback.print_exc()
+            return wrapped
+
         # 1. Subscriber: /exploration/markers
         def markers_cb(msg: MarkerArray):
             with self._lock:
@@ -307,7 +331,9 @@ class TelemetryCollector:
                 self.candidate_frontiers = cand_count
                 self.assigned_goals = assign_count
 
-        node.create_subscription(MarkerArray, '/exploration/markers', markers_cb, 10)
+        node.create_subscription(
+            MarkerArray, '/exploration/markers', safe_callback(markers_cb), 10
+        )
 
         # 2. Subscriber: /map
         def map_cb(msg: OccupancyGrid):
@@ -323,7 +349,9 @@ class TelemetryCollector:
                 self.map_width = msg.info.width
                 self.map_height = msg.info.height
 
-        node.create_subscription(OccupancyGrid, '/map', map_cb, 1)
+        node.create_subscription(
+            OccupancyGrid, '/map', safe_callback(map_cb), 1
+        )
 
         # 3. Subscribers for each robot
         for ns in self.namespaces:
@@ -347,9 +375,12 @@ class TelemetryCollector:
                         r.yaw = math.atan2(siny_cosp, cosy_cosp)
                 return odom_cb
 
-            node.create_subscription(Odometry, f'/{ns}/odom', make_odom_cb(ns), 10)
+            node.create_subscription(
+                Odometry, f'/{ns}/odom', safe_callback(make_odom_cb(ns)), 10
+            )
 
-            # Goal pose
+            # Goal pose (coordinator visualization topic; `goal_pose` is a
+            # reserved Nav2 input and must not be used here).
             def make_goal_cb(r_ns):
                 def goal_cb(msg: PoseStamped):
                     with self._lock:
@@ -359,24 +390,72 @@ class TelemetryCollector:
                             r.goal_y = msg.pose.position.y
                 return goal_cb
 
-            node.create_subscription(PoseStamped, f'/{ns}/goal_pose', make_goal_cb(ns), 10)
+            node.create_subscription(
+                PoseStamped,
+                f'/{ns}/exploration_goal',
+                safe_callback(make_goal_cb(ns)),
+                10,
+            )
 
-            # Action status
-            def make_status_cb(r_ns):
+            # Action status.  Both NavigateToPose and NavigateThroughPoses
+            # servers publish independently; merge them without letting an
+            # empty/idle status from one source hide an active tour on the
+            # other.  A non-empty status is aged by its goal_info stamp (stable
+            # across periodic republication), falling back to the header stamp.
+            def make_status_cb(r_ns, source):
                 def status_cb(msg: GoalStatusArray):
                     with self._lock:
                         r = self.robots.get(r_ns)
                         if not r:
                             return
+
+                        # ROS 2's action_msgs/GoalStatusArray has no header
+                        # (unlike ROS 1's actionlib_msgs), so age the source
+                        # by its goal stamp and fall back to wall time.
                         if not msg.status_list:
+                            now_stamp = time.time()
+                            r.status_by_source[source] = (
+                                now_stamp, 0.0, None
+                            )
+                        else:
+                            latest = msg.status_list[-1]
+                            goal_stamp = (
+                                latest.goal_info.stamp.sec
+                                + latest.goal_info.stamp.nanosec * 1e-9
+                            )
+                            if goal_stamp <= 0.0:
+                                goal_stamp = time.time()
+                            r.status_by_source[source] = (
+                                goal_stamp, goal_stamp, int(latest.status)
+                            )
+
+                        active = [
+                            (goal_stamp, source_name, st)
+                            for source_name, (hdr, goal_stamp, st)
+                            in r.status_by_source.items()
+                            if st is not None
+                        ]
+                        if not active:
                             r.action_status = 0
                             r.action_status_text = "IDLE"
                             r.goal_x = None
                             r.goal_y = None
                             return
 
-                        latest = msg.status_list[-1]
-                        st = latest.status
+                        # Newest goal wins.  On an exact tie prefer a live
+                        # status so an idle source cannot mask an active one.
+                        goal_stamp, source_name, st = max(
+                            active,
+                            key=lambda e: (
+                                e[0],
+                                1 if e[2] in (1, 2, 3) else 0,
+                            ),
+                        )
+                        del source_name
+                        if goal_stamp < r.last_status_goal_stamp:
+                            # Only a stale goal is still listed on the other
+                            # source; keep the newest known display.
+                            return
                         r.action_status = st
                         status_map = {
                             1: "ACCEPTED",
@@ -384,34 +463,57 @@ class TelemetryCollector:
                             3: "CANCELING",
                             4: "SUCCEEDED",
                             5: "CANCELED",
-                            6: "ABORTED"
+                            6: "ABORTED",
                         }
-                        r.action_status_text = status_map.get(st, f"STATUS_{st}")
+                        r.action_status_text = status_map.get(
+                            st, f"STATUS_{st}"
+                        )
 
-                        # If status transitioned to finished
-                        if st == 4:
-                            r.last_stop_cause = "Succeeded"
-                            r.last_stop_time = datetime.now().strftime("%H:%M:%S")
-                        elif st == 5:
-                            r.last_stop_cause = "Cancelled"
-                            r.last_stop_time = datetime.now().strftime("%H:%M:%S")
-                        elif st == 6:
-                            r.last_stop_cause = "Aborted / Failed"
-                            r.last_stop_time = datetime.now().strftime("%H:%M:%S")
+                        if goal_stamp >= r.last_status_goal_stamp:
+                            r.last_status_goal_stamp = goal_stamp
+                            if st == 4:
+                                r.last_stop_cause = "Succeeded"
+                                r.last_stop_time = datetime.now().strftime(
+                                    "%H:%M:%S"
+                                )
+                            elif st == 5:
+                                r.last_stop_cause = "Cancelled"
+                                r.last_stop_time = datetime.now().strftime(
+                                    "%H:%M:%S"
+                                )
+                            elif st == 6:
+                                r.last_stop_cause = "Aborted / Failed"
+                                r.last_stop_time = datetime.now().strftime(
+                                    "%H:%M:%S"
+                                )
 
                         if st in (4, 5, 6):
                             r.goal_x = None
                             r.goal_y = None
                 return status_cb
 
-            node.create_subscription(GoalStatusArray, f'/{ns}/navigate_to_pose/_action/status', make_status_cb(ns), 10)
+            node.create_subscription(
+                GoalStatusArray,
+                f'/{ns}/navigate_to_pose/_action/status',
+                safe_callback(make_status_cb(ns, 'to_pose')),
+                10,
+            )
+            node.create_subscription(
+                GoalStatusArray,
+                f'/{ns}/navigate_through_poses/_action/status',
+                safe_callback(make_status_cb(ns, 'through_poses')),
+                10,
+            )
 
         executor = SingleThreadedExecutor()
         executor.add_node(node)
         try:
             executor.spin()
         except Exception:
-            pass
+            # ExternalShutdownException during Ctrl-C is expected; only
+            # report exceptions that happen while the context is healthy.
+            if rclpy.ok():
+                traceback.print_exc()
         finally:
             node.destroy_node()
 

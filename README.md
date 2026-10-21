@@ -189,12 +189,12 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 在原有 2D SLAM / frontier / Nav2 之上，双车链路额外增加一条并行的 3D 建图层：
 
-- 每台车在 `base_scan` 上增加一颗 16 线、360° 水平、3 Hz 的 `gpu_lidar`，桥接为 `/robotX/points`
+- 每台车在 `base_scan` 上增加一颗 32 线（-30°..+55°）、720 点、5 Hz 的 `gpu_lidar`，桥接为 `/robotX/points`
 - `/robotX/points` 同时作为 Nav2 局部 `voxel_layer` 和全局 `obstacle_layer` 的 `PointCloud2` 观测源，因此桌面、床面、柜顶等悬空结构会投影进 2D 代价地图
 - `scripts/merge_pointclouds.py` 用 TF 把两车点云从 `robotX/base_scan` 变换到 `world`，体素降采样后发布 `/points_merged`
 - `octomap_server` 订阅 `/points_merged`，输出 `/octomap_binary`、`/octomap_full`、`/octomap_point_cloud_centers` 和 `/projected_map`
 
-2D SLAM、`/robotX/scan`、frontier 探索和 Nav2 规划逻辑都不变；3D 图只用于展示和存档，不参与后续导航。
+2D SLAM、`/robotX/scan` 与 Nav2 规划逻辑不变；`multi_robot_coordinator.py` 现在还会消费 `/octomap_point_cloud_centers`，把占据体素结构计入前沿评分，并在 2D 前沿闭合后做残差补盲与收敛判定（见下节）。3D 图不再只是被动展示/存档。
 
 ```bash
 # 默认无头：不启动 Gazebo GUI，也不启动 RViz
@@ -225,11 +225,32 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 
 `config/octomap_params.yaml` 中 `latch: false` 是为了避免无头 VM 上 `octomap_server` 每次点云更新都序列化整棵 `octomap_binary`/`octomap_full` 树。`save_cloud_pcd.py` 使用 volatile reliable QoS，靠周期性更新取数；存档时保持 `merge_pointclouds.py` / `octomap_server` 运行即可。
 
-**2D 建图完成 ≠ 3D 建图完成。** 2D frontier 结束只说明地面可通行区域没有未知边界；家具背面、桌下、垂直视场外仍可能有空洞。
+**2D 建图完成 ≠ 3D 建图完成。** 2D frontier 结束只说明地面可通行区域没有未知边界；家具背面、桌下、垂直视场外仍可能有空洞。协调器会在 2D 前沿连续 3 个周期（约 6 s）为空后启用残差补盲：从 3D 占据柱中找低密度/高未知率的遮挡口袋和 2D 未知区里的 3D 结构，生成可达视点继续探索；2D 前沿为空、残差增益低于阈值、体素/柱增长低于阈值连续 6 个周期后判定收敛。
+
+### TARE 化调度与 A/B 开关
+
+协调器把 TARE 的三个核心思想接入了现有 Nav2 架构：
+
+- **3D 信息增益**：`VoxelColumnIndex` 用 0.1 m 柱状栅格统计占据体素密度、高度跨度、悬空比例和 2D 未知率；`total_gain = gain_scale * gain_2d + gain_3d_scale * g3d`。
+- **Local / Global 双层调度**：距空闲车 6 m 内且同自由连通域的候选进入该车 Local 池；其余进入 Global 池，按 `roi = gain / (dist + 1)` 竞拍，避免长时间折返。
+- **近场 TSP 连续巡游**：Local 池按最近邻 + 2-opt 排序，一次 `NavigateThroughPoses` 下发（最多 6 点、总长 ≤10 m、点距 ≥1.2 m），中间点不停车。
+
+运行中的降级行为：`navigate_through_poses` 不可用或连续失败 2 次时，该车自动退回单点 `NavigateToPose`；单点规划失败会按点计失败并拉黑重试；3D 索引构建超过 `cycle_time_budget_ms` 时只跳过本周期的 3D 评分并保留上一版索引，不影响 2D 调度。
+
+所有新行为都有开关；关闭后回到原来的 2D 单点竞拍：
+
+```bash
+# 2D-only 基线（对比用）
+COORDINATOR_ARGS="-p use_3d_gain:=false -p local_scheduling_enable:=false \
+  -p residual_enable:=false -p convergence_enable:=false" \
+HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
+```
+
+关键参数在 `config/coordinator_params.yaml` 的 `use_3d_gain`、`local_scheduling_enable`、`local_radius`、`local_max_waypoints`、`use_through_poses`、`residual_enable`、`convergence_enable` 等条目。算法模块 `scripts/exploration_3d.py` 不依赖 ROS，可单独运行 `python3 -m unittest discover -s scripts -p 'test_exploration_3d.py' -v`。
 
 常用参数文件：
 
-- `config/gz_waffle_3d_lidar.sdf.xacro`：3D 雷达（默认 16 线 / 3 Hz；有独显时可升到 24 线 / 5 Hz）
+- `config/gz_waffle_3d_lidar.sdf.xacro`：3D 雷达（32 线 / 720 点 / 5 Hz；无独显时可降到 12–16 线）
 - `config/tb3_points_bridge.yaml`、`config/tb3_bridge_no_clock.yaml`：`gz.msgs.PointCloudPacked` → `sensor_msgs/msg/PointCloud2` 桥接
 - `config/octomap_params.yaml`：OctoMap 分辨率、z 裁剪和发布 QoS（`latch: false`）
 - `config/nav2_multirobot_slam_params.yaml`：双车 Nav2 的 `PointCloud2` 观测源
@@ -243,10 +264,12 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 - `config/nav2_params_rl.yaml`：TD3 导航参数
 - `config/nav2_params_vmware.yaml`：TurtleBot4 / MPPI 在虚拟机上的参数
 - `config/nav2_multirobot_slam_params.yaml`：双车多命名空间 Nav2 + `slam_toolbox` 参数
-- `config/gz_waffle_3d_lidar.sdf.xacro`：双车 3D 点云建图使用的 16 线 / 3 Hz TB3 模型
+- `config/gz_waffle_3d_lidar.sdf.xacro`：双车 3D 点云建图使用的 32 线 / 5 Hz TB3 模型
 - `config/tb3_points_bridge.yaml`：robot1 的 3D 点云 GZ → ROS 桥接；robot2 的桥接条目在 `tb3_bridge_no_clock.yaml`
 - `config/octomap_params.yaml`：OctoMap 3D 占据地图参数
 - `scripts/merge_pointclouds.py`：双车点云变换到 `world` 并按体素合并
+- `scripts/exploration_3d.py`：3D 体素增益、残差补盲、TSP、Local/Global 所有权与收敛算法（纯 Python）
+- `scripts/test_exploration_3d.py`：上述算法的 stdlib `unittest`
 - `scripts/save_cloud_pcd.py`：把周期发布的点云保存为 ASCII PCD
 - `scripts/monitor_dashboard.py`：双车协同自主探索实时监控仪表盘（由仿真脚本自动拉起）
 - `docs/3d_mapping_plan.md`：3D 点云建图的完整设计与实施计划
@@ -259,7 +282,7 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 
 1. [x] **共享合并地图 + 竞拍协商机制（已完成）**：实现 `scripts/multi_robot_coordinator.py`，统一订阅全局合并大地图 `/map`，基于边际效益（前沿增益减去距离/航向代价）进行多车竞拍协商调度，并通过 TF / 初始位姿矩阵逆变换下发 Nav2 导航目标，消除重复探索与航向冲突。详细配置见 `config/coordinator_params.yaml`。
 
-2. [x] **仿真 3D 点云建图（部分完成）**：TurtleBot3 实物使用单线激光雷达（LDS-01/02）。本次只在 **Gazebo 双机仿真**中增加 16 线 / 3 Hz 3D 雷达，沿用现有 `slam_toolbox` 的 2D 位姿，把两车点云合并后送入 `octomap_server`；桌/床等悬空物通过 Nav2 `PointCloud2` 观测源投影进 2D 代价地图。3D 图仅用于展示和存档，不用于后续导航；实车传感器升级、标定和 3D 重定位仍未实现。设计与验收流程见 `docs/3d_mapping_plan.md` 和 README 的“双机 3D 点云建图（无头）”章节。
+2. [x] **仿真 3D 点云建图与 3D 参与探索（部分完成）**：TurtleBot3 实物使用单线激光雷达（LDS-01/02）。本次在 **Gazebo 双机仿真**中增加 32 线 / 5 Hz 3D 雷达，沿用现有 `slam_toolbox` 的 2D 位姿，把两车点云合并后送入 `octomap_server`；桌/床等悬空物通过 Nav2 `PointCloud2` 观测源投影进 2D 代价地图。协调器进一步把占据体素结构用于前沿增益、2D 闭合后的残差补盲和收敛判定，Local/Global 调度与近场 TSP 巡游也已接入；实车传感器升级、标定和 3D 重定位仍未实现。设计与验收流程见 `docs/3d_mapping_plan.md` 和 README 的“双机 3D 点云建图（无头）”章节。
 
 3. 现在使用的 TurtleBot3 Waffle 车头正前方安装了一颗 Intel RealSense 深度摄像头，但在 Nav2 官方的精简仿真包（nav2_minimal_tb3_sim）中，为了极大降低对 CPU/GPU 的算力消耗（特别是虚拟机环境），默认只启动了激光雷达和里程计的桥接，摄像头的图像渲染插件默认被精简关闭了。
 目标：在拥有独立显卡直通的高性能主机上开启摄像头的视频流展示

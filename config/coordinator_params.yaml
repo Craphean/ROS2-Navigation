@@ -1,8 +1,13 @@
-# Parameters for multi-robot auction exploration coordinator
+# Parameters for multi-robot exploration coordinator.
+#
+# The legacy 2D auction is fully preserved when the feature switches below are
+# disabled.  See docs/3d_mapping_plan.md for the TARE-inspired design.
 multi_robot_coordinator:
   ros__parameters:
     use_sim_time: true
-    # Frequency of coordination / auction cycle (Hz)
+
+    # --- Legacy frontier / auction parameters ---
+    # Frequency of the coordination cycle (Hz)
     rate_hz: 0.5
     # Minimum number of frontier cells to form a valid cluster
     min_frontier_size: 5
@@ -21,3 +26,87 @@ multi_robot_coordinator:
     # Minimum clearance from known obstacles for frontier safe goal retraction (meters)
     min_clearance: 0.35
 
+    # --- 3D information gain ---
+    use_3d_gain: true
+    octomap_cloud_topic: "/octomap_point_cloud_centers"
+    voxel_index_resolution: 0.10
+    voxel_min_z: 0.08
+    voxel_max_z: 2.0
+    voxel_min_points_per_column: 3
+    voxel_max_points: 400000
+    voxel_update_period: 1.0
+    gain_3d_window_radius: 1.5
+    gain_3d_scale: 40.0
+    gain_3d_density_weight: 0.30
+    gain_3d_unknown_weight: 0.35
+    gain_3d_floating_weight: 0.15
+    gain_3d_height_weight: 0.10
+    gain_3d_occupancy_weight: 0.10
+    gain_3d_density_ref: 0.18
+    gain_3d_occupancy_ref: 8.0
+    gain_3d_height_ref: 0.80
+    gain_3d_wall_zmin: 0.25
+    gain_3d_wall_zmax: 1.30
+    voxel_cloud_warn_timeout: 15.0
+    cycle_time_budget_ms: 150.0
+
+    # --- Local / Global hierarchical scheduling ---
+    local_scheduling_enable: true
+    local_radius: 6.0
+    local_max_waypoints: 6
+    local_min_spacing: 1.2
+    local_max_tour_length: 10.0
+    local_tour_score_dist_weight: 1.0
+    local_release_unselected: false
+    local_release_cooldown: 5.0
+    local_release_score_penalty: 0.7
+    tsp_2opt_passes: 2
+    global_roi_enable: true
+    global_roi_distance_offset: 1.0
+    global_roi_min: 0.05
+    global_roi_scale: 5.0
+    global_max_distance: 0.0
+    global_max_candidates: 8
+
+    # --- Tour dispatch / supervision ---
+    use_through_poses: true
+    through_poses_fail_limit: 2
+    action_wait_sec: 2.0
+    tf_wait_sec: 0.1
+    tour_timeout_per_waypoint: 25.0
+    tour_stall_window: 20.0
+    tour_stall_min_translation: 0.10
+    tour_stall_min_progress: 0.20
+    tour_rewrite_on_invalidation: true
+    tour_max_rewrites: 2
+
+    # --- Residual blind-spot cleanup ---
+    residual_enable: true
+    residual_activation_cycles: 3
+    residual_min_cluster_cells: 25
+    residual_min_density: 0.08
+    residual_min_unknown_frac: 0.20
+    residual_structure_radius: 2.5
+    residual_min_structure_columns: 3
+    residual_ring_radius: 1.0
+    residual_ring_min_empty_sectors: 3
+    residual_viewpoint_search_radius: 2.5
+    residual_max_candidates: 4
+    residual_dedupe_radius: 1.5
+    residual_score_scale: 10.0
+    residual_blacklist_radius: 1.0
+    residual_max_attempts: 2
+    residual_coverage_hole_enable: false
+
+    # --- Convergence ---
+    convergence_enable: true
+    convergence_cycles_required: 6
+    convergence_residual_gain_threshold: 0.50
+    convergence_voxel_growth_epsilon: 25
+    convergence_voxel_growth_rate: 0.005
+    convergence_require_3d: true
+    fallback_convergence_timeout: 120.0
+    convergence_stop_dispatch: true
+
+    # Map freshness used by convergence and stale-map handling.
+    map_loss_timeout: 5.0
