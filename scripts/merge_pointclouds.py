@@ -63,7 +63,11 @@ class PointCloudMerger(Node):
             self.declare_parameter("publish_rate", 3.0).value
         )
         self.min_z = float(self.declare_parameter("min_z", 0.05).value)
-        self.max_z = float(self.declare_parameter("max_z", 2.0).value)
+        # 3.0 m keeps ceilings and the top of tall walls for the PCD archive
+        # (a house interior is routinely 2.4-2.8 m).  octomap_server applies
+        # its own 2.0 m clip from config/octomap_params.yaml, so navigation and
+        # the coordinator's voxel index are unaffected by this wider range.
+        self.max_z = float(self.declare_parameter("max_z", 3.0).value)
         self.min_range = float(self.declare_parameter("min_range", 0.1).value)
         self.max_range = float(self.declare_parameter("max_range", 12.0).value)
         self.tf_timeout = float(self.declare_parameter("tf_timeout", 0.1).value)

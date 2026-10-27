@@ -1,0 +1,20 @@
+{
+  "output": "maps/merged_full.pcd",
+  "points": 1102679,
+  "voxel_size_m": 0.02,
+  "frames": 721,
+  "dropped_by_z": 0,
+  "duration_s": 672.4,
+  "bounds": {
+    "min": [
+      -5.53,
+      -4.59,
+      0.05
+    ],
+    "max": [
+      5.55,
+      4.57,
+      1.71
+    ]
+  }
+}

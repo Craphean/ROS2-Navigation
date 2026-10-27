@@ -6,13 +6,33 @@ octomap_server:
   ros__parameters:
     frame_id: world
     base_frame_id: base_footprint
-    resolution: 0.02
+    # 0.02 m voxels blew up to 48.2M leaves after ~30 min of warehouse
+    # exploration.  OctomapServer::publishAll() walks the WHOLE tree on every
+    # cloud insert (and serialises octomap_binary when anything subscribes to
+    # it), so the node stopped publishing /octomap_binary,
+    # /octomap_point_cloud_centers and /projected_map entirely and dragged the
+    # 4-core box down with it — which in turn starved collision_monitor's
+    # lifecycle bond and took Nav2 down.
+    # 0.10 m matches the consumer (coordinator voxel_index_resolution: 0.10) and
+    # cuts the leaf count ~125x (48M -> ~0.4M).  If you want a finer archive,
+    # save a PCD from the raw merged cloud instead of raising this back up.
+    resolution: 0.10
     point_cloud_min_z: 0.08
     point_cloud_max_z: 2.0
     occupancy_min_z: 0.08
     occupancy_max_z: 2.0
     filter_ground_plane: false
-    sensor_model.max_range: 12.0
+    # DO NOT lower this back to the LiDAR's 12 m.  /points_merged is already in
+    # the world frame, so octomap resolves the sensor origin as
+    # world -> world = identity, i.e. it measures every point's range from the
+    # WORLD ORIGIN, not from the robot.  With max_range = 12 the whole map was
+    # silently clipped to a 12 m sphere around (0,0,0): the warehouse run came
+    # out as a 22 x 22 m box inside a 28 x 45 m world, and every wall farther
+    # than 12 m from the origin disappeared.  Verified with a synthetic cloud:
+    # walls at x = 5/9/15/20 m keep 744 points at 12 m (xmax 9.05) versus 1488
+    # points at 100 m (xmax 20.05).
+    # 100 m covers the largest world here (warehouse: ~28 x 45 m) with margin.
+    sensor_model.max_range: 100.0
     publish_free_space: false
     # Keep this false in the headless VM: with latch=true octomap_server
     # serializes octomap_binary/full on every cloud update even when nobody

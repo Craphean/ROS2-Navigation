@@ -210,7 +210,7 @@ HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
 ros2 run octomap_server octomap_saver_node --ros-args \
   -p octomap_path:="$PWD/maps/tb3_3d_map.bt" -p full:=true
 
-# 占据体素中心点云（ASCII .pcd）
+# 占据体素中心点云（ASCII .pcd，分辨率跟随 octomap_server，现为 0.10 m）
 python3 scripts/save_cloud_pcd.py \
   --topic /octomap_point_cloud_centers --output maps/tb3_3d_map.pcd
 
@@ -223,7 +223,49 @@ ros2 run nav2_map_server map_saver_cli -f maps/tb3_3d_projected \
 
 `.pcd` 是 ASCII 格式的占据体素中心，可以直接用文本编辑器查看，也可以复制到有图形界面的机器上用 CloudCompare / MeshLab 打开。
 
+### 需要比 OctoMap 更细的 3D 档案时
+
+`/points_merged`（`merge_pointclouds.py` 的输出）是**每帧合并**——两台车各自最新一帧 3D 雷达拼起来，不是累积地图，所以单帧存下来只有薄薄两片。要拿整图必须累积，但直接缓存原始消息会爆内存（约 2 MB × 3 Hz ≈ 21 GB/h）。用 `save_cloud_pcd.py` 的累积模式，它会把每帧折进一个体素哈希（内存只随"走过的体素数"增长），并每 `--checkpoint-sec` 秒落一次盘，中途被杀也留得下能用的文件：
+
+```bash
+# 边跑边攒；--accumulate 设成整轮时长，Ctrl-C/被杀时最近一次 checkpoint 仍有效
+python3 scripts/save_cloud_pcd.py \
+  --topic /points_merged --output maps/tb3_3d_raw.pcd \
+  --accumulate 3600 --voxel-size 0.05 --binary --checkpoint-sec 60
+```
+
+`--binary` 写二进制 PCD（12 B/点，比 ASCII 快约 50 倍），CloudCompare / Open3D / PCL 都能直接读。这样既拿到 0.05 m 的细档案，又不用把 `octomap_server` 的分辨率调回去（那会让树重新涨到千万节点级）。
+
 `config/octomap_params.yaml` 中 `latch: false` 是为了避免无头 VM 上 `octomap_server` 每次点云更新都序列化整棵 `octomap_binary`/`octomap_full` 树。`save_cloud_pcd.py` 使用 volatile reliable QoS，靠周期性更新取数；存档时保持 `merge_pointclouds.py` / `octomap_server` 运行即可。
+
+#### 一条命令导出完整点云：`export_merged_cloud.py`
+
+`save_cloud_pcd.py --accumulate` 要自己估时长、手动停。`export_merged_cloud.py` 多做了三件事：**地图不再增长就自己收尾**（`--idle-stop`）、默认就写二进制、结束时输出一份 JSON 报告（点数/包围盒/帧数）。
+
+```bash
+python3 scripts/export_merged_cloud.py \
+  --topic /points_merged --output maps/merged_full.pcd \
+  --voxel-size 0.02 --min-z 0.03 --max-z 3.0 \
+  --idle-stop 25 --checkpoint-sec 60 --report maps/merged_full.json
+```
+
+- `--voxel-size 0.02`：`merge_pointclouds.py` 的原始精度就是 2 cm，再细没有意义；0.05 m 的 OctoMap 中心点会丢掉 60% 的细节。
+- `--max-z 3.0`：`merge_pointclouds.py` 的 `max_z` 默认已放宽到 3.0 m，能留下天花板与高墙顶部；`octomap_server` 仍按自己的 2.0 m 裁剪，导航行为不变。
+- `--idle-stop 25`：25 s 没有新体素就判定探索结束，自动写盘退出。
+- 大场景（仓库、医院）建议 `--voxel-size 0.03`，体素集合常驻内存约 100–300 MB。
+
+#### 坑：`sensor_model.max_range` 会按“世界原点”裁剪
+
+`/points_merged` 的 `frame_id` 是 `world`，`octomap_server` 查 `world → world` 得到单位变换，于是**把所有点距世界原点的距离当成传感器量程**。早先 `sensor_model.max_range: 12.0` 的结果是整张 3D 图被裁成以原点为心、半径 12 m 的球：warehouse（28 × 45 m）只剩中间 22 × 22 m，外围墙体全丢，远看像“放射状条纹”。
+
+现已改为 `100.0`。复现与验收（合成点云，x = 5/9/15/20 m 四堵墙）：
+
+| `max_range` | 输出点数 | 最远 x |
+|---|---|---|
+| 12.0（旧） | 744 | 9.05 m |
+| 100.0（现） | 1488 | 20.05 m |
+
+注意 `merge_pointclouds.py` 的 `max_range: 12.0` 是**传感器自身量程**、按车体坐标算，不受此影响，不用改。
 
 **2D 建图完成 ≠ 3D 建图完成。** 2D frontier 结束只说明地面可通行区域没有未知边界；家具背面、桌下、垂直视场外仍可能有空洞。协调器会在 2D 前沿连续 3 个周期（约 6 s）为空后启用残差补盲：从 3D 占据柱中找低密度/高未知率的遮挡口袋和 2D 未知区里的 3D 结构，生成可达视点继续探索；2D 前沿为空、残差增益低于阈值、体素/柱增长低于阈值连续 6 个周期后判定收敛。
 
@@ -270,7 +312,8 @@ HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
 - `scripts/merge_pointclouds.py`：双车点云变换到 `world` 并按体素合并
 - `scripts/exploration_3d.py`：3D 体素增益、残差补盲、TSP、Local/Global 所有权与收敛算法（纯 Python）
 - `scripts/test_exploration_3d.py`：上述算法的 stdlib `unittest`
-- `scripts/save_cloud_pcd.py`：把周期发布的点云保存为 ASCII PCD
+- `scripts/save_cloud_pcd.py`：把点云存成 PCD（单帧快照 / 有界内存的增量累积；支持 ascii 与 binary，累积模式定期 checkpoint）
+- `scripts/export_merged_cloud.py`：把 `/points_merged` 累积成高精度 PCD 档案（0.02 m 体素、地图停止增长自动收尾、输出 JSON 报告）
 - `scripts/monitor_dashboard.py`：双车协同自主探索实时监控仪表盘（由仿真脚本自动拉起）
 - `docs/3d_mapping_plan.md`：3D 点云建图的完整设计与实施计划
 - `config/cyclonedds.xml`：CycloneDDS 配置。TB3 RL 导航和 TB4 导航默认用它，避免 Fast DDS 共享内存锁

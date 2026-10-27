@@ -36,7 +36,7 @@ from rclpy.time import Time
 
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import Point, PoseStamped, Quaternion
-from nav2_msgs.action import NavigateThroughPoses, NavigateToPose
+from nav2_msgs.action import BackUp, NavigateThroughPoses, NavigateToPose
 from nav_msgs.msg import OccupancyGrid, Path
 from sensor_msgs.msg import PointCloud2
 from visualization_msgs.msg import Marker, MarkerArray
@@ -145,6 +145,11 @@ class RobotTracker:
 
         self.action_client: Optional[ActionClient] = None
         self.through_client: Optional[ActionClient] = None
+        self.backup_client: Optional[ActionClient] = None
+        # Out-of-bounds self recovery (see _start_backup_recovery).
+        self.backup_active: bool = False
+        self.backup_last_time: float = -1e9
+        self.backup_count: int = 0
         self.failed_goals_count: Dict[Tuple[int, int], int] = {}
         self.goal_pub = None
         self.plan_pub = None
@@ -178,6 +183,11 @@ class RobotTracker:
         # Relocalization jump detection
         self.prev_world_x: Optional[float] = None
         self.prev_world_y: Optional[float] = None
+
+        # Nav2 stack availability (set by MultiRobotCoordinator._check_nav_stack).
+        # >= 0 means "action servers have been unreachable since this sim time".
+        self.nav_down_since: float = -1.0
+        self.nav_warn_time: float = -1e9
 
 
 class MultiRobotCoordinator(Node):
@@ -260,6 +270,16 @@ class MultiRobotCoordinator(Node):
         self.declare_parameter('tour_stall_min_progress', 0.20)
         self.declare_parameter('tour_rewrite_on_invalidation', True)
         self.declare_parameter('tour_max_rewrites', 2)
+
+        # Out-of-bounds self recovery.  The global costmap is exactly as large
+        # as a robot's SLAM map, so a robot that stops a few centimetres past
+        # the mapped area is outside its own costmap and every plan aborts at
+        # the start pose check.  nav2_behaviors/backup drives on the rolling
+        # local costmap and is then the only motion that still works.
+        self.declare_parameter('backup_recovery_enable', True)
+        self.declare_parameter('backup_distance', 0.40)
+        self.declare_parameter('backup_speed', 0.06)
+        self.declare_parameter('backup_cooldown', 20.0)
 
         # Residual blind spots
         self.declare_parameter('residual_enable', True)
@@ -455,6 +475,17 @@ class MultiRobotCoordinator(Node):
             self.get_parameter('tour_max_rewrites').value
         )
 
+        self.backup_recovery_enable = bool(
+            self.get_parameter('backup_recovery_enable').value
+        )
+        self.backup_distance = float(
+            self.get_parameter('backup_distance').value
+        )
+        self.backup_speed = float(self.get_parameter('backup_speed').value)
+        self.backup_cooldown = float(
+            self.get_parameter('backup_cooldown').value
+        )
+
         self.residual_enable = bool(
             self.get_parameter('residual_enable').value
         )
@@ -567,6 +598,14 @@ class MultiRobotCoordinator(Node):
         self._last_cycle_time: float = -1e9
         self._through_unready_warned: set = set()
         self._tf_checked: set = set()
+        # Nav2 stack watchdog (see _check_nav_stack).
+        self.nav_outage_warn_period = float(
+            self.declare_parameter('nav_outage_warn_period', 15.0).value
+        )
+        self._nav_outage_all_logged: bool = False
+        # Dispatch starvation reporting (see _warn_dispatch_starved).
+        self._last_starved_log_time: float = -1e9
+        self._global_reject_info: Optional[Tuple[int, float]] = None
         self.cycle_lock = threading.Lock()
         # Serializes robot goal/tracker state mutations between the timer
         # thread and action callbacks.  Reentrant because dispatch/reset and
@@ -610,6 +649,12 @@ class MultiRobotCoordinator(Node):
                 self,
                 NavigateThroughPoses,
                 f'/{ns}/navigate_through_poses',
+                callback_group=self.cb_group,
+            )
+            robot.backup_client = ActionClient(
+                self,
+                BackUp,
+                f'/{ns}/backup',
                 callback_group=self.cb_group,
             )
 
@@ -1227,8 +1272,9 @@ class MultiRobotCoordinator(Node):
         if elapsed_ms > self.cycle_time_budget_ms:
             self.get_logger().warning(
                 f'[3D] voxel index build {elapsed_ms:.1f} ms exceeds '
-                f'cycle_time_budget_ms={self.cycle_time_budget_ms:.1f} ms; '
-                f'skipping 3D gain scoring this cycle.'
+                f'cycle_time_budget_ms={self.cycle_time_budget_ms:.1f} ms: '
+                f'the box is CPU-bound (build is ~30 ms when idle). 3D gain '
+                f'is still scored from this fresh index.'
             )
 
     def _check_cloud_staleness(self, now: float):
@@ -1307,7 +1353,9 @@ class MultiRobotCoordinator(Node):
             # Sim time has not started yet; nothing is safe to time out.
             return
 
-        cycle_start = time.perf_counter()
+        self._check_nav_stack(now)
+        self._check_backup_timeout(now)
+
         self._last_cycle_time = now
 
         self.update_robot_poses()
@@ -1330,10 +1378,13 @@ class MultiRobotCoordinator(Node):
             self.frontier_empty_cycles += 1
         else:
             self.frontier_empty_cycles = 0
-        skip_3d = (
-            (time.perf_counter() - cycle_start) * 1000.0
-            > self.cycle_time_budget_ms
-        )
+        # Skip 3D scoring only when the voxel index is missing or stale - never
+        # merely because this cycle is running late.  The rebuild has already
+        # been paid for by now, and dropping the score silently removes the 3D
+        # weight from the auction for exactly the cycles that hold the freshest
+        # index.  On a loaded box that used to be roughly half of all cycles,
+        # which made 3D gain look like it "sometimes" applies.
+        skip_3d = not self._index_available(now)
         self.score_candidates(clusters, skip_3d)
 
         # Residual blind spots once the 2D frontier is quiet.
@@ -1493,18 +1544,53 @@ class MultiRobotCoordinator(Node):
                         )
                     if global_pool:
                         if self.global_roi_enable:
-                            self.run_global_auction(
-                                remaining_idle, global_pool, occ
+                            n = self.run_global_auction(
+                                remaining_idle, global_pool, occ, dispatched
                             )
+                            if n == 0 and self._global_reject_info is not None:
+                                pool_n, best_roi = self._global_reject_info
+                                self._warn_dispatch_starved(
+                                    f'{pool_n} global candidate(s) all rejected '
+                                    f'by the ROI gate (best ROI '
+                                    f'{best_roi:.3f} < min_roi '
+                                    f'{self.roi_params.min_roi:.3f}); using the '
+                                    f'utility auction instead.'
+                                )
+                                self.run_auction(
+                                    remaining_idle,
+                                    global_pool,
+                                    occ.resolution,
+                                    dispatched,
+                                )
                         else:
                             self.run_auction(
                                 remaining_idle,
                                 global_pool,
                                 occ.resolution,
+                                dispatched,
                             )
             else:
                 self.run_auction(
-                    idle_robots, available, occ.resolution
+                    idle_robots, available, occ.resolution, dispatched
+                )
+
+        # Liveness net.  Candidates exist and robots are idle, yet nobody got a
+        # goal: every scheduling gate (local ownership, component filter, ROI
+        # threshold) can silently reject the whole pool, which used to leave
+        # both robots standing still with nothing in the log.  Never let that
+        # happen without a reason and a fallback.
+        if dispatch_allowed and available and not dispatched:
+            still_idle = [
+                r for r in self.robots.values() if r.state == 'IDLE'
+            ]
+            if still_idle:
+                self._warn_dispatch_starved(
+                    f'{len(still_idle)} idle robot(s) and '
+                    f'{len(available)} reachable candidate(s) but nothing was '
+                    f'dispatched; falling back to the utility auction.'
+                )
+                self.run_auction(
+                    still_idle, available, occ.resolution, dispatched
                 )
 
         # Convergence tracking.
@@ -1685,10 +1771,16 @@ class MultiRobotCoordinator(Node):
         idle_robots: List[RobotTracker],
         clusters: List[object],
         res: float,
-    ):
-        """Legacy sequential single-item greedy auction."""
+        dispatched: Optional[set] = None,
+    ) -> int:
+        """Legacy sequential single-item greedy auction.
+
+        Returns the number of goals dispatched.  ``dispatched`` is updated in
+        place so the caller can tell whether anyone actually got a goal.
+        """
         remaining_robots = list(idle_robots)
         remaining_clusters = list(clusters)
+        count = 0
 
         while remaining_robots and remaining_clusters:
             best_bid = -float('inf')
@@ -1714,6 +1806,9 @@ class MultiRobotCoordinator(Node):
                 # idle robots bid for the same pool instead of aborting.
                 remaining_robots.remove(winner_robot)
                 continue
+            count += 1
+            if dispatched is not None:
+                dispatched.add(winner_robot.namespace)
             remaining_robots.remove(winner_robot)
 
             before = list(remaining_clusters)
@@ -1738,15 +1833,28 @@ class MultiRobotCoordinator(Node):
                 ]
             remaining_clusters = next_clusters
 
+        return count
+
     def run_global_auction(
         self,
         idle_robots: List[RobotTracker],
         clusters: List[object],
         occ: OccupancyView,
-    ):
-        """ROI-based auction for strategic Global transfers."""
+        dispatched: Optional[set] = None,
+    ) -> int:
+        """ROI-based auction for strategic Global transfers.
+
+        Returns the number of goals dispatched.  Zero with a non-empty pool
+        means every candidate was filtered out by the ROI threshold or the max
+        distance; the caller falls back to the plain utility auction so the
+        fleet never idles out of starvation.
+        """
         remaining_robots = list(idle_robots)
         remaining_clusters = list(clusters)
+        count = 0
+        best_rejected_roi = -float('inf')
+        # Cleared on every call; the caller reads it to explain a zero result.
+        self._global_reject_info: Optional[Tuple[int, float]] = None
 
         while remaining_robots and remaining_clusters:
             best_bid = -float('inf')
@@ -1761,11 +1869,13 @@ class MultiRobotCoordinator(Node):
                         continue
                     bid, roi, dist = global_bid(agent, cand, self.roi_params)
                     if roi < self.roi_params.min_roi:
+                        best_rejected_roi = max(best_rejected_roi, roi)
                         continue
                     if (
                         self.roi_params.max_distance > 0.0
                         and dist > self.roi_params.max_distance
                     ):
+                        best_rejected_roi = max(best_rejected_roi, roi)
                         continue
                     if bid > best_bid:
                         best_bid = bid
@@ -1788,6 +1898,9 @@ class MultiRobotCoordinator(Node):
                 # idle robots bid for the same pool instead of aborting.
                 remaining_robots.remove(winner_robot)
                 continue
+            count += 1
+            if dispatched is not None:
+                dispatched.add(winner_robot.namespace)
             remaining_robots.remove(winner_robot)
 
             before = list(remaining_clusters)
@@ -1812,6 +1925,10 @@ class MultiRobotCoordinator(Node):
                 ]
             remaining_clusters = next_clusters
 
+        if count == 0 and clusters and best_rejected_roi > -float('inf'):
+            self._global_reject_info = (len(clusters), best_rejected_roi)
+        return count
+
     # ------------------------------------------------------------------
     # Action dispatch
     # ------------------------------------------------------------------
@@ -1824,6 +1941,91 @@ class MultiRobotCoordinator(Node):
             return bool(client.wait_for_server(timeout_sec=0.0))
         except Exception:
             return False
+
+    def _warn_dispatch_starved(self, detail: str) -> None:
+        """Report a dispatch starvation at most once every 10 s.
+
+        The coordination cycle runs at 0.5 Hz, so an unthrottled message here
+        would bury the log within a minute.
+        """
+        now = self.get_sim_time_sec()
+        if now - self._last_starved_log_time < 10.0:
+            return
+        self._last_starved_log_time = now
+        self.get_logger().warning(f'[Dispatch] {detail}')
+
+    def _check_nav_stack(self, now: float) -> None:
+        """Watchdog for a dead Nav2 stack on either robot.
+
+        A lifecycle ``bond_timeout`` tear-down deactivates every nav2 node, and
+        the automatic re-bringup can itself fail.  When that happens the
+        coordinator used to keep re-auctioning the same frontier and log
+        "Action server not ready!" dozens of times per second until the run was
+        killed by hand, which hid the real cause.  This logs one clear error per
+        robot when its servers disappear, a reminder every
+        ``nav_outage_warn_period`` seconds, and a recovery notice once the
+        lifecycle manager has brought the stack back.
+        """
+        all_down = True
+        for robot in self.robots.values():
+            ready = (
+                self._action_server_ready(robot.action_client)
+                or self._action_server_ready(robot.through_client)
+            )
+
+            if ready:
+                all_down = False
+                if robot.nav_down_since >= 0.0:
+                    self.get_logger().info(
+                        f'[{robot.namespace}] Nav2 action servers back online '
+                        f'after {now - robot.nav_down_since:.0f}s; resuming '
+                        f'dispatch.'
+                    )
+                    robot.nav_down_since = -1.0
+                    robot.nav_warn_time = -1e9
+                continue
+
+            if robot.nav_down_since < 0.0:
+                robot.nav_down_since = now
+                robot.nav_warn_time = -1e9
+
+            outage = now - robot.nav_down_since
+            # Ignore blips: only report once the outage is real, then remind.
+            if outage < self.nav_outage_warn_period:
+                continue
+            if (
+                robot.nav_warn_time >= 0.0
+                and now - robot.nav_warn_time < self.nav_outage_warn_period
+            ):
+                continue
+
+            robot.nav_warn_time = now
+            self.get_logger().error(
+                f'[{robot.namespace}] Nav2 action server unreachable for '
+                f'{outage:.0f}s: the nav2 stack is down (lifecycle bond '
+                f'timeout or a failed re-bringup). Waiting for the '
+                f'lifecycle manager; see the robot bringup log for '
+                f'"CRITICAL FAILURE"/"Aborting bringup".'
+            )
+
+        if all_down:
+            outages = [
+                now - r.nav_down_since
+                for r in self.robots.values()
+                if r.nav_down_since >= 0.0
+            ]
+            if (
+                outages
+                and min(outages) >= self.nav_outage_warn_period
+                and not self._nav_outage_all_logged
+            ):
+                self._nav_outage_all_logged = True
+                self.get_logger().error(
+                    'CRITICAL: no robot has a Nav2 action server. Exploration '
+                    'cannot continue until Nav2 recovers.'
+                )
+        else:
+            self._nav_outage_all_logged = False
 
     def _candidate_yaw(self, cand, robot: RobotTracker) -> float:
         yaw = getattr(cand, 'yaw_world', None)
@@ -1869,9 +2071,8 @@ class MultiRobotCoordinator(Node):
     def _dispatch_goal_locked(self, robot: RobotTracker, cluster) -> bool:
         """Send a single-point NavigateToPose action."""
         if not self._action_server_ready(robot.action_client):
-            self.get_logger().warning(
-                f'[{robot.namespace}] Action server not ready!'
-            )
+            # Per-cycle detail is reported (throttled) by _check_nav_stack;
+            # logging here floods the log at the auction rate.
             return False
 
         xl, yl = self.world_to_robot_local(
@@ -2289,6 +2490,10 @@ class MultiRobotCoordinator(Node):
             self._increment_through_failure(robot)
             self._reset_robot_nav(robot)
             self.handle_goal_failure(robot, target, key)
+            if self._is_out_of_bounds_failure(error_msg):
+                # The goal is not to blame: the robot itself is standing
+                # outside its own costmap, so no plan can start from there.
+                self._start_backup_recovery(robot)
         except Exception as exc:
             self.get_logger().error(
                 f'[{robot.namespace}] Exception in goal result: {exc}'
@@ -2458,6 +2663,143 @@ class MultiRobotCoordinator(Node):
             empty_path.header.frame_id = 'world'
             robot.plan_pub.publish(empty_path)
         robot.state = 'IDLE'
+
+    # ------------------------------------------------------------------
+    # Out-of-bounds self recovery
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _is_out_of_bounds_failure(error_msg: str) -> bool:
+        """True when NavfnPlanner rejected the *start* pose.
+
+        The global costmap is sized to the robot's SLAM map, so a robot that
+        stops a few centimetres outside the mapped area sits outside its own
+        costmap.  ``worldToMap()`` then rejects the start pose, the planner
+        throws, and the compute_path action server aborts the goal itself
+        (error_code 203) - the BT never runs, so no recovery behaviour ever
+        fires and the robot can never plan its way back in.
+        """
+        msg = (error_msg or '').lower()
+        return 'outside bounds' in msg or (
+            'outside' in msg and ('bounds' in msg or 'the map' in msg)
+        )
+
+    def _start_backup_recovery(self, robot: RobotTracker) -> None:
+        """Drive the robot backwards onto the map with nav2_behaviors/backup.
+
+        ``backup`` runs on the rolling local costmap, which always contains the
+        robot, so it is the one motion still available when the global costmap
+        does not.
+        """
+        if not self.backup_recovery_enable:
+            return
+        if robot.backup_active:
+            return
+
+        now = self.get_sim_time_sec()
+        if now - robot.backup_last_time < self.backup_cooldown:
+            return
+
+        if robot.backup_client is None or not self._action_server_ready(
+            robot.backup_client
+        ):
+            self.get_logger().error(
+                f'[{robot.namespace}] Pose is outside the global costmap but '
+                f'the backup action server is unavailable; this robot cannot '
+                f'recover on its own.'
+            )
+            return
+
+        goal = BackUp.Goal()
+        goal.target = Point(x=-abs(self.backup_distance), y=0.0, z=0.0)
+        goal.speed = float(self.backup_speed)
+        goal.time_allowance = Duration(seconds=15.0).to_msg()
+
+        robot.backup_active = True
+        robot.backup_last_time = now
+        robot.backup_count += 1
+        # Keep the robot out of the auction until the motion finishes.
+        robot.state = 'RECOVERING'
+
+        self.get_logger().warning(
+            f'[{robot.namespace}] Start pose is outside the global costmap '
+            f'(SLAM map edge); backing up {self.backup_distance:.2f} m at '
+            f'{self.backup_speed:.2f} m/s to re-enter the map '
+            f'(attempt {robot.backup_count}).'
+        )
+
+        try:
+            robot.backup_client.send_goal_async(goal).add_done_callback(
+                lambda fut: self._backup_goal_response(fut, robot)
+            )
+        except Exception as exc:
+            self.get_logger().error(
+                f'[{robot.namespace}] Failed to send backup goal: {exc}'
+            )
+            self._finish_backup_recovery(robot, 'send failed')
+
+    def _backup_goal_response(self, future, robot: RobotTracker) -> None:
+        try:
+            goal_handle = future.result()
+        except Exception as exc:
+            self.get_logger().error(
+                f'[{robot.namespace}] Backup goal response error: {exc}'
+            )
+            self._finish_backup_recovery(robot, 'response error')
+            return
+
+        if goal_handle is None or not goal_handle.accepted:
+            self.get_logger().error(
+                f'[{robot.namespace}] Backup goal rejected by the behavior '
+                f'server.'
+            )
+            self._finish_backup_recovery(robot, 'rejected')
+            return
+
+        try:
+            goal_handle.get_result_async().add_done_callback(
+                lambda fut: self._backup_result(fut, robot)
+            )
+        except Exception as exc:
+            self.get_logger().error(
+                f'[{robot.namespace}] Backup result request error: {exc}'
+            )
+            self._finish_backup_recovery(robot, 'result error')
+
+    def _backup_result(self, future, robot: RobotTracker) -> None:
+        detail = ''
+        try:
+            wrapped = future.result()
+            status = wrapped.status
+            error_code = int(getattr(wrapped.result, 'error_code', -1))
+            error_msg = getattr(wrapped.result, 'error_msg', '')
+            detail = f'status={status}, error_code={error_code}'
+            if error_msg:
+                detail += f', msg="{error_msg}"'
+        except Exception as exc:
+            detail = f'exception: {exc}'
+        self._finish_backup_recovery(robot, detail)
+
+    def _finish_backup_recovery(self, robot: RobotTracker, detail: str) -> None:
+        with self._state_lock:
+            robot.backup_active = False
+            if robot.state == 'RECOVERING':
+                robot.state = 'IDLE'
+        self.get_logger().info(
+            f'[{robot.namespace}] Out-of-bounds recovery finished ({detail}); '
+            f'robot is idle again.'
+        )
+
+    def _check_backup_timeout(self, now: float) -> None:
+        """Never leave a robot wedged in RECOVERING if backup goes silent."""
+        for robot in self.robots.values():
+            if not robot.backup_active:
+                continue
+            if now - robot.backup_last_time > 25.0:
+                self.get_logger().error(
+                    f'[{robot.namespace}] Backup recovery produced no result '
+                    f'within 25s; forcing the robot back to idle.'
+                )
+                self._finish_backup_recovery(robot, 'timeout')
 
     def cancel_robot_goal(self, robot: RobotTracker):
         with self._state_lock:

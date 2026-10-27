@@ -247,19 +247,22 @@ voxel_layer:
     data_type: "PointCloud2"
     min_obstacle_height: 0.05
     max_obstacle_height: 2.0
-    clearing: true
+    clearing: false            # 点云只做 marking，清障交给 scan（见下方说明）
     marking: true
-    raytrace_max_range: 6.0
-    raytrace_min_range: 0.2
-    obstacle_max_range: 5.0
+    raytrace_max_range: 0.0
+    raytrace_min_range: 0.0
+    obstacle_max_range: 3.0
     obstacle_min_range: 0.2
 ```
 
-global `obstacle_layer` 同样增加 `points` source。
+**global `obstacle_layer` 绝对不要加 `points` source**（2026-10-26 实测结论，已回退）。
 
 说明：
 
-- **必须改 `z_voxels`**：当前 local `VoxelLayer` 是 `z_resolution: 0.05`、`z_voxels: 16`，只有 0.8 m 高，会把 1.0 m 的桌面裁掉；改成 40 后覆盖到 2.0 m。全局 `ObstacleLayer` 是 2D 投影，不受此限制
+- **`points` 不能进全局代价地图**：3D 雷达是 720×32≈23k 点、5 Hz 的原始点云，全局代价地图 505×600 栅格上带 `clearing: true` + `raytrace_max_range: 6.0` 时，单次 `updateMap()` 要 0.6–0.9 s，代价地图锁被占用约 70%。结果是 `planner_server` 抢不到执行器，`is_path_valid` 调用成片超时，最后 lifecycle bond 4000 ms 收不到心跳，`lifecycle_manager` 判定 `CRITICAL FAILURE: SERVER planner_server IS DOWN` 并把整栈 Nav2 拆掉——两车同时挂。全局障碍由 2D `scan`（360 线，20 m 量程，代价可忽略）加合并后的 SLAM 静态地图提供即可
+- **局部 `voxel_layer` 保留 `points` 但只做 marking**：近处低矮障碍仍能被 3D 点到，同时不再对 23k 点做 6 m 体素射线追踪（那部分和 20 Hz 控制器抢 CPU，表现为 `Control loop missed its desired rate`）；近距离清障由 `scan` 的 raytrace 负责
+- **如果确实需要桌面/床面参与全局规划**（Phase 2 的原始目的）：先把点云降采样到 0.10 m 左右的 VoxelGrid（约 2–4k 点）再喂全局 costmap，不要直接喂 23k 原始点云；或者只在 hospital/house 这类有小家具的世界里临时开启，并在 `ros2 topic hz /robotX/global_costmap/costmap` 上确认没有掉到 1 Hz 以下
+- **必须改 `z_voxels`**：当前 local `VoxelLayer` 是 `z_resolution: 0.05`、`z_voxels: 16`，只有 0.8 m 高，会把 1.0 m 的桌面裁掉；改成 40 后覆盖到 2.0 m
 - `topic: points` 是相对名，Nav2 会解析成 `/robotX/points`
 - `min_obstacle_height: 0.05` 滤掉地面和噪声；`max_obstacle_height: 2.0` 覆盖墙和家具
 - 桌子/床的**完整投影**会让其下方不可通行。如果以后想让小车钻桌底，把 `min_obstacle_height` 改成 `0.05`、`max_obstacle_height` 改成机器人高度（约 0.25 m）即可；3D 点云里仍然保留桌面
@@ -320,7 +323,13 @@ octomap_server:
   ros__parameters:
     frame_id: world
     base_frame_id: base_footprint
-    resolution: 0.05
+    # 2026-10-26: 实际跑仓库时曾用 0.02 m，30 分钟后树涨到 4820 万叶子，
+    # OctomapServer::publishAll() 每次插入点云都要遍历整棵树（被订阅时还要
+    # writeBinary 序列化），节点彻底卡死，/octomap_point_cloud_centers、
+    # /projected_map 全部停发，并把 4 核 VM 拖垮到 collision_monitor 的
+    # lifecycle bond 超时 → Nav2 整栈被拆。0.10 m 与协调器
+    # voxel_index_resolution 一致，叶子数降到约 1/125（≈0.4M）。
+    resolution: 0.10
     point_cloud_min_z: 0.08
     point_cloud_max_z: 2.0
     occupancy_min_z: 0.08

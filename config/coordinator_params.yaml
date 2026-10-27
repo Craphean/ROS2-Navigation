@@ -90,6 +90,18 @@ multi_robot_coordinator:
     tour_rewrite_on_invalidation: true
     tour_max_rewrites: 2
 
+    # --- Out-of-bounds self recovery ---
+    # The global costmap is exactly as large as a robot's SLAM map, so a robot
+    # that stops a few centimetres past the mapped area sits outside its own
+    # costmap: NavfnPlanner rejects the start pose and every goal aborts with
+    # error 203 before any BT recovery can run.  On that failure the
+    # coordinator drives the robot backwards with nav2_behaviors/backup (which
+    # uses the rolling local costmap) so it can plan again.
+    backup_recovery_enable: true
+    backup_distance: 0.40
+    backup_speed: 0.06
+    backup_cooldown: 20.0
+
     # --- Residual blind-spot cleanup ---
     residual_enable: true
     residual_activation_cycles: 3
@@ -120,3 +132,10 @@ multi_robot_coordinator:
 
     # Map freshness used by convergence and stale-map handling.
     map_loss_timeout: 5.0
+
+    # --- Nav2 health watchdog ---
+    # When a robot's Nav2 action servers vanish (lifecycle bond timeout or a
+    # failed re-bringup) report it once and then remind at this period, instead
+    # of re-auctioning the same frontier and logging "Action server not ready!"
+    # at the coordination rate.
+    nav_outage_warn_period: 15.0
