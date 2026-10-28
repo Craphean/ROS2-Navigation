@@ -31,6 +31,7 @@ kill_matching TERM \
   'tb3_simulation_launch' \
   'tb4_simulation_launch' \
   'gz-sim-main' \
+  'gz-sim-server' \
   'gz-sim-gui-client' \
   '/lib/rviz2/rviz2' \
   'sync_slam_toolbox_node' \
@@ -43,6 +44,9 @@ kill_matching TERM \
   '/lib/robot_state_publisher/robot_state_publisher' \
   '/lib/explore_lite/explore' \
   '/lib/multirobot_map_merge/map_merge' \
+  'merge_pointclouds.py' \
+  'octomap_server_node' \
+  'monitor_dashboard.py' \
   'multi_robot_coordinator.py' \
   'multi_robot_plan_relay.py' \
   'rl_cmd_vel_relay.py' \
@@ -50,11 +54,15 @@ kill_matching TERM \
 sleep 1
 kill_matching KILL \
   'gz-sim-main' \
+  'gz-sim-server' \
   'gz-sim-gui-client' \
   'tb3_simulation_launch' \
   'tb4_simulation_launch' \
   '/lib/rviz2/rviz2' \
   '/lib/multirobot_map_merge/map_merge' \
+  'merge_pointclouds.py' \
+  'octomap_server_node' \
+  'monitor_dashboard.py' \
   'multi_robot_coordinator.py' \
   'multi_robot_plan_relay.py' \
   'rl_cmd_vel_relay.py' \
@@ -90,7 +98,13 @@ while read -r pid; do
 done < <(pgrep -f 'scripts/tb[34]_(multi_explore_slam|explore_slam|slam_gazebo|nav_gazebo|nav_rl_gazebo)\.sh' 2>/dev/null)
 
 echo "[kill_nav2_sim] Clearing DDS shared memory ..."
-rm -f /dev/shm/cyclonedds* /dev/shm/fastrtps_* /dev/shm/fastdds* /dev/shm/sem.fastdds* /dev/shm/sem.fastrtps* 2>/dev/null
+if [[ "${SKIP_DDS_SHM_CLEAN:-0}" =~ ^(1|true|yes)$ ]]; then
+  # The web console keeps its own rclpy node on CycloneDDS; deleting the
+  # segment files under it would break the process that asked for the stop.
+  echo "[kill_nav2_sim] SKIP_DDS_SHM_CLEAN=1 — leaving /dev/shm alone."
+else
+  rm -f /dev/shm/cyclonedds* /dev/shm/fastrtps_* /dev/shm/fastdds* /dev/shm/sem.fastdds* /dev/shm/sem.fastrtps* 2>/dev/null
+fi
 
 echo "[kill_nav2_sim] Done. Safe to start a new sim."
 exit 0

@@ -1,0 +1,300 @@
+<?xml version="1.0"?>
+<!--
+  Mine tunnel world for the dual-robot inspection demo.
+
+  Layout (all dimensions in metres, world frame):
+
+        y=+15  ┌──────────────┐  North chamber (equipment / pump room)
+               │   CHAMBER    │
+        y=+9   └──┐        ┌──┘
+                  │        │
+                  │  CROSS │  A  (x=-12, width 2.8)
+        y=+1.6 ┌─┘        └─┐
+   x=-22 ══════╪════════════╪═════════════════╪═════════ x=+22
+               │  MAIN DRIFT (width 3.2, height 2.8)     │
+        y=-1.6 └─┐        ┌─┘                         ┌─┘
+                  │ CROSS  │  B (x=+10)               │
+        y=-9   ┌──┘        └──┐                     ┌──┘
+               │   CHAMBER    │  South chamber
+        y=-15  └──────────────┘
+
+  Everything is built from boxes on purpose: no Fuel/online models, so the
+  world works offline and the 3D LiDAR / 2D LiDAR see clean planar surfaces.
+  A single ceiling slab covers the whole footprint, which keeps the geometry
+  count low while still giving the 32-line LiDAR a roof to map.
+
+  Usage:
+    WORLD=mine ./scripts/tb3_multi_explore_slam.sh
+    HEADLESS=False USE_RVIZ=True WORLD=mine ./scripts/tb3_multi_explore_slam.sh
+-->
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="headless" default="true"/>
+
+  <!-- One box: collision + visual, colour in linear RGB. -->
+  <xacro:macro name="solid" params="name px py pz sx sy sz cr cg cb">
+    <collision name="${name}_c">
+      <pose>${px} ${py} ${pz} 0 0 0</pose>
+      <geometry><box><size>${sx} ${sy} ${sz}</size></box></geometry>
+    </collision>
+    <visual name="${name}_v">
+      <pose>${px} ${py} ${pz} 0 0 0</pose>
+      <geometry><box><size>${sx} ${sy} ${sz}</size></box></geometry>
+      <material>
+        <ambient>${cr} ${cg} ${cb} 1</ambient>
+        <diffuse>${cr} ${cg} ${cb} 1</diffuse>
+        <specular>0.08 0.08 0.08 1</specular>
+      </material>
+    </visual>
+  </xacro:macro>
+
+  <!-- Emissive lamp strip: no light cost, but the camera sees a bright band. -->
+  <xacro:macro name="lamp" params="name px py">
+    <visual name="${name}_v">
+      <pose>${px} ${py} 2.62 0 0 0</pose>
+      <geometry><box><size>0.9 0.12 0.05</size></box></geometry>
+      <material>
+        <ambient>1.0 0.82 0.48 1</ambient>
+        <diffuse>1.0 0.82 0.48 1</diffuse>
+        <emissive>1.0 0.72 0.32 1</emissive>
+      </material>
+    </visual>
+  </xacro:macro>
+
+  <!-- Steel arch across the main drift (x axis). -->
+  <xacro:macro name="arch_x" params="idx x">
+    <xacro:solid name="ax_${idx}_s" px="${x}" py="-1.5" pz="1.375"
+                 sx="0.15" sy="0.15" sz="2.75" cr="0.30" cg="0.29" cb="0.24"/>
+    <xacro:solid name="ax_${idx}_n" px="${x}" py="1.5" pz="1.375"
+                 sx="0.15" sy="0.15" sz="2.75" cr="0.30" cg="0.29" cb="0.24"/>
+    <xacro:solid name="ax_${idx}_b" px="${x}" py="0" pz="2.60"
+                 sx="0.15" sy="3.15" sz="0.15" cr="0.33" cg="0.31" cb="0.25"/>
+  </xacro:macro>
+
+  <xacro:macro name="arch_row_x" params="i n x0 step">
+    <xacro:if value="${int(i) &lt; int(n)}">
+      <xacro:arch_x idx="${i}" x="${float(x0) + int(i) * float(step)}"/>
+      <xacro:arch_row_x i="${int(i) + 1}" n="${n}" x0="${x0}" step="${step}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <!-- Steel arch across a side drift (y axis). -->
+  <xacro:macro name="arch_y" params="idx cx y">
+    <xacro:solid name="ay_${idx}_w" px="${float(cx) - 1.35}" py="${y}" pz="1.375"
+                 sx="0.15" sy="0.15" sz="2.75" cr="0.30" cg="0.29" cb="0.24"/>
+    <xacro:solid name="ay_${idx}_e" px="${float(cx) + 1.35}" py="${y}" pz="1.375"
+                 sx="0.15" sy="0.15" sz="2.75" cr="0.30" cg="0.29" cb="0.24"/>
+    <xacro:solid name="ay_${idx}_b" px="${cx}" py="${y}" pz="2.60"
+                 sx="2.95" sy="0.15" sz="0.15" cr="0.33" cg="0.31" cb="0.25"/>
+  </xacro:macro>
+
+  <xacro:macro name="arch_row_y" params="i n cx y0 step">
+    <xacro:if value="${int(i) &lt; int(n)}">
+      <xacro:arch_y idx="${i}" cx="${cx}" y="${float(y0) + int(i) * float(step)}"/>
+      <xacro:arch_row_y i="${int(i) + 1}" n="${n}" cx="${cx}" y0="${y0}" step="${step}"/>
+    </xacro:if>
+  </xacro:macro>
+
+  <world name="mine">
+    <scene>
+      <grid>false</grid>
+      <shadows>false</shadows>
+      <ambient>0.30 0.29 0.27 1</ambient>
+      <background>0.02 0.025 0.03 1</background>
+    </scene>
+
+    <physics name="1ms" type="ode">
+      <max_step_size>0.003</max_step_size>
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <xacro:unless value="$(arg headless)">
+      <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    </xacro:unless>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <!-- One directional "cap lamp" fill.  Point lights are deliberately
+         avoided: each one adds a shader loop to every camera pass. -->
+    <light name="mine_cap_lamp" type="directional">
+      <cast_shadows>0</cast_shadows>
+      <pose>0 0 9 0 0 0</pose>
+      <diffuse>0.88 0.84 0.74 1</diffuse>
+      <specular>0.10 0.10 0.10 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.008</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.18 0.12 -0.97</direction>
+    </light>
+
+    <!-- ================================================================== -->
+    <!-- Floor                                                              -->
+    <!-- ================================================================== -->
+    <model name="mine_ground">
+      <static>true</static>
+      <link name="link">
+        <collision name="floor_c">
+          <geometry><plane><normal>0 0 1</normal><size>60 60</size></plane></geometry>
+          <surface>
+            <friction><ode><mu>100</mu><mu2>50</mu2></ode></friction>
+          </surface>
+        </collision>
+        <visual name="floor_v">
+          <geometry><plane><normal>0 0 1</normal><size>60 60</size></plane></geometry>
+          <material>
+            <ambient>0.19 0.17 0.15 1</ambient>
+            <diffuse>0.19 0.17 0.15 1</diffuse>
+            <specular>0.02 0.02 0.02 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================== -->
+    <!-- Walls, roof and steel arches                                       -->
+    <!-- ================================================================== -->
+    <model name="mine_structure">
+      <static>true</static>
+      <link name="link">
+
+        <!-- Main drift side walls.  Split into three segments so the two
+             side drifts stay open: gaps are x[-13.4,-10.6] and x[8.6,11.4]. -->
+        <xacro:solid name="drift_wall_s1" px="-17.70" py="-1.70" pz="1.40"
+                     sx="8.60" sy="0.20" sz="2.80" cr="0.40" cg="0.36" cb="0.31"/>
+        <xacro:solid name="drift_wall_s2" px="-1.00" py="-1.70" pz="1.40"
+                     sx="19.20" sy="0.20" sz="2.80" cr="0.40" cg="0.36" cb="0.31"/>
+        <xacro:solid name="drift_wall_s3" px="16.70" py="-1.70" pz="1.40"
+                     sx="10.60" sy="0.20" sz="2.80" cr="0.40" cg="0.36" cb="0.31"/>
+
+        <xacro:solid name="drift_wall_n1" px="-17.70" py="1.70" pz="1.40"
+                     sx="8.60" sy="0.20" sz="2.80" cr="0.40" cg="0.36" cb="0.31"/>
+        <xacro:solid name="drift_wall_n2" px="-1.00" py="1.70" pz="1.40"
+                     sx="19.20" sy="0.20" sz="2.80" cr="0.40" cg="0.36" cb="0.31"/>
+        <xacro:solid name="drift_wall_n3" px="16.70" py="1.70" pz="1.40"
+                     sx="10.60" sy="0.20" sz="2.80" cr="0.40" cg="0.36" cb="0.31"/>
+
+        <!-- Main drift end caps -->
+        <xacro:solid name="drift_cap_w" px="-22.00" py="0" pz="1.40"
+                     sx="0.20" sy="3.60" sz="2.80" cr="0.38" cg="0.34" cb="0.29"/>
+        <xacro:solid name="drift_cap_e" px="22.00" py="0" pz="1.40"
+                     sx="0.20" sy="3.60" sz="2.80" cr="0.38" cg="0.34" cb="0.29"/>
+
+        <!-- Cross drift A (x=-12): walls at x=-13.5 / -10.5,
+             interrupted by the main drift at y=+-1.6. -->
+        <xacro:solid name="cross_a_w_s" px="-13.50" py="-5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_a_w_n" px="-13.50" py="5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_a_e_s" px="-10.50" py="-5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_a_e_n" px="-10.50" py="5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_a_cap_s" px="-12.00" py="-9.00" pz="1.40"
+                     sx="3.20" sy="0.20" sz="2.80" cr="0.38" cg="0.34" cb="0.29"/>
+
+        <!-- Cross drift B (x=+10): walls at x=8.5 / 11.5. -->
+        <xacro:solid name="cross_b_w_s" px="8.50" py="-5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_b_w_n" px="8.50" py="5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_b_e_s" px="11.50" py="-5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_b_e_n" px="11.50" py="5.30" pz="1.40"
+                     sx="0.20" sy="7.40" sz="2.80" cr="0.38" cg="0.35" cb="0.30"/>
+        <xacro:solid name="cross_b_cap_n" px="10.00" py="9.00" pz="1.40"
+                     sx="3.20" sy="0.20" sz="2.80" cr="0.38" cg="0.34" cb="0.29"/>
+
+        <!-- North chamber (x -15.5..-8.5, y 9..15) -->
+        <xacro:solid name="ch_a_w" px="-15.50" py="12.00" pz="1.40"
+                     sx="0.20" sy="6.00" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_a_e" px="-8.50" py="12.00" pz="1.40"
+                     sx="0.20" sy="6.00" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_a_n" px="-12.00" py="15.00" pz="1.40"
+                     sx="7.20" sy="0.20" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_a_s_w" px="-14.50" py="9.00" pz="1.40"
+                     sx="2.20" sy="0.20" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_a_s_e" px="-9.50" py="9.00" pz="1.40"
+                     sx="2.20" sy="0.20" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+
+        <!-- South chamber (x 6.5..13.5, y -15..-9) -->
+        <xacro:solid name="ch_b_w" px="6.50" py="-12.00" pz="1.40"
+                     sx="0.20" sy="6.00" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_b_e" px="13.50" py="-12.00" pz="1.40"
+                     sx="0.20" sy="6.00" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_b_s" px="10.00" py="-15.00" pz="1.40"
+                     sx="7.20" sy="0.20" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_b_n_w" px="7.50" py="-9.00" pz="1.40"
+                     sx="2.20" sy="0.20" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+        <xacro:solid name="ch_b_n_e" px="12.50" py="-9.00" pz="1.40"
+                     sx="2.20" sy="0.20" sz="2.80" cr="0.36" cg="0.33" cb="0.28"/>
+
+        <!-- Single ceiling slab.  Overlaps the wall tops by 5 cm so the 3D
+             LiDAR can never see a slit into the void. -->
+        <xacro:solid name="roof" px="0" py="0" pz="2.85"
+                     sx="60" sy="34" sz="0.20" cr="0.22" cg="0.20" cb="0.18"/>
+
+        <!-- Main drift arches every 2.5 m -->
+        <xacro:arch_row_x i="0" n="17" x0="-20.0" step="2.5"/>
+        <!-- Side drift arches every 3.0 m -->
+        <xacro:arch_row_y i="0" n="6" cx="-12.0" y0="-7.5" step="3.0"/>
+        <xacro:arch_row_y i="6" n="12" cx="10.0" y0="-7.5" step="3.0"/>
+
+        <!-- Lamp strips -->
+        <xacro:lamp name="lamp_0" px="-18.0" py="0"/>
+        <xacro:lamp name="lamp_1" px="-9.0" py="0"/>
+        <xacro:lamp name="lamp_2" px="0.0" py="0"/>
+        <xacro:lamp name="lamp_3" px="9.0" py="0"/>
+        <xacro:lamp name="lamp_4" px="18.0" py="0"/>
+        <xacro:lamp name="lamp_a" px="-12.0" py="5.0"/>
+        <xacro:lamp name="lamp_b" px="10.0" py="-5.0"/>
+      </link>
+    </model>
+
+    <!-- ================================================================== -->
+    <!-- Props: obstacles on the shoulders, never on the centre line        -->
+    <!-- ================================================================== -->
+    <model name="mine_props">
+      <static>true</static>
+      <link name="link">
+        <!-- Ore cart -->
+        <xacro:solid name="cart_body" px="4.2" py="0.95" pz="0.55"
+                     sx="1.30" sy="0.70" sz="0.85" cr="0.28" cg="0.24" cb="0.16"/>
+        <xacro:solid name="cart_top" px="4.2" py="0.95" pz="1.02"
+                     sx="1.10" sy="0.55" sz="0.12" cr="0.20" cg="0.17" cb="0.12"/>
+
+        <!-- Crates -->
+        <xacro:solid name="crate_0" px="-6.2" py="-1.10" pz="0.30"
+                     sx="0.55" sy="0.55" sz="0.60" cr="0.36" cg="0.27" cb="0.17"/>
+        <xacro:solid name="crate_1" px="-5.5" py="-1.15" pz="0.24"
+                     sx="0.45" sy="0.45" sz="0.48" cr="0.32" cg="0.24" cb="0.15"/>
+        <xacro:solid name="crate_2" px="14.6" py="1.10" pz="0.32"
+                     sx="0.60" sy="0.50" sz="0.64" cr="0.34" cg="0.26" cb="0.16"/>
+
+        <!-- Ventilation pipes along the north wall -->
+        <xacro:solid name="pipe_0" px="0.0" py="1.32" pz="2.18"
+                     sx="38.0" sy="0.12" sz="0.12" cr="0.30" cg="0.34" cb="0.30"/>
+        <xacro:solid name="pipe_1" px="0.0" py="1.32" pz="2.02"
+                     sx="38.0" sy="0.08" sz="0.08" cr="0.26" cg="0.30" cb="0.27"/>
+
+        <!-- Rock piles -->
+        <xacro:solid name="rock_0" px="-17.2" py="1.15" pz="0.22"
+                     sx="0.55" sy="0.45" sz="0.44" cr="0.26" cg="0.24" cb="0.22"/>
+        <xacro:solid name="rock_1" px="18.4" py="-1.15" pz="0.26"
+                     sx="0.60" sy="0.50" sz="0.52" cr="0.24" cg="0.22" cb="0.20"/>
+        <xacro:solid name="rock_2" px="-12.4" py="7.6" pz="0.20"
+                     sx="0.50" sy="0.60" sz="0.40" cr="0.25" cg="0.23" cb="0.21"/>
+
+        <!-- Switch cabinet in the north chamber -->
+        <xacro:solid name="cabinet" px="-14.9" py="13.9" pz="0.75"
+                     sx="0.45" sy="0.90" sz="1.50" cr="0.18" cg="0.26" cb="0.28"/>
+      </link>
+    </model>
+  </world>
+</sdf>

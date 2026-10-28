@@ -419,9 +419,14 @@
 
         <pose>0.069 -0.047 0.107 0 0 0</pose>
 
-        <sensor name="intel_realsense_r200_depth" type="depth">
+        <!-- Forward RGB camera.  A plain `camera` sensor is enough for the
+             console's MJPEG feed and for the future YOLO fire/smoke detector;
+             `type="depth"` would add a second render pass plus a depth point
+             cloud that nothing consumes on a 4-core software-rendered VM. -->
+        <sensor name="intel_realsense_r200_depth" type="camera">
           <always_on>1</always_on>
           <update_rate>5</update_rate>
+          <topic>$(arg namespace)/camera</topic>
           <pose>0.064 -0.047 0.107 0 0 0</pose>
           <frame_id>camera_depth_frame</frame_id>
           <camera name="realsense_depth_camera">
@@ -429,20 +434,12 @@
             <image>
               <width>320</width>
               <height>240</height>
+              <format>R8G8B8</format>
             </image>
-            <lens>
-              <projection>
-                <!-- focal_length = fx = fy = width / ( 2 * tan (hfov / 2 ) ) -->
-                <!-- tx = hackBaseline * focal_length -->
-                <tx>19.4</tx>
-              </projection>
-            </lens>
-            <depth_camera>
-              <clip>
-                <near>0.001</near>
-                <far>5.0</far>
-              </clip>
-            </depth_camera>
+            <clip>
+              <near>0.05</near>
+              <far>30.0</far>
+            </clip>
           </camera>
         </sensor>
       </link>

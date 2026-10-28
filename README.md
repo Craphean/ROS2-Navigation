@@ -65,10 +65,44 @@ source install/setup.bash
 ./scripts/kill_nav2_sim.sh
 ```
 
+## 矿井智能巡检控制台
+
+在双车 SLAM + 3D 点云建图之上，新增一个面向竞赛演示的浏览器控制台（F1 实时监控 / F2 远程遥控 / F3 巡检任务 / F6 公网访问）。
+
+```bash
+# 终端 1：矿井世界，不跑自主探索，等待控制台派发巡检任务
+SKIP_DDS_SHM_CLEAN=1 WORLD=mine EXPLORATION_MODE=off HEADLESS=True \
+  DASHBOARD=False ./scripts/tb3_multi_explore_slam.sh
+
+# 终端 2
+./scripts/console.sh          # 打开 http://127.0.0.1:8080 ，口令 mine2026
+```
+
+也可以在控制台里点「启动仿真」，由控制台自己拉起 `WORLD=mine`。公网访问：
+
+```bash
+cpolar http 8080              # 只映射这一个端口
+```
+
+| 能力 | 说明 |
+| --- | --- |
+| 实时监控 | 合并地图 `/map` 转 PNG、双车位姿、激光点、双路 320×240 车载视频、事件流 |
+| 远程遥控 | 虚拟摇杆 + WASD，20 Hz `TwistStamped`，300 ms deadman，接管时自动关闭 `collision_monitor` |
+| 巡检任务 | 多航点顺序执行、到点停留、进度/状态、暂停/继续/跳过/终止、失败重试与跳过 |
+| 召回 / 保存 | 返回出生点、保存合并地图为 `maps/inspection_<时间>.yaml` |
+| 勘探切换 | 「开始/停止勘探」启停 `multi_robot_coordinator.py`，巡检时不会被抢目标 |
+| 公网 | cpolar 单端口；只读匿名，控制需登录；未登录看不到控制按钮 |
+| YOLO 预留 | `POST /api/detections` + WS `detections` + 视频叠加层接口 |
+
+详细架构、接口与排障见 [docs/console.md](docs/console.md)。
+
+> 从终端启动仿真时记得带 `SKIP_DDS_SHM_CLEAN=1`：仿真退出会调用 `kill_nav2_sim.sh`，默认清理 `/dev/shm/cyclonedds*`，会把同时在跑的控制台 DDS 连接弄断。
+
 ## 脚本一览
 
 | 脚本 | 作用 |
 | --- | --- |
+| `scripts/console.sh` | 启动矿井巡检 Web 控制台（等价 `console/run.sh`） |
 | `scripts/tb3_slam_gazebo.sh` | TurtleBot3 + Gazebo + SLAM 手动建图 |
 | `scripts/tb3_nav_gazebo.sh` | TurtleBot3 已知地图导航（MPPI 局部控制器，默认使用 `maps/tb3_map.yaml`） |
 | `scripts/tb3_nav_rl_gazebo.sh` | 同上，局部控制器换成 TD3（`rl_nav2_controller::RlController`） |
@@ -86,6 +120,7 @@ source install/setup.bash
 - `hospital`（**全新新增**：医院病房与走廊医疗综合区，含普通双人病房、ICU急救室、分诊护士站、医生诊断室及贯通走廊，配有病床、医疗不锈钢柜等高精度 Fuel 官方模型，100% 水平平整地面）
 - `house`（**全新新增**：室内家庭生活环境，三室两厅套房户型，包含客厅、主卧、独立书房、餐厅与玄关，配有沙发茶几、大床衣柜、办公桌椅与书架等 Fuel 模型，通道规整，极度适合小车穿梭）
 - `warehouse`（TurtleBot4 默认，大型立体物流仓储）
+- `mine`（**新增**：矿井巷道，44 m 主巷 + 两条横巷 + 南北硐室，钢支架/矿车/管线，纯几何体离线可用，专为巡检演示设计）
 - `depot`（工业厂房与物流中转站世界）
 
 VMware 上若要打开 Gazebo 窗口：`HEADLESS=False ./scripts/...`。首次加载如果网络较慢，可先执行 `./scripts/download_fuel_models.sh` 提前缓存。
@@ -337,7 +372,12 @@ HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
 
 5. benchmark 基准测试，设计对比试验
 
-6. 中控台：
+6. [x] **中控台（基础版已完成，2026-10）**：自研 Web 控制台 `console/`，单端口 8080。
+    已完成：实时全局地图（/map → PNG Canvas）、双车位姿/激光/状态、双路 320×240 车载视频、多航点巡检任务（顺序执行/停留/进度/暂停/继续/跳过/终止/失败重试）、虚拟摇杆与 WASD 遥控（20 Hz TwistStamped + 300 ms deadman + collision_monitor 交接）、单点导航、召回、保存地图、一键启停仿真、勘探/巡检模式切换、cpolar 公网入口与只读/操作员权限、YOLO 检测结果接口预留。
+    未完成（后续）：Gazebo 3D 数字孪生（环境 Mesh + URDF）、Foxglove 作为内置面板、真机适配。
+    详见 `docs/console.md`。
+
+    原始设想：
     展示内容：
     实时建图进度（实时全局地图，rviz视图）
     集成 Gazebo 3D 数字孪生（3D Digital Twin）：无需开启笨重的 Gazebo GUI，加载环境 Mesh 和机器人 URDF 模型。

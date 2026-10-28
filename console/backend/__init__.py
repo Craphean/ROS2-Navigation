@@ -1,0 +1,1 @@
+"""Mine inspection console backend."""

@@ -10,8 +10,8 @@
 #   RANDOM_SPAWN=false     (set RANDOM_SPAWN=true to randomly pick 2 non-overlapping inspection stations)
 #
 # 3D point-cloud mapping (headless by default):
-#   - Each robot gets a 16-line / 3 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
-#   - /robotX/points feeds Nav2 costmaps and scripts/merge_pointclouds.py.
+#   - Each robot gets a 32-line / 5 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
+#   - /robotX/points feeds the Nav2 local voxel layer and scripts/merge_pointclouds.py.
 #   - The merged cloud is published as /points_merged in the world frame and fed to
 #     octomap_server (3D map + projected_map + octomap_point_cloud_centers).
 #   - Archive after exploration:
@@ -182,6 +182,33 @@ HOUSE_STATION_POSES=(
   "-2.00 -1.50 -1.57 餐厅就餐过渡区"
 )
 
+# Mine 9 Curated Inspection Stations (矿井巷道巡检基站池)
+# Main drift is 3.2 m wide; every station sits on the centre line of a
+# corridor or chamber, at least 1.2 m away from walls, arches and props.
+MINE_STATION_NAMES=(
+  "STATION_MINE_PORTAL"          # [0] 井口/起点
+  "STATION_DRIFT_WEST"           # [1] 主巷西段
+  "STATION_CROSS_A_JUNCTION"     # [2] A 横巷三岔口
+  "STATION_CROSS_A_NORTH"        # [3] A 横巷北段
+  "STATION_CHAMBER_NORTH"        # [4] 北硐室（泵房/配电）
+  "STATION_JUNCTION_MID"         # [5] 主巷中点
+  "STATION_CROSS_B_SOUTH"        # [6] B 横巷南段
+  "STATION_CHAMBER_SOUTH"        # [7] 南硐室（设备存放）
+  "STATION_EAST_FACE"            # [8] 东端掘进工作面
+)
+
+MINE_STATION_POSES=(
+  "-19.20 0.00 0.00 井口/起点"
+  "-16.00 0.00 0.00 主巷西段"
+  "-12.00 0.00 0.00 A横巷三岔口"
+  "-12.00 5.50 1.57 A横巷北段"
+  "-12.00 11.50 1.57 北硐室"
+  "0.00 0.00 0.00 主巷中点"
+  "10.00 -5.50 -1.57 B横巷南段"
+  "10.00 -11.50 -1.57 南硐室"
+  "19.00 0.00 0.00 东端掘进工作面"
+)
+
 case "${WORLD:-sandbox}" in
   sandbox|tb3_sandbox)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_sandbox.sdf.xacro"
@@ -244,6 +271,32 @@ case "${WORLD:-sandbox}" in
       echo "[tb3_multi_explore_slam]   Spawn Distance: ${sep_dist}m"
     fi
     ;;
+  mine|coalmine|mine_tunnel)
+    WORLD_FILE="${ROOT_DIR}/worlds/mine.sdf.xacro"
+    DEFAULT_R1_X="-20.50"; DEFAULT_R1_Y="-0.70"; DEFAULT_R1_YAW="0.00"
+    DEFAULT_R2_X="-20.50"; DEFAULT_R2_Y="0.70";  DEFAULT_R2_YAW="0.00"
+
+    if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
+      if command -v shuf >/dev/null 2>&1; then
+        mapfile -t indices < <(shuf -i 0-8 -n 2)
+        idx1="${indices[0]}"; idx2="${indices[1]}"
+      else
+        idx1=$(( RANDOM % 9 ))
+        idx2=$(( (idx1 + 1 + (RANDOM % 8)) % 9 ))
+      fi
+      read -r r1_x r1_y r1_yaw r1_desc <<< "${MINE_STATION_POSES[idx1]}"
+      read -r r2_x r2_y r2_yaw r2_desc <<< "${MINE_STATION_POSES[idx2]}"
+      DEFAULT_R1_X="${r1_x}"; DEFAULT_R1_Y="${r1_y}"; DEFAULT_R1_YAW="${r1_yaw}"
+      DEFAULT_R2_X="${r2_x}"; DEFAULT_R2_Y="${r2_y}"; DEFAULT_R2_YAW="${r2_yaw}"
+      sep_dist=$(python3 -c "import math; print(f'{math.hypot(float(\"${r1_x}\") - float(\"${r2_x}\"), float(\"${r1_y}\") - float(\"${r2_y}\")):.2f}')" 2>/dev/null || echo "N/A")
+      echo "[tb3_multi_explore_slam] [Random Spawn] Mine Inspection Stations Activated:"
+      echo "[tb3_multi_explore_slam]   Robot1 -> Station #${idx1} [${MINE_STATION_NAMES[idx1]}]: (${DEFAULT_R1_X}, ${DEFAULT_R1_Y}) [${r1_desc}]"
+      echo "[tb3_multi_explore_slam]   Robot2 -> Station #${idx2} [${MINE_STATION_NAMES[idx2]}]: (${DEFAULT_R2_X}, ${DEFAULT_R2_Y}) [${r2_desc}]"
+      echo "[tb3_multi_explore_slam]   Spawn Distance: ${sep_dist}m"
+    else
+      echo "[tb3_multi_explore_slam] [Fixed Spawn] Mine portal: Robot1 (-20.50, -0.70), Robot2 (-20.50, 0.70)."
+    fi
+    ;;
   warehouse|tb4_warehouse)
     WORLD_FILE="${TB4_SIM_SHARE}/worlds/warehouse.sdf"
     DEFAULT_R1_X="2.00"; DEFAULT_R1_Y="-19.65"; DEFAULT_R1_YAW="1.57"
@@ -300,7 +353,7 @@ esac
 
 if [[ ! -f "${WORLD_FILE}" ]]; then
   echo "[tb3_multi_explore_slam] World not found: ${WORLD_FILE}" >&2
-  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house (or full path to .sdf/.sdf.xacro)" >&2
+  echo "Supported presets: sandbox | empty | warehouse | depot | hospital | house | mine (or full path to .sdf/.sdf.xacro)" >&2
   exit 1
 fi
 
@@ -324,6 +377,17 @@ RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_
 
 echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} known_init_poses=${KNOWN_INIT_POSES}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
+
+# Persist spawn metadata for the web console: it needs the exact world-frame
+# initial poses to (a) convert map clicks into each robot's local map frame and
+# (b) send a "recall to portal" goal.  Written before Nav2 starts so a console
+# that is already running can pick it up.
+mkdir -p "${ROOT_DIR}/console/run"
+printf '{"world":"%s","world_name":"%s","robot1":[%s,%s,%s],"robot2":[%s,%s,%s],"mode":"%s"}\n' \
+  "${WORLD_FILE}" "${WORLD:-custom}" \
+  "${ROBOT1_X}" "${ROBOT1_Y}" "${ROBOT1_YAW}" \
+  "${ROBOT2_X}" "${ROBOT2_Y}" "${ROBOT2_YAW}" \
+  "${EXPLORATION_MODE}" > "${ROOT_DIR}/console/run/sim_meta.json"
 if command -v free >/dev/null 2>&1; then
   LC_ALL=C free -h | awk '/^Mem:/ {printf "[tb3_multi_explore_slam] memory: %s total, %s available\n", $2, $7}'
 fi
@@ -587,7 +651,7 @@ if [[ "${EXPLORATION_MODE,,}" == "auction" ]]; then
   echo "  - Merged map topic:   /map (frame_id: world)"
   echo "  - Markers topic:      /exploration/markers"
   echo "  - map_merge log:      ${MERGE_LOG}"
-else
+elif [[ "${EXPLORATION_MODE,,}" == "legacy" ]]; then
   echo "[tb3_multi_explore_slam] Starting legacy explore_lite for /robot1 and /robot2 ..."
   ros2 run explore_lite explore --ros-args \
     -r __ns:=/robot1 \
@@ -622,6 +686,14 @@ else
   echo "  - robot2 explore log: ${EXPLORE2_LOG}"
   echo "  - map_merge log:      ${MERGE_LOG}"
   echo "  - Merged map topic:   /map (frame_id: world)"
+elif [[ "${EXPLORATION_MODE,,}" =~ ^(off|none|manual)$ ]]; then
+  echo "[tb3_multi_explore_slam] EXPLORATION_MODE=${EXPLORATION_MODE}: no autonomous explorer."
+  echo "[tb3_multi_explore_slam]   Waiting for the console / teleop to drive the robots."
+  echo "  - Merged map topic:   /map (frame_id: world)"
+  echo "  - Nav2 actions:       /robot1/navigate_to_pose, /robot2/navigate_to_pose"
+else
+  echo "[tb3_multi_explore_slam] Unknown EXPLORATION_MODE='${EXPLORATION_MODE}' (auction|legacy|off)" >&2
+  exit 2
 fi
 
 DASHBOARD="${DASHBOARD:-true}"

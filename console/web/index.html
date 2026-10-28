@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#080b0e" />
+  <title>矿井智能巡检机器人控制台</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 20l6-14 3 7 2-3 7 10z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>矿井智能巡检控制台</h1>
+        <p>MINE INSPECTION CONSOLE · TB3 ×2</p>
+      </div>
+    </div>
+
+    <div class="status-cluster">
+      <span class="pill" id="pill-link"><i class="led"></i><span>链路</span></span>
+      <span class="pill" id="pill-clock"><span>仿真时钟</span><b>--</b></span>
+      <span class="pill" id="pill-map"><span>地图</span><b>--</b></span>
+      <span class="pill" id="pill-mode"><span>模式</span><b>巡检</b></span>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn ghost" id="btn-explore" title="启动自主勘探协调器">开始勘探</button>
+      <button class="btn ghost" id="btn-stop-explore" title="停止自主勘探">停止勘探</button>
+      <button class="btn danger" id="btn-estop">急停</button>
+      <button class="btn" id="btn-login">操作员登录</button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <aside class="col left">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>车队状态</h2>
+          <span class="hint" id="fleet-hint">2 台在线</span>
+        </div>
+        <div id="robot-cards" class="robot-cards"></div>
+      </section>
+
+      <section class="panel grow">
+        <div class="panel-head">
+          <h2>巡检任务</h2>
+          <span class="hint" id="mission-state">IDLE</span>
+        </div>
+
+        <select id="mission-select" class="select"></select>
+
+        <div class="progress">
+          <div class="progress-bar"><i id="mission-progress"></i></div>
+          <div class="progress-meta">
+            <span id="mission-step">0 / 0</span>
+            <span id="mission-robot">robot1</span>
+          </div>
+        </div>
+
+        <ol id="waypoint-list" class="waypoints"></ol>
+
+        <div class="btn-row">
+          <button class="btn small" id="btn-mission-start">开始</button>
+          <button class="btn small ghost" id="btn-mission-pause">暂停</button>
+          <button class="btn small ghost" id="btn-mission-resume">继续</button>
+          <button class="btn small ghost" id="btn-mission-skip">跳过</button>
+          <button class="btn small danger-ghost" id="btn-mission-stop">终止</button>
+        </div>
+      </section>
+    </aside>
+
+    <section class="col center">
+      <div class="view-bar">
+        <div class="tabs">
+          <button class="tab active" data-view="2d">2D 建图</button>
+          <button class="tab on" id="btn-scan-toggle">激光点云</button>
+        </div>
+        <div class="view-tools">
+          <span class="hint" id="click-hint">点击地图：单点导航</span>
+          <button class="btn small ghost" id="btn-click-mode">追加航点</button>
+          <button class="btn small ghost" id="btn-fit">复位视图</button>
+        </div>
+      </div>
+
+      <div class="map-wrap" id="map-wrap">
+        <canvas id="map-canvas"></canvas>
+        <div class="map-empty" id="map-empty">
+          <div class="spinner"></div>
+          <p>等待 /map …</p>
+          <small>若长时间无地图，请确认仿真已启动</small>
+        </div>
+        <div class="map-legend">
+          <span><i class="sw free"></i>可通行</span>
+          <span><i class="sw occ"></i>障碍</span>
+          <span><i class="sw unknown"></i>未知</span>
+          <span><i class="sw scan"></i>激光</span>
+        </div>
+        <div class="map-scale" id="map-scale">5 m</div>
+      </div>
+
+      <div class="mission-strip">
+        <div class="strip-block">
+          <label>当前任务</label>
+          <b id="strip-name">—</b>
+        </div>
+        <div class="strip-block">
+          <label>当前航点</label>
+          <b id="strip-waypoint">—</b>
+        </div>
+        <div class="strip-block">
+          <label>剩余距离</label>
+          <b id="strip-distance">—</b>
+        </div>
+        <div class="strip-block">
+          <label>最近事件</label>
+          <b id="strip-event" class="ellipsis">—</b>
+        </div>
+      </div>
+    </section>
+
+    <aside class="col right">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>车载视频</h2>
+          <span class="hint">320×240 · 5 Hz</span>
+        </div>
+        <div class="video-stack">
+          <div class="video-box">
+            <img id="video-robot1" alt="robot1 camera" />
+            <div class="video-fallback" id="video-fallback-robot1">无信号</div>
+            <span class="video-tag r1">ROBOT 1</span>
+          </div>
+          <div class="video-box">
+            <img id="video-robot2" alt="robot2 camera" />
+            <div class="video-fallback" id="video-fallback-robot2">无信号</div>
+            <span class="video-tag r2">ROBOT 2</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel grow">
+        <div class="panel-head">
+          <h2>事件流</h2>
+          <span class="hint" id="event-count">0</span>
+        </div>
+        <ul id="event-list" class="events"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="controlbar">
+    <div class="joy-wrap">
+      <div class="joystick" id="joystick" aria-label="虚拟摇杆">
+        <div class="joy-ring"></div>
+        <div class="joy-stick" id="joy-stick"></div>
+      </div>
+      <div class="joy-readout">
+        <b id="joy-vx">0.00</b><span>m/s</span>
+        <b id="joy-wz">0.00</b><span>rad/s</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>控制目标</label>
+      <div class="segmented" id="teleop-target">
+        <button class="active" data-ns="robot1">ROBOT 1</button>
+        <button data-ns="robot2">ROBOT 2</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn small" id="btn-lease">接管</button>
+        <button class="btn small ghost" id="btn-release">释放</button>
+      </div>
+      <span class="hint" id="teleop-state">未接管 · WASD / 摇杆</span>
+    </div>
+
+    <div class="control-group">
+      <label>快捷操作</label>
+      <div class="btn-row">
+        <button class="btn small ghost" id="btn-recall-1">召回 R1</button>
+        <button class="btn small ghost" id="btn-recall-2">召回 R2</button>
+        <button class="btn small ghost" id="btn-save-map">保存地图</button>
+        <button class="btn small ghost" id="btn-start-sim">启动仿真</button>
+        <button class="btn small ghost" id="btn-stop-sim">停止仿真</button>
+      </div>
+      <span class="hint" id="sim-state">仿真：未管理</span>
+    </div>
+
+    <div class="control-group estop-group">
+      <button class="btn danger big" id="btn-estop-2">急停<br><small>E-STOP</small></button>
+      <button class="btn ghost small" id="btn-clear-estop">解除急停</button>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <dialog class="login-dialog" id="login-dialog">
+    <form method="dialog" id="login-form">
+      <h2>操作员登录</h2>
+      <p class="hint">只读访问无需登录；导航、遥控、任务与启停需要操作口令。</p>
+      <input type="password" id="login-token" placeholder="操作口令" autocomplete="current-password" />
+      <div class="btn-row">
+        <button class="btn" value="ok" id="login-submit">登录</button>
+        <button class="btn ghost" value="cancel">取消</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
