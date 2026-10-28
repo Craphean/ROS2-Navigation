@@ -44,7 +44,7 @@ multi_robot_coordinator:
     voxel_max_z: 2.0
     voxel_min_points_per_column: 3
     voxel_max_points: 400000
-    voxel_update_period: 1.0
+    voxel_update_period: 2.0
     gain_3d_window_radius: 1.5
     gain_3d_scale: 40.0
     gain_3d_density_weight: 0.30

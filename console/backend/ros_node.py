@@ -246,7 +246,13 @@ class ConsoleNode(Node):
 
         local_x, local_y, local_yaw = self.world_to_map(ns, x, y, yaw)
         goal = NavigateToPose.Goal()
-        goal.pose.header.frame_id = f"{ns}/map"
+        # Nav2 runs inside the robot namespace and listens to the *local* TF
+        # tree, whose global frame is the unprefixed `map`.  The coordinates
+        # above are already expressed in the physical frame that map_merge
+        # calls `<ns>/map` (identical pose, different label), so the goal must
+        # be labelled `map`; sending `<ns>/map` makes bt_navigator fail with
+        # error 9002 "source_frame does not exist".
+        goal.pose.header.frame_id = "map"
         goal.pose.header.stamp = self.get_clock().now().to_msg()
         goal.pose.pose.position.x = local_x
         goal.pose.pose.position.y = local_y

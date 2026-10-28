@@ -54,7 +54,7 @@ CONSOLE_MANAGE_SIM=0 ./console/run.sh
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `CONSOLE_HOST` | `127.0.0.1` | 监听地址。公网暴露时保持 127.0.0.1，由 cpolar 转发 |
+| `CONSOLE_HOST` | `0.0.0.0` | 监听地址。默认允许宿主机/局域网访问；设为 `127.0.0.1` 则只允许本机（cpolar 仍可用） |
 | `CONSOLE_PORT` | `8080` | 端口 |
 | `CONSOLE_TOKEN` | `mine2026` | 操作口令；只读访问无需口令 |
 | `CONSOLE_WORLD` | `mine` | 「启动仿真」使用的世界 |
@@ -171,6 +171,9 @@ cpolar http 8080
 | 视频无信号 | `gz topic -l \| grep camera`；`ros2 topic hz /robot1/camera/image`；相机是否被 `HEADLESS` 关掉 |
 | 遥控不动 | `ros2 service list \| grep collision_monitor/toggle`；接管是否成功；`ros2 topic echo /robot1/cmd_vel` 是否 20 Hz |
 | 目标下发后车跑飞 | 检查 `world → robot1/map` TF 是否存在；`sim_meta.json` 的出生位姿是否与实际一致 |
+| 手动目标下发后车不动 | 看 `/tmp/tb3_multi_robot1_bringup.log` 是否有 `frame_id 'robot1/map'` / error 9002；控制台已改用 `map`。若在勘探模式，控制台会自动停协调器；外部启动的协调器需手动停 |
+| 宿主机打不开局域网地址 | 确认控制台监听 `0.0.0.0`（默认）；`sudo ufw allow 8080/tcp`；VMware NAT 下宿主机用 VMnet8 的 192.168.190.1 访问 192.168.190.128，仍不行可加端口转发或改桥接 |
+| 勘探时大量 STALL | 见下文「STALL 的成因」：CPU 饱和 + 进度检查器过严 + 目标落在未知/障碍区 |
 | 控制台起不来 | 用 `/usr/bin/python3` 建 venv（PATH 上的 3.13 无法 import rclpy）；`console/run.sh` 已处理 |
 | 启动仿真后控制台 DDS 断 | 确认 `SKIP_DDS_SHM_CLEAN=1` 或由控制台启动仿真 |
 

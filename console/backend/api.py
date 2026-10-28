@@ -188,12 +188,45 @@ def _check_ns(request: Request, ns: str) -> None:
         raise HTTPException(status_code=404, detail=f"未知机器人 {ns}")
 
 
+async def _take_manual_control(request: Request) -> None:
+    """Stop autonomous exploration before a manual goal / teleop lease.
+
+    The coordinator re-dispatches to any IDLE robot every 0.5 s, so a manual
+    goal would otherwise be preempted within one cycle.  If the coordinator was
+    started outside the console we cannot stop it safely, so reject with a
+    clear message instead of silently losing the goal.
+    """
+    proc = request.app.state.proc
+    node = request.app.state.node
+    if proc.exploration_status().get("running"):
+        await asyncio.to_thread(proc.stop_exploration)
+        request.app.state.hub.publish_nowait(
+            {
+                "type": "event",
+                "level": "warn",
+                "code": "MANUAL_TAKEOVER",
+                "ns": "",
+                "text": "人工接管，已停止自主勘探",
+                "ts": time.time(),
+            }
+        )
+        await asyncio.sleep(0.5)
+        return
+    if "multi_robot_coordinator" in node.get_node_names():
+        raise HTTPException(
+            status_code=409,
+            detail="自主勘探正在外部运行（不是控制台启动的），请先停止协调器再手动控制",
+        )
+
+
 @router.post("/robot/{ns}/goal", dependencies=[Depends(require_operator)])
 async def robot_goal(request: Request, ns: str, body: GoalBody) -> dict[str, Any]:
     _check_ns(request, ns)
     node = request.app.state.node
     if not node.nav_clients[ns].server_is_ready():
         raise HTTPException(status_code=503, detail="Nav2 尚未就绪")
+    await _take_manual_control(request)
+    await node.cancel_goal(ns)
     asyncio.create_task(
         node.navigate_world(ns, body.x, body.y, body.yaw, 300.0),
         name=f"goal-{ns}",
@@ -218,6 +251,8 @@ async def robot_recall(request: Request, ns: str) -> dict[str, Any]:
         pose = data.get(ns, [0.0, 0.0, 0.0])
     except (OSError, ValueError):
         raise HTTPException(status_code=409, detail="缺少 sim_meta.json，无法召回")
+    await _take_manual_control(request)
+    await node.cancel_goal(ns)
     asyncio.create_task(
         node.navigate_world(ns, float(pose[0]), float(pose[1]), float(pose[2]), 300.0),
         name=f"recall-{ns}",
@@ -324,6 +359,8 @@ async def teleop_lease(request: Request, body: LeaseBody) -> dict[str, Any]:
     owner = request.headers.get("x-client-id") or (
         request.client.host if request.client else "web"
     )
+    await _take_manual_control(request)
+    await request.app.state.node.cancel_goal(body.ns)
     try:
         return await request.app.state.teleop.acquire(body.ns, owner)
     except Exception as exc:  # noqa: BLE001

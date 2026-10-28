@@ -21,7 +21,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
 class Settings:
     root: Path = ROOT
     robots: tuple[str, ...] = ("robot1", "robot2")
-    host: str = os.environ.get("CONSOLE_HOST", "127.0.0.1")
+    # Bind all interfaces by default so the host machine / phone on the LAN can
+    # reach the console.  Use CONSOLE_HOST=127.0.0.1 to restrict to loopback
+    # (cpolar still works in that case).
+    host: str = os.environ.get("CONSOLE_HOST", "0.0.0.0")
     port: int = int(os.environ.get("CONSOLE_PORT", "8080"))
     # Shared operator password.  Judges may read the dashboard anonymously,
     # but every control action requires this token.

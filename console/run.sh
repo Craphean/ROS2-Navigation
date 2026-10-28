@@ -44,7 +44,7 @@ fi
 mkdir -p "${ROOT_DIR}/console/run/missions" "${ROOT_DIR}/console/missions"
 
 PORT="${CONSOLE_PORT:-8080}"
-HOST="${CONSOLE_HOST:-127.0.0.1}"
+HOST="${CONSOLE_HOST:-0.0.0.0}"
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 
 echo "======================================================================"
