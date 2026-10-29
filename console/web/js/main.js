@@ -1,7 +1,7 @@
 import { $, api, toast } from "./utils.js";
 import { Link } from "./ws.js";
 import { MapView } from "./map2d.js?v=4";
-import { CloudView } from "./cloud3d.js?v=7";
+import { CloudView } from "./cloud3d.js?v=8";
 import { updateFleet } from "./fleet.js";
 import { renderMission, renderMissionSelect } from "./mission.js";
 import { Teleop } from "./teleop.js";
@@ -245,6 +245,13 @@ function applyRole(role) {
   document.body.classList.toggle("is-operator", role === "operator");
 }
 
+function closeLoginDialog() {
+  const dialog = $("#login-dialog");
+  if (dialog?.open) dialog.close();
+  const input = $("#login-token");
+  if (input) input.value = "";
+}
+
 function requireOperator() {
   if (state.role === "operator") return true;
   toast("请先登录操作员", "error");
@@ -368,6 +375,13 @@ function wireActions() {
 
   $("#login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    // Both buttons are submit buttons (method="dialog"), so 取消 also lands
+    // here; without this branch it would try to log in with an empty token and
+    // leave the dialog open.
+    if (event.submitter?.value === "cancel") {
+      closeLoginDialog();
+      return;
+    }
     const token = $("#login-token").value.trim();
     try {
       await api("/api/login", { method: "POST", body: { token } });

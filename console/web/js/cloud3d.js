@@ -265,14 +265,19 @@ export class CloudView {
     this.pointer.x = event.clientX;
     this.pointer.y = event.clientY;
     if (this.pointer.button === 2 || event.shiftKey) {
-      const eye = this._eye();
+      // Grab-and-drag: the cloud follows the cursor. For lookAt(eye, target,
+      // +Z) the screen-up axis is cross(right, forward), i.e.
+      // (-cos(yaw)sin(pitch), -sin(yaw)sin(pitch), cos(pitch)); the old code
+      // added the horizontal view direction instead, which made vertical
+      // drags feel inverted and mostly change depth.
       const scale = this.distance / Math.max(200, this.height);
+      const sp = Math.sin(this.pitch);
       const cp = Math.cos(this.pitch);
       const rightx = -Math.sin(this.yaw);
       const righty = Math.cos(this.yaw);
-      this.target[0] += (-dx * rightx + dy * Math.cos(this.yaw) * cp) * scale;
-      this.target[1] += (-dx * righty + dy * Math.sin(this.yaw) * cp) * scale;
-      void eye;
+      this.target[0] += (-dx * rightx - dy * Math.cos(this.yaw) * sp) * scale;
+      this.target[1] += (-dx * righty - dy * Math.sin(this.yaw) * sp) * scale;
+      this.target[2] += dy * cp * scale;
       return;
     }
     this.yaw -= dx * 0.008;
