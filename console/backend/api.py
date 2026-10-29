@@ -60,6 +60,7 @@ class WorldViewBody(BaseModel):
     yaw: float | None = None
     pitch: float | None = None
     distance: float | None = None
+    target: list[float] | None = None
 
 
 class SimRestartBody(SimStartBody):
@@ -612,6 +613,7 @@ async def world_preview_start(request: Request, body: WorldViewBody) -> dict[str
             yaw=body.yaw,
             pitch=body.pitch,
             distance=body.distance,
+            target=body.target,
             ns=body.ns,
         )
     except RuntimeError as exc:
@@ -626,6 +628,7 @@ async def world_preview_view(request: Request, body: WorldViewBody) -> dict[str,
         yaw=body.yaw,
         pitch=body.pitch,
         distance=body.distance,
+        target=body.target,
         ns=body.ns,
     )
 

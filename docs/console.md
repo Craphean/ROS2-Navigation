@@ -154,13 +154,14 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 
 「世界」标签页看的是 gz-sim 自己渲染的画面，不是浏览器的三维重建：
 
-- 控制台启动时用 `gz service /world/<w>/create` 往当前世界塞一个 `preview_cam` 模型（带 camera sensor，960×540@15 Hz），
-  `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再用和车载视频相同的 MJPEG 管线推给浏览器。
+- 控制台启动时用 `gz service /world/<w>/create` 往当前世界塞一个 `preview_cam` 模型（camera sensor，960×540@15 Hz），
+  `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再走和车载视频相同的 MJPEG 管线。
   渲染走 EGL（无窗口、用 GPU），所以不需要 X / Gazebo GUI。
-- 相机**贴在所选车的位姿上**（车体中心上方 0.78 m，朝车头方向），拖拽改偏航/俯仰、滚轮最多后退 2.5 m。
-  之所以不做绕地图中心环绕：house / mine 都有顶，眼位一旦高过天花板就只剩一片灰；
-  而车能开到的位置必然是空的，所以跟着车最稳。
-- 前端在「世界」标签打开时以 600 ms 周期重发位姿（gz service 一次约 80 ms），车动镜头跟着动。
+- 相机是**环绕式自由视角**，和 Gazebo 视口一样：左键拖拽绕枢轴转，右键或 Shift+左键平移枢轴，滚轮缩放（1.5–40 m）。
+  枢轴默认落在所选车上（「对准 R1/R2」按钮可复位），所以第一次打开就在车所在的房间里。
+- 每次交互发一次 `/api/world/preview/view`（`gz service` 一次约 80 ms），前端按 90 ms 节流合并拖动事件。
+- **有顶的世界（house / mine）抬到天花板以上就只剩一片灰**——那是屋顶背面，Gazebo GUI 里同样如此；
+  要看室内就压低仰角，要看全局得先把世界里的 roof/ceiling 视觉隐藏掉（尚未实现）。
 - 仿真停止/换世界会 `stop()` 预览（相机模型随世界消失）；开启时先清掉遗留的 `parameter_bridge`，
   否则两个桥同时往一个话题发帧，画面会和相机位姿对不上。
 

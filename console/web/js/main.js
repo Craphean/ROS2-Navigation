@@ -128,10 +128,25 @@ function setView(mode) {
 /* ------------------------------------------------------------------ */
 /* Gazebo world preview                                                */
 /* ------------------------------------------------------------------ */
-const worldState = { active: false, ns: "robot1", yaw: 0, pitch: -8, distance: 0 };
-let worldDragging = false;
+const worldState = {
+  active: false,
+  ns: "robot1",
+  yaw: 0,
+  pitch: 12,
+  distance: 3,
+  target: [0, 0, 0.8],
+};
 let worldViewTimer = 0;
 let worldViewQueued = false;
+
+function applyWorldStatus(status) {
+  if (!status) return;
+  if (status.ns) worldState.ns = status.ns;
+  if (status.yaw !== undefined) worldState.yaw = status.yaw;
+  if (status.pitch !== undefined) worldState.pitch = status.pitch;
+  if (status.distance !== undefined) worldState.distance = status.distance;
+  if (Array.isArray(status.target)) worldState.target = status.target.slice(0, 3);
+}
 
 async function refreshWorldPreview() {
   let status = null;
@@ -142,13 +157,8 @@ async function refreshWorldPreview() {
   }
   const active = Boolean(status?.active && status?.bridge);
   if (active) {
-    Object.assign(worldState, {
-      active: true,
-      ns: status.ns ?? worldState.ns,
-      yaw: status.yaw ?? worldState.yaw,
-      pitch: status.pitch ?? worldState.pitch,
-      distance: status.distance ?? worldState.distance,
-    });
+    worldState.active = true;
+    applyWorldStatus(status);
     const img = $("#world-stream");
     if (img && !img.dataset.streaming) {
       img.dataset.streaming = "1";
@@ -173,12 +183,7 @@ async function startWorldPreview() {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ns: worldState.ns,
-      yaw: worldState.yaw,
-      pitch: worldState.pitch,
-      distance: worldState.distance,
-    }),
+    body: JSON.stringify({ ns: worldState.ns, pitch: worldState.pitch, distance: worldState.distance }),
   })
     .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
     .catch((error) => ({ ok: false, body: { detail: error.message } }));
@@ -202,13 +207,13 @@ function queueWorldView() {
       worldViewQueued = false;
       queueWorldView();
     }
-  }, 130);
+  }, 90);
 }
 
-async function sendWorldView() {
+async function sendWorldView(extra = {}) {
   if (!worldState.active) return;
   try {
-    await fetch("/api/world/preview/view", {
+    const response = await fetch("/api/world/preview/view", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -217,8 +222,14 @@ async function sendWorldView() {
         yaw: worldState.yaw,
         pitch: worldState.pitch,
         distance: worldState.distance,
+        target: worldState.target,
+        ...extra,
       }),
     });
+    const status = await response.json();
+    // The server clamps pitch/distance and recenters on ns; mirror it so the
+    // next drag starts from what is actually on screen.
+    applyWorldStatus(status);
   } catch {
     /* a dropped frame of drag is not worth a toast */
   }
@@ -232,61 +243,99 @@ function bindWorldPreview() {
     await call("/api/world/preview/stop", {}, "世界预览已关闭");
     await refreshWorldPreview();
   });
-  $("#btn-world-reset")?.addEventListener("click", async () => {
-    if (!worldState.active) return;
-    Object.assign(worldState, { yaw: 0, pitch: -8, distance: 0 });
-    queueWorldView();
+
+  const recenter = async (ns) => {
+    // Only ns/pitch/distance: sending the old pivot would undo the recentre.
+    worldState.ns = ns;
+    try {
+      const response = await fetch("/api/world/preview/view", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ns, pitch: 12, distance: 3 }),
+      });
+      applyWorldStatus(await response.json());
+    } catch {
+      /* keep the current view */
+    }
+  };
+
+  $("#btn-world-reset")?.addEventListener("click", () => {
+    if (worldState.active) recenter(worldState.ns);
   });
 
   document.querySelectorAll("#world-target button").forEach((button) => {
     button.addEventListener("click", () => {
       if (!worldState.active) return;
-      worldState.ns = button.dataset.ns;
       document
         .querySelectorAll("#world-target button")
         .forEach((other) => other.classList.toggle("active", other === button));
-      queueWorldView();
+      recenter(button.dataset.ns);
     });
   });
 
   const img = $("#world-stream");
   let drag = null;
+  img?.addEventListener("contextmenu", (event) => event.preventDefault());
+
   img?.addEventListener("pointerdown", (event) => {
     if (!worldState.active) return;
+    event.preventDefault();
     img.setPointerCapture(event.pointerId);
-    drag = { x: event.clientX, y: event.clientY };
-    worldDragging = true;
+    drag = {
+      x: event.clientX,
+      y: event.clientY,
+      // Right button or Shift = pan, like the Gazebo GUI.
+      pan: event.button === 2 || event.shiftKey,
+    };
     img.classList.add("dragging");
   });
+
   img?.addEventListener("pointermove", (event) => {
     if (!drag) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
     drag.x = event.clientX;
     drag.y = event.clientY;
-    // Drag to look around from the robot's shoulder; yaw is relative to the
-    // robot's heading, so turning the robot keeps the view behind it.
-    worldState.yaw = ((worldState.yaw - dx * 0.3 + 540) % 360) - 180;
-    worldState.pitch = Math.min(35, Math.max(-75, worldState.pitch - dy * 0.25));
+    if (drag.pan) {
+      // Grab-and-drag: the world follows the cursor, so the pivot moves the
+      // other way along the camera's right / up axes.
+      const height = img.clientHeight || 540;
+      const scale = worldState.distance / Math.max(240, height);
+      const yaw = (worldState.yaw * Math.PI) / 180;
+      const pitch = (worldState.pitch * Math.PI) / 180;
+      const rx = -Math.sin(yaw);
+      const ry = Math.cos(yaw);
+      const ux = -Math.cos(yaw) * Math.sin(pitch);
+      const uy = -Math.sin(yaw) * Math.sin(pitch);
+      const uz = Math.cos(pitch);
+      worldState.target = [
+        worldState.target[0] + (-dx * rx + dy * ux) * scale,
+        worldState.target[1] + (-dx * ry + dy * uy) * scale,
+        worldState.target[2] + dy * uz * scale,
+      ];
+    } else {
+      worldState.yaw = (worldState.yaw - dx * 0.3 + 360) % 360;
+      worldState.pitch = Math.min(88, Math.max(2, worldState.pitch + dy * 0.25));
+    }
     queueWorldView();
   });
+
   const drop = () => {
     drag = null;
-    worldDragging = false;
     img?.classList.remove("dragging");
   };
   window.addEventListener("pointerup", drop);
   window.addEventListener("pointercancel", drop);
+
   img?.addEventListener(
     "wheel",
     (event) => {
       if (!worldState.active) return;
       event.preventDefault();
-      // Zoom is a small pull-back: past ~2.5 m the eye leaves the room the
-      // robot is standing in and the walls fill the frame.
       worldState.distance = Math.min(
-        2.5,
-        Math.max(0, worldState.distance + event.deltaY * 0.002)
+        40,
+        Math.max(1.5, worldState.distance * Math.exp(event.deltaY * 0.0012))
       );
       queueWorldView();
     },
@@ -826,11 +875,6 @@ async function boot() {
   setInterval(() => {
     if (viewMode === "world") refreshWorldPreview();
   }, 5000);
-  // Shoulder camera follows the robot: 1.6 Hz is enough at walking speed and
-  // keeps each gz service round-trip off the drag path.
-  setInterval(() => {
-    if (viewMode === "world" && worldState.active && !worldDragging) sendWorldView();
-  }, 600);
 }
 
 boot();

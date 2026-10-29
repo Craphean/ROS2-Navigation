@@ -68,12 +68,16 @@ class WorldPreview:
         # walls in every indoor world; the space right behind a robot that got
         # there by driving is the one place guaranteed to be free.
         self.ns = settings.robots[0]
-        self.yaw_offset = 0.0  # degrees, 0 = looking the way the robot faces
-        self.pitch = -8.0      # degrees, negative looks down
-        # 0 puts the eye right over the robot's footprint, the only spot that
-        # is guaranteed to be hollow (the robot got there by driving). Any
-        # backward offset can end up inside a wall or the ceiling slab.
-        self.distance = 0.0
+        # Orbit camera, like dragging in the Gazebo GUI: the eye circles a
+        # pivot in the world, right-drag slides that pivot and the wheel decides
+        # the radius.  A fixed "camera on the robot" view cannot be navigated -
+        # this one lets the operator fly out of a room and look back in.
+        self.target = [0.0, 0.0, 0.8]
+        self.yaw = 0.0        # degrees, camera azimuth around the pivot
+        self.pitch = 12.0     # degrees, elevation above the pivot
+        # Roofed worlds hide everything above the ceiling slab, so the default
+        # stays at eye level; orbit up only in open worlds.
+        self.distance = 3.0
         self.active = False
         self._lock = threading.Lock()
 
@@ -129,9 +133,10 @@ class WorldPreview:
             "world": self.world_name(),
             "bridge": bool(self.bridge and self.bridge.poll() is None),
             "ns": self.ns,
-            "yaw": round(self.yaw_offset, 1),
+            "yaw": round(self.yaw, 1),
             "pitch": round(self.pitch, 1),
             "distance": round(self.distance, 2),
+            "target": [round(v, 2) for v in self.target],
         }
 
     def start(self, **view: Any) -> dict[str, Any]:
@@ -145,6 +150,8 @@ class WorldPreview:
             self._create_model(world)
             self._start_bridge()
             self.active = True
+            self._recenter(str(view.get("ns") or self.ns))
+        # An explicit ns in the request wins over the recentered default.
         return self.set_view(**view)
 
     def set_view(self, **view: Any) -> dict[str, Any]:
@@ -154,12 +161,16 @@ class WorldPreview:
             ns = view.get("ns")
             if ns and ns in self.settings.robots:
                 self.ns = ns
+                self._recenter(ns)
+            target_xyz = view.get("target")
+            if isinstance(target_xyz, (list, tuple)) and len(target_xyz) == 3:
+                self.target = [float(v) for v in target_xyz]
             if view.get("yaw") is not None:
-                self.yaw_offset = ((float(view["yaw"]) + 180.0) % 360.0) - 180.0
+                self.yaw = float(view["yaw"]) % 360.0
             if view.get("pitch") is not None:
-                self.pitch = min(35.0, max(-75.0, float(view["pitch"])))
+                self.pitch = min(88.0, max(2.0, float(view["pitch"])))
             if view.get("distance") is not None:
-                self.distance = min(2.5, max(0.0, float(view["distance"])))
+                self.distance = min(40.0, max(1.5, float(view["distance"])))
             eye, quat, target = self._eye()
             world = self.world_name()
             request = (
@@ -271,18 +282,25 @@ class WorldPreview:
             except (ProcessLookupError, PermissionError):
                 pass
 
-    def _robot_pose(self) -> tuple[float, float, float]:
-        """(x, y, yaw) of the tracked robot in world, TF first."""
+    def _robot_pose(self, ns: str | None = None) -> tuple[float, float, float]:
+        """(x, y, yaw) of a robot in world, TF first."""
+        name = ns or self.ns
         if self.node is not None:
-            pose = self.node.lookup_world_pose(self.ns)
+            pose = self.node.lookup_world_pose(name)
             if pose is not None:
                 return (float(pose[0]), float(pose[1]), float(pose[2]))
         try:
             meta = json.loads(self.settings.sim_meta_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return (0.0, 0.0, 0.0)
-        pose = meta.get(self.ns) or meta.get("robot1") or [0.0, 0.0, 0.0]
+        pose = meta.get(name) or meta.get("robot1") or [0.0, 0.0, 0.0]
         return (float(pose[0]), float(pose[1]), float(pose[2]))
+
+    def _recenter(self, ns: str) -> None:
+        """Put the pivot on a robot and look along its heading."""
+        x, y, heading = self._robot_pose(ns)
+        self.target = [x, y, 0.8]
+        self.yaw = (math.degrees(heading) + 180.0) % 360.0
 
     def _eye(
         self,
@@ -291,26 +309,21 @@ class WorldPreview:
         tuple[float, float, float, float],
         tuple[float, float, float],
     ]:
-        x, y, heading = self._robot_pose()
-        azimuth = heading + math.radians(self.yaw_offset)
-        pitch = math.radians(self.pitch)
-        distance = self.distance
+        azimuth = math.radians(self.yaw)
+        elevation = math.radians(self.pitch)
+        ce = math.cos(elevation)
         eye = (
-            x - distance * math.cos(azimuth),
-            y - distance * math.sin(azimuth),
-            0.78,
+            self.target[0] + self.distance * ce * math.cos(azimuth),
+            self.target[1] + self.distance * ce * math.sin(azimuth),
+            self.target[2] + self.distance * math.sin(elevation),
         )
-        forward = (
-            math.cos(azimuth) * math.cos(pitch),
-            math.sin(azimuth) * math.cos(pitch),
-            math.sin(pitch),
-        )
-        target = (
-            eye[0] + 4.0 * forward[0],
-            eye[1] + 4.0 * forward[1],
-            eye[2] + 4.0 * forward[2],
-        )
-        cy, sy = math.cos(azimuth / 2), math.sin(azimuth / 2)
+        dx = self.target[0] - eye[0]
+        dy = self.target[1] - eye[1]
+        dz = self.target[2] - eye[2]
+        yaw = math.atan2(dy, dx)
+        pitch = math.atan2(dz, math.hypot(dx, dy))
+        # Camera +X looks at the pivot: q = qz(yaw) * qy(pitch).
+        cy, sy = math.cos(yaw / 2), math.sin(yaw / 2)
         cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
         quat = (-sy * sp, cy * sp, sy * cp, cy * cp)
-        return eye, quat, target
+        return eye, quat, (self.target[0], self.target[1], self.target[2])
