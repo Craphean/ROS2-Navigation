@@ -517,8 +517,15 @@ function wireActions() {
     if (!requireOperator()) return;
     toast("正在导出点云…");
     const payload = await call("/api/cloud/save", { binary: true });
-    if (payload?.ok) {
-      toast(`已导出 ${payload.points.toLocaleString()} 点 → ${payload.path}`, "ok");
+    if (!payload?.ok) return;
+    // The export lands on the machine running the console; pull it down so the
+    // operator ends up with the file instead of just a path on the server.
+    const name = String(payload.path).split("/").pop();
+    try {
+      await downloadFile(`/api/cloud/file/${encodeURIComponent(name)}`, name);
+      toast(`已下载 ${name}（${payload.points.toLocaleString()} 点）`, "ok");
+    } catch (error) {
+      toast(`导出成功但下载失败：${error.message}`, "error");
     }
   });
 
@@ -587,6 +594,20 @@ async function triggerEstop() {
 /* ------------------------------------------------------------------ */
 /* sim polling                                                         */
 /* ------------------------------------------------------------------ */
+async function downloadFile(url, filename) {
+  const response = await fetch(url, { credentials: "same-origin" });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  const blob = await response.blob();
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 10000);
+}
+
 async function loadWorlds() {
   try {
     const payload = await api("/api/sim/worlds");

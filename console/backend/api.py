@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import re
 import time
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .auth import COOKIE_NAME, is_operator, require_operator
@@ -20,6 +21,8 @@ from .video import mjpeg_stream
 router = APIRouter(prefix="/api")
 
 DETECTION_TTL = 3.0
+# inspection_20261029_142537.pcd - the only names /api/cloud/file will serve.
+_PCD_NAME = re.compile(r"inspection_[0-9]{8}_[0-9]{6}\.pcd\Z")
 
 
 class GoalBody(BaseModel):
@@ -229,6 +232,25 @@ async def save_cloud(request: Request, body: CloudSaveBody | None = None) -> dic
         "points": int(points.shape[0]),
         "voxel": voxel,
     }
+
+
+@router.get("/cloud/file/{name}", dependencies=[Depends(require_operator)])
+async def download_cloud(request: Request, name: str) -> FileResponse:
+    """Serve an exported PCD so the operator can pull it to their own machine.
+
+    The export itself can only write where the console runs; this is the only
+    way to get the file onto the laptop that is watching the dashboard.
+    """
+    if not _PCD_NAME.match(name):
+        raise HTTPException(status_code=404, detail="文件名不合法")
+    path = request.app.state.settings.root / "maps" / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        filename=name,
+    )
 
 
 def _pcd_writer(settings: Any):

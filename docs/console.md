@@ -147,6 +147,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 - 缓存与 `scripts/export_merged_cloud.py` 用同一套体素哈希与 z 过滤，但分辨率是控制台的 0.04 m、z∈[0.05, 2.0]——也就是 3D 视图里正在看的那份数据，不是脚本默认的 0.02 m。要更细的全密度档案，仍然用脚本的 `--accumulate` / `--idle-stop`。
 - 写盘直接复用脚本里的 `write_pcd()`（二进制 xyz float32，12 B/点），格式只有一份实现。
 - 点一下拿到的就是整趟累积结果，不用再等 N 秒；无点云时返回 404，只读账号不能导出。
+- 文件写在**跑控制台的那台机器**上，所以导出后前端会立刻请求 `/api/cloud/file/<名字>` 把它下载到看控制台的电脑；文件名走白名单正则，只放行 `inspection_<日期>_<时间>.pcd`，避免借这个接口读别的东西。
 
 ## 5. HTTP / WebSocket
 
@@ -163,6 +164,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | GET/POST | `/api/missions`、`/{id}/start|pause|resume|skip|stop|waypoints` | 写操作需登录 | 任务 |
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
 | POST | `/api/cloud/save` | 是 | 导出累积点云到 `maps/inspection_<ts>.pcd` |
+| GET | `/api/cloud/file/{name}` | 是 | 把导出的 PCD 下载到操作员本机（只接受 `inspection_<时间>.pcd`） |
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |
 | GET | `/api/sim/worlds` | 否 | 可选世界列表 + 当前世界 |
 | POST | `/api/sim/restart` | 是 | 停 → 可选清缓存 → 按 `world`/`mode`/`headless` 重启 |
