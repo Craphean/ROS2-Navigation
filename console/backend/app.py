@@ -26,9 +26,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings.ensure_dirs()
 
     video_hubs = {ns: FrameHub(settings.jpeg_quality) for ns in settings.robots}
-    # Gazebo preview: 15 Hz source, encoded at most 8 Hz - it is a context view,
-    # not the thing being inspected.
-    world_hub = FrameHub(settings.jpeg_quality, max_fps=8.0)
+    # Gazebo preview: 15 Hz source. Encoding is the only per-frame CPU cost, and
+    # the camera moves with the operator's drag, so keep most of the source rate.
+    # No encode throttle: the preview frames are small (640x360) and the hub
+    # receives them in near-duplicate pairs, which a rate limit silently halves.
+    world_hub = FrameHub(settings.jpeg_quality, max_fps=0.0)
     hub = WsHub()
 
     @asynccontextmanager

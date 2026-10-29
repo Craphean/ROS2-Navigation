@@ -602,7 +602,10 @@ async def cloud_bin(request: Request) -> Response:
 # ----------------------------------------------------------------------
 @router.get("/world/preview/status")
 async def world_preview_status(request: Request) -> dict[str, Any]:
-    return request.app.state.world_preview.status()
+    return {
+        **request.app.state.world_preview.status(),
+        "frames": request.app.state.world_hub.stats(),
+    }
 
 
 @router.post("/world/preview/start", dependencies=[Depends(require_operator)])

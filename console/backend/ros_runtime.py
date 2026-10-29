@@ -27,9 +27,10 @@ class RosRuntime:
     ):
         rclpy.init(args=None, signal_handler_options=SignalHandlerOptions.NO)
         self.node = ConsoleNode(settings, video_hubs, world_hub)
-        # Two threads: callbacks must not starve while an action result is
-        # being awaited.  The VM only has four cores, so do not raise this.
-        self.executor = MultiThreadedExecutor(num_threads=2)
+        # Callbacks must not starve while an action result is awaited, and the
+        # 15 Hz preview image is a 1 MB message: two threads left the image
+        # subscription dropping frames under load.
+        self.executor = MultiThreadedExecutor(num_threads=3)
         self.executor.add_node(self.node)
         self._thread = threading.Thread(target=self._spin, name="rclpy", daemon=True)
         self._thread.start()

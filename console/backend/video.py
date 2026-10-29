@@ -128,6 +128,14 @@ class FrameHub:
         """Latest frame as JPEG, encoded on demand for snapshot.jpg polls."""
         return self.encode()
 
+    def stats(self) -> dict[str, int]:
+        """Counters for the diagnostics endpoint (no lock needed: ints only)."""
+        return {
+            "received": self._frame_seq,
+            "encoded": self._seq,
+            "clients": self.clients,
+        }
+
 
 def _decode_image(msg: Any) -> np.ndarray | None:
     height = int(msg.height)

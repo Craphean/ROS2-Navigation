@@ -14,6 +14,7 @@ model, never this code.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import shutil
@@ -24,6 +25,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
+
+LOGGER = logging.getLogger(__name__)
 
 MODEL = "preview_cam"
 TOPIC = "/preview_cam/image"
@@ -63,6 +66,7 @@ class WorldPreview:
         self.settings = settings
         self.node = node
         self.bridge: subprocess.Popen | None = None
+        self.helper: subprocess.Popen | None = None
         # Shoulder camera: the eye sits just behind the tracked robot and looks
         # along its heading.  Orbiting a fixed world point put the eye inside
         # walls in every indoor world; the space right behind a robot that got
@@ -97,6 +101,12 @@ class WorldPreview:
         )
         env["SKIP_DDS_SHM_CLEAN"] = "1"
         env["PYTHONUNBUFFERED"] = "1"
+        # The helper links gz-transport; RUNPATH only covers the executable's
+        # own dependencies, so the transitive gz libs need LD_LIBRARY_PATH.
+        gz_libs = [str(p) for p in sorted(Path("/opt/ros/lyrical/opt").glob("*/lib"))]
+        if gz_libs:
+            existing = env.get("LD_LIBRARY_PATH", "")
+            env["LD_LIBRARY_PATH"] = ":".join(gz_libs + ([existing] if existing else []))
         return env
 
     def world_name(self) -> str | None:
@@ -149,6 +159,7 @@ class WorldPreview:
             self._write_sdf()
             self._create_model(world)
             self._start_bridge()
+            self._start_helper(world)
             self.active = True
             self._recenter(str(view.get("ns") or self.ns))
         # An explicit ns in the request wins over the recentered default.
@@ -179,7 +190,7 @@ class WorldPreview:
                 f"orientation: {{x: {quat[0]:.6f}, y: {quat[1]:.6f}, "
                 f"z: {quat[2]:.6f}, w: {quat[3]:.6f}}}"
             )
-            ok, output = self._service(f"/world/{world}/set_pose", "gz.msgs.Pose", request)
+            ok, output = self._push_pose(eye, quat, world, request)
         if not ok:
             # A restarted world lost the model; the next start() recreates it.
             self.active = False
@@ -193,6 +204,7 @@ class WorldPreview:
 
     def stop(self) -> dict[str, Any]:
         with self._lock:
+            self._stop_helper()
             self._kill_bridge()
             self.active = False
         return {"ok": True, **self.status()}
@@ -208,8 +220,8 @@ class WorldPreview:
                 topic=TOPIC,
                 fps=15.0,
                 fov=1.15,
-                width=960,
-                height=540,
+                width=640,
+                height=360,
             ),
             encoding="utf-8",
         )
@@ -217,6 +229,11 @@ class WorldPreview:
 
     def _create_model(self, world: str) -> None:
         path = self.settings.run_dir / f"{MODEL}.sdf"
+        # Recreate instead of reusing: a camera left over from an earlier start
+        # keeps its old resolution / topic, and gz ignores a second create.
+        self._service(
+            f"/world/{world}/remove", "gz.msgs.Entity", f'name: "{MODEL}" type: 2'
+        )
         request = f'sdf_filename: "{path}"'
         ok, output = self._service(f"/world/{world}/create", "gz.msgs.EntityFactory", request)
         if not ok:
@@ -224,6 +241,73 @@ class WorldPreview:
             # else (bad SDF) is worth surfacing in the log.
             if "exist" not in output.lower():
                 raise RuntimeError(output or "创建预览相机失败")
+
+    def _start_helper(self, world: str) -> None:
+        """Spawn the persistent pose helper (see tools/preview_pose_bridge.cc)."""
+        self._stop_helper()
+        path = self.settings.root / "console" / "bin" / "preview_pose_bridge"
+        if not path.is_file():
+            LOGGER.warning("preview helper missing: %s (falling back to gz service)", path)
+            return
+        try:
+            self.helper = subprocess.Popen(
+                [str(path), world, MODEL],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                bufsize=1,
+                start_new_session=True,
+                env=self._env(),
+            )
+        except OSError as exc:
+            LOGGER.warning("preview helper failed to start: %r", exc)
+            self.helper = None
+
+    def _stop_helper(self) -> None:
+        process = self.helper
+        self.helper = None
+        if process is None or process.poll() is not None:
+            return
+        try:
+            if process.stdin is not None:
+                process.stdin.close()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=3.0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+    def _push_pose(
+        self,
+        eye: tuple[float, float, float],
+        quat: tuple[float, float, float, float],
+        world: str,
+        request: str,
+    ) -> tuple[bool, str]:
+        """One pose, through the helper when possible.
+
+        The helper turns a ~400 ms process spawn into a ~1 ms write; 'gz
+        service' stays as the fallback so the console still works when the
+        helper has not been built.
+        """
+        helper = self.helper
+        if helper is not None and helper.poll() is None and helper.stdin is not None:
+            line = (
+                f"{eye[0]:.4f} {eye[1]:.4f} {eye[2]:.4f} "
+                f"{quat[0]:.6f} {quat[1]:.6f} {quat[2]:.6f} {quat[3]:.6f}\n"
+            )
+            try:
+                helper.stdin.write(line)
+                helper.stdin.flush()
+                return True, ""
+            except (BrokenPipeError, OSError, ValueError):
+                self._stop_helper()
+        return self._service(f"/world/{world}/set_pose", "gz.msgs.Pose", request)
 
     def _kill_stray_bridges(self) -> None:
         """Kill bridges left behind by a previous console process.

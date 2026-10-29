@@ -207,7 +207,7 @@ function queueWorldView() {
       worldViewQueued = false;
       queueWorldView();
     }
-  }, 90);
+  }, 40);
 }
 
 async function sendWorldView(extra = {}) {

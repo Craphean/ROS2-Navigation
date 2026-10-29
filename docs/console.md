@@ -158,12 +158,17 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
   `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再走和车载视频相同的 MJPEG 管线。
   渲染走 EGL（无窗口、用 GPU），所以不需要 X / Gazebo GUI。
 - 相机是**环绕式自由视角**，和 Gazebo 视口一样：左键拖拽绕枢轴转，右键或 Shift+左键平移枢轴，滚轮缩放（1.5–40 m）。
-  枢轴默认落在所选车上（「对准 R1/R2」按钮可复位），所以第一次打开就在车所在的房间里。
-- 每次交互发一次 `/api/world/preview/view`（`gz service` 一次约 80 ms），前端按 90 ms 节流合并拖动事件。
+  枢轴默认落在所选车上（「对齐 R1/R2」按钮可重置），所以第一次打开就在车所在的房间里。
+- **性能**：一次拖拽如果直接调 `gz service`，进程启动 + 传输发现约 400 ms，手感就是 0.4 s 一跳。
+  因此位姿走常驻助手 `console/bin/preview_pose_bridge`（源码 `tools/preview_pose_bridge.cc`）：
+  它常驻一个 gz transport 节点，从 stdin 读位姿，单次约 1–2 ms。首次使用前先编译：
+  `./scripts/build_preview_pose_bridge.sh`；没有这个二进制时自动退回 `gz service`（能用但卡）。
+- 相机 640×360@15 Hz（渲染中的 RTF 常让实际帧率更高），控制台侧不做编码限流：
+  限流会和一帧两发的消息节奏打拍，把 20 fps 直接砍半成 10 fps。
 - **有顶的世界（house / mine）抬到天花板以上就只剩一片灰**——那是屋顶背面，Gazebo GUI 里同样如此；
   要看室内就压低仰角，要看全局得先把世界里的 roof/ceiling 视觉隐藏掉（尚未实现）。
-- 仿真停止/换世界会 `stop()` 预览（相机模型随世界消失）；开启时先清掉遗留的 `parameter_bridge`，
-  否则两个桥同时往一个话题发帧，画面会和相机位姿对不上。
+- 仿真停止/换世界会 `stop()` 预览（相机模型随世界消失）；开启时先删旧相机模型再重建（否则改了分辨率不生效），
+  并清掉遗留的 `parameter_bridge`，否则两个桥同时往一个话题发帧，画面会和相机位姿对不上。
 
 ## 5. HTTP / WebSocket
 
@@ -181,7 +186,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
 | GET | `/api/world/preview.mjpeg` | 否 | Gazebo 世界预览视频流 |
 | GET | `/api/world/preview/status` | 否 | 预览状态（是否开启、跟踪哪台车、视角） |
-| POST | `/api/world/preview/start|stop`、`/view` | 是 | 开启/关闭预览、调整视角 |
+| POST | `/api/world/preview/start|stop`、`/view` | 是 | 开启/关闭预览、调整视角（枢轴/方位/仰角/半径） |
 | POST | `/api/cloud/save` | 是 | 导出累积点云到 `maps/inspection_<ts>.pcd` |
 | GET | `/api/cloud/file/{name}` | 是 | 把导出的 PCD 下载到操作员本机（只接受 `inspection_<时间>.pcd`） |
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |
