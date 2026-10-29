@@ -17,6 +17,7 @@ from .procman import ProcSupervisor
 from .ros_runtime import RosRuntime
 from .teleop import TeleopGate
 from .video import FrameHub
+from .worldview import WorldPreview
 from .ws import WsHub, build_ws_router, state_pump
 
 
@@ -25,6 +26,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings.ensure_dirs()
 
     video_hubs = {ns: FrameHub(settings.jpeg_quality) for ns in settings.robots}
+    # Gazebo preview: 15 Hz source, encoded at most 8 Hz - it is a context view,
+    # not the thing being inspected.
+    world_hub = FrameHub(settings.jpeg_quality, max_fps=8.0)
     hub = WsHub()
 
     @asynccontextmanager
@@ -32,10 +36,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         loop = asyncio.get_running_loop()
         for frame_hub in video_hubs.values():
             frame_hub.bind_loop(loop)
+        world_hub.bind_loop(loop)
 
-        runtime = RosRuntime(settings, video_hubs)
+        runtime = RosRuntime(settings, video_hubs, world_hub)
         app.state.runtime = runtime
         app.state.node = runtime.node
+        app.state.world_preview = WorldPreview(settings, runtime.node)
 
         engine = MissionEngine(runtime.node, settings, emit=hub.publish_nowait)
         app.state.engine = engine
@@ -55,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             with contextlib.suppress(asyncio.CancelledError):
                 await pump
             await teleop.stop()
+            app.state.world_preview.stop()
             app.state.proc.shutdown()
             await hub.close_all()
             runtime.shutdown()
@@ -69,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.hub = hub
     app.state.video_hubs = video_hubs
+    app.state.world_hub = world_hub
     app.state.proc = ProcSupervisor(settings)
     app.state.map_cache = {}
     app.state.detections = {}

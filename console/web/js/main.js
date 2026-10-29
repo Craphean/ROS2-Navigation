@@ -106,18 +106,192 @@ function setView(mode) {
   viewMode = mode;
   const wrap = $("#map-wrap");
   const three = mode === "3d";
+  const world = mode === "world";
+  const flat = !three && !world;
   wrap?.classList.toggle("show-3d", three);
+  wrap?.classList.toggle("show-world", world);
   $("#cloud-canvas")?.classList.toggle("visible", three);
-  $("#btn-view-2d")?.classList.toggle("active", !three);
+  $("#btn-view-2d")?.classList.toggle("active", flat);
   $("#btn-view-3d")?.classList.toggle("active", three);
-  $("#click-hint") && ($("#click-hint").style.display = three ? "none" : "");
-  $("#btn-click-mode") && ($("#btn-click-mode").style.display = three ? "none" : "");
+  $("#btn-view-world")?.classList.toggle("active", world);
+  $("#click-hint") && ($("#click-hint").style.display = flat ? "" : "none");
+  $("#btn-click-mode") && ($("#btn-click-mode").style.display = flat ? "" : "none");
   if (three) {
     cloudView.resize();
     cloudView.visible = true;
   } else {
     cloudView.visible = false;
   }
+  if (world) refreshWorldPreview();
+}
+
+/* ------------------------------------------------------------------ */
+/* Gazebo world preview                                                */
+/* ------------------------------------------------------------------ */
+const worldState = { active: false, ns: "robot1", yaw: 0, pitch: -8, distance: 0 };
+let worldDragging = false;
+let worldViewTimer = 0;
+let worldViewQueued = false;
+
+async function refreshWorldPreview() {
+  let status = null;
+  try {
+    status = await api("/api/world/preview/status");
+  } catch {
+    status = null;
+  }
+  const active = Boolean(status?.active && status?.bridge);
+  if (active) {
+    Object.assign(worldState, {
+      active: true,
+      ns: status.ns ?? worldState.ns,
+      yaw: status.yaw ?? worldState.yaw,
+      pitch: status.pitch ?? worldState.pitch,
+      distance: status.distance ?? worldState.distance,
+    });
+    const img = $("#world-stream");
+    if (img && !img.dataset.streaming) {
+      img.dataset.streaming = "1";
+      img.src = `/api/world/preview.mjpeg?t=${Date.now()}`;
+    }
+  } else {
+    worldState.active = false;
+    const img = $("#world-stream");
+    if (img) {
+      img.dataset.streaming = "";
+      img.removeAttribute("src");
+    }
+  }
+  $("#world-empty")?.classList.toggle("hidden", active);
+  return active;
+}
+
+async function startWorldPreview() {
+  if (!requireOperator()) return;
+  toast("正在启动世界预览…");
+  const payload = await fetch("/api/world/preview/start", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ns: worldState.ns,
+      yaw: worldState.yaw,
+      pitch: worldState.pitch,
+      distance: worldState.distance,
+    }),
+  })
+    .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
+    .catch((error) => ({ ok: false, body: { detail: error.message } }));
+  if (!payload.ok || payload.body?.ok === false) {
+    toast(payload.body?.detail || payload.body?.message || "启动失败", "error");
+    return;
+  }
+  await refreshWorldPreview();
+  toast("世界预览已开启", "ok");
+}
+
+function queueWorldView() {
+  if (worldViewTimer) {
+    worldViewQueued = true;
+    return;
+  }
+  sendWorldView();
+  worldViewTimer = window.setTimeout(() => {
+    worldViewTimer = 0;
+    if (worldViewQueued) {
+      worldViewQueued = false;
+      queueWorldView();
+    }
+  }, 130);
+}
+
+async function sendWorldView() {
+  if (!worldState.active) return;
+  try {
+    await fetch("/api/world/preview/view", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ns: worldState.ns,
+        yaw: worldState.yaw,
+        pitch: worldState.pitch,
+        distance: worldState.distance,
+      }),
+    });
+  } catch {
+    /* a dropped frame of drag is not worth a toast */
+  }
+}
+
+function bindWorldPreview() {
+  $("#btn-view-world")?.addEventListener("click", () => setView("world"));
+  $("#btn-world-start")?.addEventListener("click", startWorldPreview);
+  $("#btn-world-stop")?.addEventListener("click", async () => {
+    if (!requireOperator()) return;
+    await call("/api/world/preview/stop", {}, "世界预览已关闭");
+    await refreshWorldPreview();
+  });
+  $("#btn-world-reset")?.addEventListener("click", async () => {
+    if (!worldState.active) return;
+    Object.assign(worldState, { yaw: 0, pitch: -8, distance: 0 });
+    queueWorldView();
+  });
+
+  document.querySelectorAll("#world-target button").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!worldState.active) return;
+      worldState.ns = button.dataset.ns;
+      document
+        .querySelectorAll("#world-target button")
+        .forEach((other) => other.classList.toggle("active", other === button));
+      queueWorldView();
+    });
+  });
+
+  const img = $("#world-stream");
+  let drag = null;
+  img?.addEventListener("pointerdown", (event) => {
+    if (!worldState.active) return;
+    img.setPointerCapture(event.pointerId);
+    drag = { x: event.clientX, y: event.clientY };
+    worldDragging = true;
+    img.classList.add("dragging");
+  });
+  img?.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    // Drag to look around from the robot's shoulder; yaw is relative to the
+    // robot's heading, so turning the robot keeps the view behind it.
+    worldState.yaw = ((worldState.yaw - dx * 0.3 + 540) % 360) - 180;
+    worldState.pitch = Math.min(35, Math.max(-75, worldState.pitch - dy * 0.25));
+    queueWorldView();
+  });
+  const drop = () => {
+    drag = null;
+    worldDragging = false;
+    img?.classList.remove("dragging");
+  };
+  window.addEventListener("pointerup", drop);
+  window.addEventListener("pointercancel", drop);
+  img?.addEventListener(
+    "wheel",
+    (event) => {
+      if (!worldState.active) return;
+      event.preventDefault();
+      // Zoom is a small pull-back: past ~2.5 m the eye leaves the room the
+      // robot is standing in and the walls fill the frame.
+      worldState.distance = Math.min(
+        2.5,
+        Math.max(0, worldState.distance + event.deltaY * 0.002)
+      );
+      queueWorldView();
+    },
+    { passive: false }
+  );
 }
 
 async function pollCloud() {
@@ -640,6 +814,7 @@ async function pollSim() {
 /* ------------------------------------------------------------------ */
 async function boot() {
   wireActions();
+  bindWorldPreview();
   await refreshSession();
   await loadWorlds();
   await refreshMissions();
@@ -647,6 +822,15 @@ async function boot() {
   pollSim();
   setInterval(pollSim, 5000);
   setInterval(refreshMissions, 20000);
+  // Cheap: one status GET every 5 s, and only while the tab is open.
+  setInterval(() => {
+    if (viewMode === "world") refreshWorldPreview();
+  }, 5000);
+  // Shoulder camera follows the robot: 1.6 Hz is enough at walking speed and
+  // keeps each gz service round-trip off the drag path.
+  setInterval(() => {
+    if (viewMode === "world" && worldState.active && !worldDragging) sendWorldView();
+  }, 600);
 }
 
 boot();

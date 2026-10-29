@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#080b0e" />
   <title>矿井智能巡检机器人控制台</title>
-  <link rel="stylesheet" href="css/app.css?v=4" />
+  <link rel="stylesheet" href="css/app.css?v=6" />
 </head>
 <body>
 <div class="app">
@@ -78,6 +78,7 @@
         <div class="tabs">
           <button class="tab active" id="btn-view-2d" type="button">2D 建图</button>
           <button class="tab" id="btn-view-3d" type="button">3D 点云</button>
+          <button class="tab" id="btn-view-world" type="button">世界</button>
           <button class="tab on" id="btn-scan-toggle" type="button" aria-pressed="true">激光点云</button>
         </div>
         <div class="view-tools">
@@ -99,6 +100,23 @@
           <div class="spinner"></div>
           <p>等待 /map …</p>
           <small>若长时间无地图，请确认仿真已启动</small>
+        </div>
+
+        <div class="world-wrap" id="world-wrap">
+          <img id="world-stream" alt="Gazebo 世界预览" draggable="false" />
+          <div class="world-tools">
+            <div class="segmented" id="world-target">
+              <button class="active" data-ns="robot1">R1</button>
+              <button data-ns="robot2">R2</button>
+            </div>
+            <button class="btn small ghost" id="btn-world-reset">复位视角</button>
+            <button class="btn small ghost" id="btn-world-stop">关闭预览</button>
+          </div>
+          <div class="map-empty" id="world-empty">
+            <p>世界预览未开启</p>
+            <small>相机跟在所选车后，拖拽环视、滚轮缩放；车动镜头跟着动</small>
+            <button class="btn small" id="btn-world-start">开启 3D 预览</button>
+          </div>
         </div>
         <div class="map-legend">
           <span><i class="sw free"></i>可通行</span>
@@ -214,6 +232,6 @@
   </dialog>
 </div>
 
-<script type="module" src="js/main.js?v=11"></script>
+<script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>

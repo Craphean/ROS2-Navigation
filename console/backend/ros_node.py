@@ -89,7 +89,12 @@ async def wait_rclpy_future(future: Any, timeout: float) -> Any:
 
 
 class ConsoleNode(Node):
-    def __init__(self, settings: Settings, video_hubs: dict[str, Any]):
+    def __init__(
+        self,
+        settings: Settings,
+        video_hubs: dict[str, Any],
+        world_hub: Any = None,
+    ):
         super().__init__(
             "mine_inspection_console",
             parameter_overrides=[
@@ -101,6 +106,7 @@ class ConsoleNode(Node):
         self.store.sim_meta = {"_path": str(settings.sim_meta_path)}
         self.store.load_sim_meta()
         self.video_hubs = video_hubs
+        self.world_hub = world_hub
         self.cb_group = ReentrantCallbackGroup()
 
         self.tf_buffer = Buffer()
@@ -229,6 +235,17 @@ class ConsoleNode(Node):
                 self._guard(
                     lambda msg, n=ns, h=hub: (h.on_image(msg), self.store.on_image(n))
                 ),
+                SENSOR_QOS,
+            )
+
+        if self.world_hub is not None:
+            # The Gazebo world preview camera is bridged in by the console
+            # itself, so this subscription is always present and simply sees
+            # nothing while the preview is off.
+            self.create_subscription(
+                Image,
+                "/preview_cam/image",
+                self._guard(self.world_hub.on_image),
                 SENSOR_QOS,
             )
 

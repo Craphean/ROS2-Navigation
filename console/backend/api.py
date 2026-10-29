@@ -55,6 +55,13 @@ class CloudSaveBody(BaseModel):
     binary: bool = True
 
 
+class WorldViewBody(BaseModel):
+    ns: str | None = None
+    yaw: float | None = None
+    pitch: float | None = None
+    distance: float | None = None
+
+
 class SimRestartBody(SimStartBody):
     clean: bool = True
 
@@ -508,6 +515,7 @@ async def sim_stop(request: Request) -> dict[str, Any]:
     if not request.app.state.settings.manage_sim:
         raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
     result = request.app.state.proc.stop_sim()
+    request.app.state.world_preview.stop()
     request.app.state.node.reset_session()
     return result
 
@@ -532,6 +540,8 @@ async def sim_restart(request: Request, body: SimRestartBody) -> dict[str, Any]:
     result = await asyncio.to_thread(
         proc.restart_sim, body.world, body.mode, body.headless, body.clean
     )
+    # The preview camera model lives inside the old world; it is gone now.
+    request.app.state.world_preview.stop()
     request.app.state.node.reset_session()
     return result
 
@@ -583,6 +593,66 @@ async def cloud_bin(request: Request) -> Response:
             "X-Cloud-Seq": str(seq),
             "X-Cloud-Count": str(count),
         },
+    )
+
+
+# ----------------------------------------------------------------------
+# Gazebo world preview
+# ----------------------------------------------------------------------
+@router.get("/world/preview/status")
+async def world_preview_status(request: Request) -> dict[str, Any]:
+    return request.app.state.world_preview.status()
+
+
+@router.post("/world/preview/start", dependencies=[Depends(require_operator)])
+async def world_preview_start(request: Request, body: WorldViewBody) -> dict[str, Any]:
+    try:
+        return await asyncio.to_thread(
+            request.app.state.world_preview.start,
+            yaw=body.yaw,
+            pitch=body.pitch,
+            distance=body.distance,
+            ns=body.ns,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/world/preview/view", dependencies=[Depends(require_operator)])
+async def world_preview_view(request: Request, body: WorldViewBody) -> dict[str, Any]:
+    # One gz service round-trip per call (~80 ms), so the UI throttles drags.
+    return await asyncio.to_thread(
+        request.app.state.world_preview.set_view,
+        yaw=body.yaw,
+        pitch=body.pitch,
+        distance=body.distance,
+        ns=body.ns,
+    )
+
+
+@router.post("/world/preview/stop", dependencies=[Depends(require_operator)])
+async def world_preview_stop(request: Request) -> dict[str, Any]:
+    return await asyncio.to_thread(request.app.state.world_preview.stop)
+
+
+@router.get("/world/preview.mjpeg")
+async def world_preview_stream(request: Request, fps: float = 0.0):
+    hub = request.app.state.world_hub
+    if request.app.state.settings.max_streams and hub.clients >= request.app.state.settings.max_streams:
+        raise HTTPException(status_code=503, detail="视频连接数已达上限")
+    hub.clients += 1
+
+    async def generator():
+        try:
+            async for chunk in mjpeg_stream(hub, fps):
+                if await request.is_disconnected():
+                    break
+                yield chunk
+        finally:
+            hub.clients = max(0, hub.clients - 1)
+
+    return StreamingResponse(
+        generator(), media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
 

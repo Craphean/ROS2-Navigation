@@ -69,6 +69,7 @@ CONSOLE_MANAGE_SIM=0 ./console/run.sh
 - **左栏**：两车状态卡（位姿、速度、导航状态、剩余距离）；巡检任务选择、进度、航点状态。
 - **中栏**：2D 建图（OccupancyGrid + 激光点 + 车辆 + 航点 + 目标连线），支持拖拽平移、滚轮缩放、点击拾取。
 - **右栏**：双路 320×240 视频；事件流（任务、航点、失败、急停）。
+- **中部视图**：2D 建图 / 3D 点云 / 世界（Gazebo 实时预览）三个标签页。
 - **底栏**：WASD/方向键、接管/释放、召回、保存地图（2D 栅格）、导出 PCD（3D 点云）、换世界/重启仿真、急停。
 
 ### 巡检任务
@@ -149,6 +150,20 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 - 点一下拿到的就是整趟累积结果，不用再等 N 秒；无点云时返回 404，只读账号不能导出。
 - 文件写在**跑控制台的那台机器**上，所以导出后前端会立刻请求 `/api/cloud/file/<名字>` 把它下载到看控制台的电脑；文件名走白名单正则，只放行 `inspection_<日期>_<时间>.pcd`，避免借这个接口读别的东西。
 
+### 4.7 Gazebo 世界预览
+
+「世界」标签页看的是 gz-sim 自己渲染的画面，不是浏览器的三维重建：
+
+- 控制台启动时用 `gz service /world/<w>/create` 往当前世界塞一个 `preview_cam` 模型（带 camera sensor，960×540@15 Hz），
+  `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再用和车载视频相同的 MJPEG 管线推给浏览器。
+  渲染走 EGL（无窗口、用 GPU），所以不需要 X / Gazebo GUI。
+- 相机**贴在所选车的位姿上**（车体中心上方 0.78 m，朝车头方向），拖拽改偏航/俯仰、滚轮最多后退 2.5 m。
+  之所以不做绕地图中心环绕：house / mine 都有顶，眼位一旦高过天花板就只剩一片灰；
+  而车能开到的位置必然是空的，所以跟着车最稳。
+- 前端在「世界」标签打开时以 600 ms 周期重发位姿（gz service 一次约 80 ms），车动镜头跟着动。
+- 仿真停止/换世界会 `stop()` 预览（相机模型随世界消失）；开启时先清掉遗留的 `parameter_bridge`，
+  否则两个桥同时往一个话题发帧，画面会和相机位姿对不上。
+
 ## 5. HTTP / WebSocket
 
 | 方法 | 路径 | 鉴权 | 说明 |
@@ -163,6 +178,9 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | POST | `/api/estop`、`/api/estop/clear` | 是 | 急停 |
 | GET/POST | `/api/missions`、`/{id}/start|pause|resume|skip|stop|waypoints` | 写操作需登录 | 任务 |
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
+| GET | `/api/world/preview.mjpeg` | 否 | Gazebo 世界预览视频流 |
+| GET | `/api/world/preview/status` | 否 | 预览状态（是否开启、跟踪哪台车、视角） |
+| POST | `/api/world/preview/start|stop`、`/view` | 是 | 开启/关闭预览、调整视角 |
 | POST | `/api/cloud/save` | 是 | 导出累积点云到 `maps/inspection_<ts>.pcd` |
 | GET | `/api/cloud/file/{name}` | 是 | 把导出的 PCD 下载到操作员本机（只接受 `inspection_<时间>.pcd`） |
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |

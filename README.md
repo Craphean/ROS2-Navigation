@@ -92,6 +92,7 @@ cpolar http 8080              # 只映射这一个端口
 | 召回 / 保存 | 返回出生点；保存 2D 合并地图为 `maps/inspection_<时间>.yaml`，导出 3D 点云为 `maps/inspection_<时间>.pcd` |
 | 勘探切换 | 「开始/停止勘探」启停 `multi_robot_coordinator.py`，巡检时不会被抢目标 |
 | 换世界 / 重启 | 下拉选世界，一键重启仿真；可勾选「重启前清除旧缓存」清 DDS 段、日志并重置地图/点云 |
+| 世界预览 | 「世界」标签页看 Gazebo 渲染的实时画面，跟在 R1/R2 车上，可拖拽环视、滚轮后退 |
 | 公网 | cpolar 单端口；只读匿名，控制需登录；未登录看不到控制按钮 |
 | YOLO 预留 | `POST /api/detections` + WS `detections` + 视频叠加层接口 |
 

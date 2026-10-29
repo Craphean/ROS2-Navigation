@@ -19,9 +19,14 @@ from .ros_node import ConsoleNode
 
 
 class RosRuntime:
-    def __init__(self, settings: Settings, video_hubs: dict[str, Any]):
+    def __init__(
+        self,
+        settings: Settings,
+        video_hubs: dict[str, Any],
+        world_hub: Any = None,
+    ):
         rclpy.init(args=None, signal_handler_options=SignalHandlerOptions.NO)
-        self.node = ConsoleNode(settings, video_hubs)
+        self.node = ConsoleNode(settings, video_hubs, world_hub)
         # Two threads: callbacks must not starve while an action result is
         # being awaited.  The VM only has four cores, so do not raise this.
         self.executor = MultiThreadedExecutor(num_threads=2)
