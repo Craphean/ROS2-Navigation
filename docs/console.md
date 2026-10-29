@@ -69,7 +69,7 @@ CONSOLE_MANAGE_SIM=0 ./console/run.sh
 - **左栏**：两车状态卡（位姿、速度、导航状态、剩余距离）；巡检任务选择、进度、航点状态。
 - **中栏**：2D 建图（OccupancyGrid + 激光点 + 车辆 + 航点 + 目标连线），支持拖拽平移、滚轮缩放、点击拾取。
 - **右栏**：双路 320×240 视频；事件流（任务、航点、失败、急停）。
-- **底栏**：虚拟摇杆、WASD/方向键、接管/释放、召回、保存地图、启停仿真、急停。
+- **底栏**：虚拟摇杆、WASD/方向键、接管/释放、召回、保存地图（2D 栅格）、导出 PCD（3D 点云）、换世界/重启仿真、急停。
 
 ### 巡检任务
 
@@ -140,6 +140,14 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 重启流程约 60–120 秒（Nav2 + SLAM + map_merge 依次就绪），期间 `/api/sim/status` 会一直返回
 `running: true`（进程已起），前端靠地图/时钟恢复来判断真正可用。
 
+### 4.6 导出 PCD
+
+「导出 PCD」不重新订阅话题，直接把控制台自己的体素缓存落盘：`/api/cloud/save` → `maps/inspection_<ts>.pcd`。
+
+- 缓存与 `scripts/export_merged_cloud.py` 用同一套体素哈希与 z 过滤，但分辨率是控制台的 0.04 m、z∈[0.05, 2.0]——也就是 3D 视图里正在看的那份数据，不是脚本默认的 0.02 m。要更细的全密度档案，仍然用脚本的 `--accumulate` / `--idle-stop`。
+- 写盘直接复用脚本里的 `write_pcd()`（二进制 xyz float32，12 B/点），格式只有一份实现。
+- 点一下拿到的就是整趟累积结果，不用再等 N 秒；无点云时返回 404，只读账号不能导出。
+
 ## 5. HTTP / WebSocket
 
 | 方法 | 路径 | 鉴权 | 说明 |
@@ -154,6 +162,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | POST | `/api/estop`、`/api/estop/clear` | 是 | 急停 |
 | GET/POST | `/api/missions`、`/{id}/start|pause|resume|skip|stop|waypoints` | 写操作需登录 | 任务 |
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
+| POST | `/api/cloud/save` | 是 | 导出累积点云到 `maps/inspection_<ts>.pcd` |
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |
 | GET | `/api/sim/worlds` | 否 | 可选世界列表 + 当前世界 |
 | POST | `/api/sim/restart` | 是 | 停 → 可选清缓存 → 按 `world`/`mode`/`headless` 重启 |

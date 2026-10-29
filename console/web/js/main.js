@@ -513,6 +513,15 @@ function wireActions() {
     if (payload) toast(`已保存 ${payload.path}`, "ok");
   });
 
+  $("#btn-save-cloud")?.addEventListener("click", async () => {
+    if (!requireOperator()) return;
+    toast("正在导出点云…");
+    const payload = await call("/api/cloud/save", { binary: true });
+    if (payload?.ok) {
+      toast(`已导出 ${payload.points.toLocaleString()} 点 → ${payload.path}`, "ok");
+    }
+  });
+
   $("#btn-restart-sim")?.addEventListener("click", async () => {
     if (!requireOperator()) return;
     const world = $("#select-world")?.value || "mine";

@@ -103,6 +103,21 @@ class CloudCache:
         with self._lock:
             return self._payload, self._seq, self._count
 
+    def points(self) -> tuple[np.ndarray, float]:
+        """Full-resolution (N, 3) voxel centres in world + the voxel size.
+
+        The browser payload is downsampled to ~60k points; a PCD export wants
+        every stored voxel, so decode the keys directly instead of reusing
+        _payload.
+        """
+        with self._lock:
+            keys = self._keys
+            voxel = self.voxel
+        if keys.size == 0:
+            return np.empty((0, 3), dtype=np.float32), voxel
+        centers = (_unpack_voxels(keys).astype(np.float32) + 0.5) * np.float32(voxel)
+        return centers, voxel
+
     # ------------------------------------------------------------------
     def _merge_locked(self, xyz: np.ndarray) -> tuple[bool, int, np.ndarray, float]:
         """Fold one cloud into the voxel store. Caller holds the lock."""

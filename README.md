@@ -89,7 +89,7 @@ cpolar http 8080              # 只映射这一个端口
 | 实时监控 | 合并地图 `/map` 转 PNG、双车位姿、激光点、双路 320×240 车载视频、事件流 |
 | 远程遥控 | 虚拟摇杆 + WASD，20 Hz `TwistStamped`，300 ms deadman，接管时自动关闭 `collision_monitor` |
 | 巡检任务 | 多航点顺序执行、到点停留、进度/状态、暂停/继续/跳过/终止、失败重试与跳过 |
-| 召回 / 保存 | 返回出生点、保存合并地图为 `maps/inspection_<时间>.yaml` |
+| 召回 / 保存 | 返回出生点；保存 2D 合并地图为 `maps/inspection_<时间>.yaml`，导出 3D 点云为 `maps/inspection_<时间>.pcd` |
 | 勘探切换 | 「开始/停止勘探」启停 `multi_robot_coordinator.py`，巡检时不会被抢目标 |
 | 换世界 / 重启 | 下拉选世界，一键重启仿真；可勾选「重启前清除旧缓存」清 DDS 段、日志并重置地图/点云 |
 | 公网 | cpolar 单端口；只读匿名，控制需登录；未登录看不到控制按钮 |

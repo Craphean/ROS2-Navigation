@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import time
 from typing import Any
@@ -45,6 +46,10 @@ class SimStartBody(BaseModel):
     world: str | None = None
     mode: str | None = None
     headless: bool = True
+
+
+class CloudSaveBody(BaseModel):
+    binary: bool = True
 
 
 class SimRestartBody(SimStartBody):
@@ -194,6 +199,47 @@ async def save_map(request: Request) -> dict[str, Any]:
             status_code=500, detail=stdout.decode(errors="replace")[-400:]
         )
     return {"ok": True, "path": str(target.with_suffix(".yaml"))}
+
+
+@router.post("/cloud/save", dependencies=[Depends(require_operator)])
+async def save_cloud(request: Request, body: CloudSaveBody | None = None) -> dict[str, Any]:
+    """Export the accumulated 3D cloud as PCD.
+
+    Written from the console's own voxel cache, which uses the same hash and
+    z-gate as scripts/export_merged_cloud.py, so a click gives the whole run
+    instantly instead of subscribing for another N seconds.  The PCD writer
+    itself is imported from that script - one implementation, one format.
+    """
+    settings = request.app.state.settings
+    points, voxel = request.app.state.node.cloud.points()
+    if not points.size:
+        raise HTTPException(status_code=404, detail="暂无三维点云")
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    target = settings.root / "maps" / f"inspection_{stamp}.pcd"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    binary = True if body is None else body.binary
+    writer = _pcd_writer(settings)
+    try:
+        await asyncio.to_thread(writer, target, points, binary)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"写入失败: {exc}") from exc
+    return {
+        "ok": True,
+        "path": str(target),
+        "points": int(points.shape[0]),
+        "voxel": voxel,
+    }
+
+
+def _pcd_writer(settings: Any):
+    """Load write_pcd() from scripts/export_merged_cloud.py."""
+    path = settings.root / "scripts" / "export_merged_cloud.py"
+    spec = importlib.util.spec_from_file_location("mine_pcd_writer", path)
+    if spec is None or spec.loader is None:
+        raise HTTPException(status_code=500, detail=f"找不到 {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.write_pcd
 
 
 # ----------------------------------------------------------------------
