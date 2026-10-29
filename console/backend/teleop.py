@@ -91,7 +91,10 @@ class TeleopGate:
                     for _ in range(10):
                         self.node.publish_cmd(ns, 0.0, 0.0)
                         await asyncio.sleep(0.05)
-                    await self.node.toggle_collision(ns, True)
+                    # E-stop owns the monitor until it is cleared. Re-arming
+                    # here would let Nav2's last command through again.
+                    if not self.estopped:
+                        await self.node.toggle_collision(ns, True)
             finally:
                 self.owner = None
                 self.ns = None
@@ -107,26 +110,60 @@ class TeleopGate:
         self.last_cmd = time.monotonic()
 
     async def estop(self) -> None:
+        """Stop both robots and keep the explorer from sending another goal.
+
+        Publishing zeros on /cmd_vel alone does nothing while Nav2 is running:
+        the collision monitor overwrites them, and the coordinator re-dispatches
+        any robot that becomes idle within one cycle. Drop the lease without
+        re-enabling the monitor, halt the coordinator, cancel every Nav2 action,
+        and hold zero velocity until clear_estop.
+        """
         self.estopped = True
         self.vx = self.wz = 0.0
-        ns_list = list(self.settings.robots)
-        for _ in range(20):
-            for ns in ns_list:
-                self.node.publish_cmd(ns, 0.0, 0.0)
-            await asyncio.sleep(0.05)
-        for ns in ns_list:
-            await self.node.cancel_goal(ns)
-        if self.owner:
-            await self.release()
+        self.last_cmd = 0.0
+        # release() would turn the collision monitor back on. Just drop the lease.
+        self.owner = None
+        self.ns = None
+        self.node.set_exploration_halt(True)
+        for ns in self.settings.robots:
+            self.node.publish_cmd(ns, 0.0, 0.0)
+        await asyncio.gather(
+            *(self._silence(ns) for ns in self.settings.robots),
+            self.node.cancel_all_navigation(),
+        )
 
-    def clear_estop(self) -> None:
+    async def _silence(self, ns: str) -> None:
+        await self.node.toggle_collision(ns, False)
+        # Zeros have to land after the monitor stops forwarding Nav2.
+        for _ in range(5):
+            self.node.publish_cmd(ns, 0.0, 0.0)
+            await asyncio.sleep(0.02)
+
+    async def clear_estop(self) -> None:
+        """Allow driving again. Exploration stays halted until it is started."""
         self.estopped = False
+        for ns in self.settings.robots:
+            ok = False
+            message = ""
+            for _ in range(3):
+                ok, message = await self.node.toggle_collision(ns, True)
+                if ok:
+                    break
+                await asyncio.sleep(0.2)
+            if not ok:
+                self.node.get_logger().error(
+                    f"[{ns}] collision monitor stayed off after estop clear: {message}"
+                )
 
     # ------------------------------------------------------------------
     async def _pump(self) -> None:
         while True:
             try:
                 await asyncio.sleep(0.05)
+                if self.estopped:
+                    for ns in self.settings.robots:
+                        self.node.publish_cmd(ns, 0.0, 0.0)
+                    continue
                 if not self.owner or not self.ns:
                     continue
                 age = time.monotonic() - self.last_cmd if self.last_cmd else 1e9

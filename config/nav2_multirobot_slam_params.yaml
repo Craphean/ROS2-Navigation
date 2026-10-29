@@ -170,7 +170,7 @@ controller_server:
       TrajectoryValidator:
         # The validator can be configured with additional parameters if needed.
         plugin: "mppi::DefaultOptimalTrajectoryValidator"
-        collision_lookahead_time: 2.0  # Time to look ahead to check for collisions
+        collision_lookahead_time: 0.8  # Reject only imminent hits, not the whole approach
         consider_footprint: false  # Whether to consider the full robot's footprint (or circle) in trajectory validation collision checks
       critics:
         [
@@ -205,7 +205,7 @@ controller_server:
       CostCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.8
+        cost_weight: 2.5
         near_collision_cost: 253
         critical_cost: 300.0
         consider_footprint: false
@@ -245,6 +245,11 @@ local_costmap:
     ros__parameters:
       update_frequency: 5.0
       publish_frequency: 2.0
+      # map->odom from slam_toolbox lags the odom stamp by a few tens of
+      # milliseconds. With the default 0.0/0.3 s tolerance the controller
+      # aborts every goal (error 102) and the behavior tree spins, waits
+      # and backs up forever, including in open space and for manual goals.
+      transform_tolerance: 1.0
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
@@ -262,8 +267,10 @@ local_costmap:
         lethal_override_cost: 200
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.70
+        # 0.70 m around every obstacle boxed the 0.22 m robot into corners:
+        # MPPI then commanded zero and the goal timed out in place.
+        cost_scaling_factor: 8.0
+        inflation_radius: 0.45
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
@@ -315,6 +322,7 @@ global_costmap:
     ros__parameters:
       update_frequency: 1.0
       publish_frequency: 1.0
+      transform_tolerance: 1.0
       global_frame: map
       robot_base_frame: base_link
       robot_radius: 0.22
@@ -368,8 +376,8 @@ global_costmap:
         map_subscribe_transient_local: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.7
+        cost_scaling_factor: 8.0
+        inflation_radius: 0.45
       always_send_full_costmap: true
       introspection_mode: "disabled"
 
@@ -567,7 +575,7 @@ collision_monitor:
       # FootprintStop, so behaviour is unchanged.
       points: "[[0.23, 0.18], [0.23, -0.18], [-0.23, -0.18], [-0.23, 0.18]]"
       action_type: "approach"
-      time_before_collision: 1.2
+      time_before_collision: 0.6
       simulation_time_step: 0.1
       min_points: 6
       visualize: false
@@ -665,38 +673,40 @@ slam_toolbox:
     debug_logging: false
     throttle_scans: 1
     transform_publish_period: 0.02
-    map_update_interval: 1.5
+    map_update_interval: 1.0
     resolution: 0.05
-    restamp_tf: false
+    # Stamp map->odom with "now" so a lookup at the latest odom time does not
+    # fail as extrapolation a few milliseconds into the future.
+    restamp_tf: true
     min_laser_range: 0.0
     max_laser_range: 20.0
-    minimum_time_interval: 0.3
-    transform_timeout: 0.2
+    minimum_time_interval: 0.15
+    transform_timeout: 0.5
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
     enable_interactive_mode: true
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.3
-    minimum_travel_heading: 0.3
+    minimum_travel_distance: 0.1
+    minimum_travel_heading: 0.15
     check_min_dist_and_heading_precisely: false
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1
     link_scan_maximum_distance: 1.5
-    loop_search_maximum_distance: 3.0
+    loop_search_maximum_distance: 6.0
     do_loop_closing: true
-    loop_match_minimum_chain_size: 10
+    loop_match_minimum_chain_size: 8
     loop_match_maximum_variance_coarse: 3.0
-    loop_match_minimum_response_coarse: 0.35
-    loop_match_minimum_response_fine: 0.45
-    correlation_search_space_dimension: 0.5
-    correlation_search_space_resolution: 0.01
+    loop_match_minimum_response_coarse: 0.4
+    loop_match_minimum_response_fine: 0.55
+    correlation_search_space_dimension: 1.2
+    correlation_search_space_resolution: 0.02
     correlation_search_space_smear_deviation: 0.1
     loop_search_space_dimension: 8.0
     loop_search_space_resolution: 0.05
     loop_search_space_smear_deviation: 0.03
-    distance_variance_penalty: 0.5
+    distance_variance_penalty: 0.25
     angle_variance_penalty: 1.0
     fine_search_angle_offset: 0.00349
     coarse_search_angle_offset: 0.349
@@ -725,38 +735,40 @@ robot1:
       debug_logging: false
       throttle_scans: 1
       transform_publish_period: 0.02
-      map_update_interval: 1.5
+      map_update_interval: 1.0
       resolution: 0.05
-      restamp_tf: false
+      # Stamp map->odom with "now" so a lookup at the latest odom time does not
+      # fail as extrapolation a few milliseconds into the future.
+      restamp_tf: true
       min_laser_range: 0.0
       max_laser_range: 20.0
-      minimum_time_interval: 0.3
-      transform_timeout: 0.2
+      minimum_time_interval: 0.15
+      transform_timeout: 0.5
       tf_buffer_duration: 30.0
       stack_size_to_use: 40000000
       enable_interactive_mode: true
       use_scan_matching: true
       use_scan_barycenter: true
-      minimum_travel_distance: 0.3
-      minimum_travel_heading: 0.3
+      minimum_travel_distance: 0.1
+      minimum_travel_heading: 0.15
       check_min_dist_and_heading_precisely: false
       scan_buffer_size: 10
       scan_buffer_maximum_scan_distance: 10.0
       link_match_minimum_response_fine: 0.1
       link_scan_maximum_distance: 1.5
-      loop_search_maximum_distance: 3.0
+      loop_search_maximum_distance: 6.0
       do_loop_closing: true
-      loop_match_minimum_chain_size: 10
+      loop_match_minimum_chain_size: 8
       loop_match_maximum_variance_coarse: 3.0
-      loop_match_minimum_response_coarse: 0.35
-      loop_match_minimum_response_fine: 0.45
-      correlation_search_space_dimension: 0.5
-      correlation_search_space_resolution: 0.01
+      loop_match_minimum_response_coarse: 0.4
+      loop_match_minimum_response_fine: 0.55
+      correlation_search_space_dimension: 1.2
+      correlation_search_space_resolution: 0.02
       correlation_search_space_smear_deviation: 0.1
       loop_search_space_dimension: 8.0
       loop_search_space_resolution: 0.05
       loop_search_space_smear_deviation: 0.03
-      distance_variance_penalty: 0.5
+      distance_variance_penalty: 0.25
       angle_variance_penalty: 1.0
       fine_search_angle_offset: 0.00349
       coarse_search_angle_offset: 0.349
@@ -785,38 +797,40 @@ robot2:
       debug_logging: false
       throttle_scans: 1
       transform_publish_period: 0.02
-      map_update_interval: 1.5
+      map_update_interval: 1.0
       resolution: 0.05
-      restamp_tf: false
+      # Stamp map->odom with "now" so a lookup at the latest odom time does not
+      # fail as extrapolation a few milliseconds into the future.
+      restamp_tf: true
       min_laser_range: 0.0
       max_laser_range: 20.0
-      minimum_time_interval: 0.3
-      transform_timeout: 0.2
+      minimum_time_interval: 0.15
+      transform_timeout: 0.5
       tf_buffer_duration: 30.0
       stack_size_to_use: 40000000
       enable_interactive_mode: true
       use_scan_matching: true
       use_scan_barycenter: true
-      minimum_travel_distance: 0.3
-      minimum_travel_heading: 0.3
+      minimum_travel_distance: 0.1
+      minimum_travel_heading: 0.15
       check_min_dist_and_heading_precisely: false
       scan_buffer_size: 10
       scan_buffer_maximum_scan_distance: 10.0
       link_match_minimum_response_fine: 0.1
       link_scan_maximum_distance: 1.5
-      loop_search_maximum_distance: 3.0
+      loop_search_maximum_distance: 6.0
       do_loop_closing: true
-      loop_match_minimum_chain_size: 10
+      loop_match_minimum_chain_size: 8
       loop_match_maximum_variance_coarse: 3.0
-      loop_match_minimum_response_coarse: 0.35
-      loop_match_minimum_response_fine: 0.45
-      correlation_search_space_dimension: 0.5
-      correlation_search_space_resolution: 0.01
+      loop_match_minimum_response_coarse: 0.4
+      loop_match_minimum_response_fine: 0.55
+      correlation_search_space_dimension: 1.2
+      correlation_search_space_resolution: 0.02
       correlation_search_space_smear_deviation: 0.1
       loop_search_space_dimension: 8.0
       loop_search_space_resolution: 0.05
       loop_search_space_smear_deviation: 0.03
-      distance_variance_penalty: 0.5
+      distance_variance_penalty: 0.25
       angle_variance_penalty: 1.0
       fine_search_angle_offset: 0.00349
       coarse_search_angle_offset: 0.349

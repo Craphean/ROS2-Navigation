@@ -1,0 +1,16 @@
+# Camera only. Kept off the point-cloud bridge: converting a 16x360 cloud
+# in the same process stalls image (and, on robot2, scan) messages for seconds.
+# gz-sim publishes the colour image on <topic> and calibration on <topic>_info.
+- ros_topic_name: "camera/image"
+  gz_topic_name: "camera"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+  subscriber_queue: 1
+  publisher_queue: 1
+
+- ros_topic_name: "camera/camera_info"
+  gz_topic_name: "camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS

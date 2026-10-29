@@ -19,12 +19,14 @@ export class MapView {
     this.meta = null;
     this.snapshot = null;
     this.waypoints = [];
+    // The picture on screen stays until the next PNG has fully decoded.
+    // Swapping src on this same Image blanks it for the whole download, and
+    // /map is republished several times a second.
     this.image = new Image();
-    this.image.decoding = "async";
-    this.image.onload = () => {
-      this.dirty = true;
-    };
     this.imageSeq = -1;
+    this._wantedSeq = -1;
+    this._loadingSeq = -1;
+    this._lastSwap = 0;
     this.center = { x: 0, y: 0 };
     this.scale = 40;
     this.fitted = false;
@@ -65,11 +67,17 @@ export class MapView {
     if (meta) {
       const first = !this.meta;
       this.meta = meta;
-      if (meta.seq !== this.imageSeq) {
-        this.imageSeq = meta.seq;
-        this.image.src = `/api/map.png?v=${meta.seq}`;
+      if (meta.seq !== this._wantedSeq) {
+        this._wantedSeq = meta.seq;
+        this._loadMap(meta.seq);
       }
       if (first && !this.fitted) this.fit();
+    } else if (this.meta) {
+      this.meta = null;
+      this.image = new Image();
+      this.imageSeq = -1;
+      this._wantedSeq = -1;
+      this._loadingSeq = -1;
     }
     this.dirty = true;
   }
@@ -91,6 +99,35 @@ export class MapView {
     this.center = { x: origin[0] + worldW / 2, y: origin[1] + worldH / 2 };
     this.fitted = true;
     this.dirty = true;
+  }
+
+  _loadMap(seq) {
+    if (this._loadingSeq >= 0) return;
+    const img = new Image();
+    this._loadingSeq = seq;
+    img.onload = () => {
+      const apply = () => {
+        if (seq >= this.imageSeq && img.naturalWidth > 0) {
+          this.image = img;
+          this.imageSeq = seq;
+          this._lastSwap = performance.now();
+          this.dirty = true;
+        }
+        this._loadingSeq = -1;
+        if (this._wantedSeq > this.imageSeq) this._loadMap(this._wantedSeq);
+      };
+      // Hold the previous frame briefly so a burst of SLAM updates does not strobe.
+      const wait = 400 - (performance.now() - this._lastSwap);
+      if (wait > 30 && this.image.naturalWidth > 0) window.setTimeout(apply, wait);
+      else apply();
+    };
+    img.onerror = () => {
+      this._loadingSeq = -1;
+      if (this._wantedSeq > this.imageSeq) {
+        window.setTimeout(() => this._loadMap(this._wantedSeq), 500);
+      }
+    };
+    img.src = `/api/map.png?v=${seq}`;
   }
 
   worldToScreen(x, y) {
@@ -237,10 +274,10 @@ export class MapView {
       const color = ROBOT_COLOR[ns] || "#37c8d4";
       if (!robot.scan || !robot.scan.length) continue;
       ctx.fillStyle = color;
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.9;
       for (const point of robot.scan) {
         const p = this.worldToScreen(point[0], point[1]);
-        ctx.fillRect(p.x - 0.9, p.y - 0.9, 1.8, 1.8);
+        ctx.fillRect(p.x - 1.3, p.y - 1.3, 2.6, 2.6);
       }
       ctx.globalAlpha = 1;
     }

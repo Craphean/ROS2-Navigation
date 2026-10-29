@@ -1,6 +1,7 @@
 import { $, api, toast } from "./utils.js";
 import { Link } from "./ws.js";
-import { MapView } from "./map2d.js";
+import { MapView } from "./map2d.js?v=4";
+import { CloudView } from "./cloud3d.js?v=7";
 import { updateFleet } from "./fleet.js";
 import { renderMission, renderMissionSelect } from "./mission.js";
 import { Teleop } from "./teleop.js";
@@ -32,6 +33,9 @@ const missionRefs = {
 const mapView = new MapView($("#map-canvas"), {
   onPick: (point) => handleMapPick(point),
 });
+const cloudView = new CloudView($("#cloud-canvas"));
+let viewMode = "2d";
+let cloudSeq = -1;
 
 const teleop = new Teleop({
   onCommand: (vx, wz) => {
@@ -75,6 +79,7 @@ function applySnapshot(snapshot) {
   updatePills(snapshot);
   updateFleet($("#robot-cards"), snapshot, activeMission());
   mapView.setSnapshot(snapshot);
+  if (viewMode === "3d") cloudView.setPoses(snapshot.robots || {});
 
   const mission = displayMission();
   renderMission(mission, missionRefs);
@@ -89,7 +94,7 @@ function applySnapshot(snapshot) {
     fallback.classList.toggle("hidden", Boolean(alive));
     if (!image.dataset.loaded) {
       image.dataset.loaded = "1";
-      image.src = `/api/video/${ns}.mjpeg?fps=5`;
+      followCamera(ns, image);
     }
   }
 
@@ -97,7 +102,73 @@ function applySnapshot(snapshot) {
   if (empty) empty.classList.toggle("hidden", Boolean(snapshot.map));
 }
 
+function setView(mode) {
+  viewMode = mode;
+  const wrap = $("#map-wrap");
+  const three = mode === "3d";
+  wrap?.classList.toggle("show-3d", three);
+  $("#cloud-canvas")?.classList.toggle("visible", three);
+  $("#btn-view-2d")?.classList.toggle("active", !three);
+  $("#btn-view-3d")?.classList.toggle("active", three);
+  $("#click-hint") && ($("#click-hint").style.display = three ? "none" : "");
+  $("#btn-click-mode") && ($("#btn-click-mode").style.display = three ? "none" : "");
+  if (three) {
+    cloudView.resize();
+    cloudView.visible = true;
+  } else {
+    cloudView.visible = false;
+  }
+}
+
+async function pollCloud() {
+  if (viewMode === "3d" && cloudView.ok) {
+    try {
+      const response = await fetch("/api/cloud.bin", { cache: "no-store" });
+      if (response.ok) {
+        const seq = Number(response.headers.get("X-Cloud-Seq") || "0");
+        const buffer = await response.arrayBuffer();
+        cloudView.setBuffer(buffer, seq);
+        cloudSeq = seq;
+        $("#cloud-empty")?.classList.toggle("has-cloud", cloudView.count > 0);
+      }
+    } catch {
+      /* keep the last cloud */
+    }
+  }
+  window.setTimeout(pollCloud, 800);
+}
+
+function followCamera(ns, image) {
+  let objectUrl = "";
+  const tick = async () => {
+    try {
+      const response = await fetch(`/api/video/${ns}/snapshot.jpg`, { cache: "no-store" });
+      if (response.ok) {
+        const blob = await response.blob();
+        const next = URL.createObjectURL(blob);
+        image.src = next;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = next;
+      }
+    } catch {
+      /* keep the last frame and try again */
+    }
+    window.setTimeout(tick, 1000 / 10);
+  };
+  tick();
+}
+
 function updatePills(snapshot) {
+  const loops = snapshot.loop_closures || {};
+  const loopTotal = Object.values(loops).reduce((sum, value) => sum + Number(value || 0), 0);
+  const loopEl = $("#loop-status");
+  if (loopEl) {
+    const parts = Object.entries(loops).map(([ns, count]) => `${ns.slice(-1)}:${count}`);
+    loopEl.textContent = loopTotal
+      ? `闭环 ${loopTotal}（${parts.join(" ")}）`
+      : "闭环 0";
+  }
+
   const clockPill = $("#pill-clock").querySelector("b");
   const clock = snapshot.sim?.clock;
   clockPill.textContent =
@@ -344,9 +415,17 @@ function wireActions() {
   });
 
   $("#btn-fit")?.addEventListener("click", () => {
+    if (viewMode === "3d") {
+      cloudView.fit();
+      return;
+    }
     mapView.fitted = false;
     mapView.fit();
   });
+
+  $("#btn-view-2d")?.addEventListener("click", () => setView("2d"));
+  $("#btn-view-3d")?.addEventListener("click", () => setView("3d"));
+  pollCloud();
 
   document.querySelectorAll("#teleop-target button").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -393,7 +472,7 @@ function wireActions() {
   $("#btn-estop")?.addEventListener("click", triggerEstop);
   $("#btn-estop-2")?.addEventListener("click", triggerEstop);
   $("#btn-clear-estop")?.addEventListener("click", async () => {
-    await call("/api/estop/clear", undefined, "急停已解除");
+    await call("/api/estop/clear", undefined, "急停已解除，自主勘探需重新启动");
   });
 
   $("#btn-explore")?.addEventListener("click", async () => {
@@ -422,7 +501,7 @@ function wireActions() {
     if (!requireOperator()) return;
     toast("正在启动仿真（约 60–90 秒）…");
     const payload = await call("/api/sim/start", {
-      world: "mine",
+      world: "house",
       mode: "off",
       headless: true,
     });
@@ -440,7 +519,9 @@ function wireActions() {
   $("#btn-scan-toggle")?.addEventListener("click", (event) => {
     mapView.showScan = !mapView.showScan;
     mapView.dirty = true;
-    event.currentTarget.classList.toggle("on", mapView.showScan);
+    const button = event.currentTarget;
+    button.classList.toggle("on", mapView.showScan);
+    button.setAttribute("aria-pressed", mapView.showScan ? "true" : "false");
   });
 
   window.addEventListener("keydown", (event) => {
@@ -456,10 +537,11 @@ async function triggerEstop() {
   if (!requireOperator()) return;
   teleop.setActive(false);
   state.leased = false;
-  await api("/api/estop", { method: "POST" }).catch((error) =>
-    toast(error.message, "error")
-  );
-  toast("急停已触发", "error");
+  const ok = await api("/api/estop", { method: "POST" }).catch((error) => {
+    toast(error.message, "error");
+    return null;
+  });
+  if (ok) toast("急停已触发，勘探已暂停", "error");
 }
 
 /* ------------------------------------------------------------------ */

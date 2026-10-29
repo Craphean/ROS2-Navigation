@@ -48,7 +48,7 @@
       <link name="imu_link">
         <sensor name="tb3_imu" type="imu">
           <always_on>true</always_on>
-          <update_rate>200</update_rate>
+          <update_rate>50</update_rate>
           <topic>$(arg namespace)/imu</topic>
           <frame_id>imu_link</frame_id>
           <imu>
@@ -162,7 +162,9 @@
           </ray>
         </sensor>
 
-        <!-- 3D LiDAR: 16 vertical beams, 360 horizontal, 3 Hz (headless VM default).
+        <!-- 3D LiDAR: 16 vertical x 360 horizontal at 5 Hz.
+             32 x 720 saturated the software renderer and the ros_gz bridge,
+             so /clock froze and then jumped and the accumulated cloud ghosted.
              Point cloud is published on <topic>/points. -->
         <sensor name="tb3_3d_lidar" type="gpu_lidar">
           <always_on>true</always_on>
@@ -181,13 +183,13 @@
           <ray>
             <scan>
               <horizontal>
-                <samples>720</samples>
+                <samples>360</samples>
                 <resolution>1.0</resolution>
                 <min_angle>-3.14159</min_angle>
                 <max_angle>3.14159</max_angle>
               </horizontal>
               <vertical>
-                <samples>32</samples>
+                <samples>16</samples>
                 <resolution>1.0</resolution>
                 <min_angle>-0.5236</min_angle>
                 <max_angle>0.9599</max_angle>
@@ -233,9 +235,9 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
-                <slip1>0.035</slip1>
+                <mu>2</mu>
+                <mu2>2</mu2>
+                <slip1>0</slip1>
                 <slip2>0</slip2>
                 <fdir1>0 0 1</fdir1>
               </ode>
@@ -293,9 +295,9 @@
           <surface>
             <friction>
               <ode>
-                <mu>1</mu>
-                <mu2>1</mu2>
-                <slip1>0.035</slip1>
+                <mu>2</mu>
+                <mu2>2</mu2>
+                <slip1>0</slip1>
                 <slip2>0</slip2>
                 <fdir1>0 0 1</fdir1>
               </ode>
@@ -419,10 +421,11 @@
 
         <pose>0.069 -0.047 0.107 0 0 0</pose>
 
-        <!-- Forward RGB camera.  A plain `camera` sensor is enough for the
-             console's MJPEG feed and for the future YOLO fire/smoke detector;
-             `type="depth"` would add a second render pass plus a depth point
-             cloud that nothing consumes on a 4-core software-rendered VM. -->
+        <!-- Forward RGB camera. A colour camera is enough for the console
+             and a later detector; a depth camera would add a second render
+             pass and a point cloud nothing consumes. Kept at 320x240 / 5 Hz:
+             this gz-sim render thread is single-core, and a larger or faster
+             camera falls seconds behind /clock even while the GPU sits idle. -->
         <sensor name="intel_realsense_r200_depth" type="camera">
           <always_on>1</always_on>
           <update_rate>5</update_rate>

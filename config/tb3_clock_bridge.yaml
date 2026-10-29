@@ -1,0 +1,9 @@
+# Sole publisher of /clock. It runs in its own process with use_sim_time:=false.
+# Sharing /clock with scan, imu and tf in one parameter_bridge stalls the clock
+# for seconds and then publishes only the newest stamp. Nav2 freezes, the diff
+# drive holds the last cmd_vel, and the next scan is inserted metres away.
+- topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+  qos_profile: CLOCK

@@ -11,25 +11,30 @@ from __future__ import annotations
 
 import asyncio
 import math
+import time
 from typing import Any
 
 import rclpy
 from action_msgs.msg import GoalStatusArray
 from geometry_msgs.msg import TwistStamped
-from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import BackUp, NavigateThroughPoses, NavigateToPose
 from nav2_msgs.msg import CollisionMonitorState
 from nav2_msgs.srv import Toggle
 from nav_msgs.msg import OccupancyGrid, Odometry
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from rosgraph_msgs.msg import Clock
-from sensor_msgs.msg import Image, LaserScan
+from sensor_msgs.msg import Image, LaserScan, PointCloud2
+from std_msgs.msg import Bool
+from slam_toolbox.msg import LoopClosureEvent
 from tf2_ros import Buffer, TransformListener
 from visualization_msgs.msg import MarkerArray
 
+from .cloud import CloudCache
 from .config import Settings
 from .state import RobotState, StateStore, yaw_from_quaternion
 
@@ -41,6 +46,21 @@ MAP_QOS = QoSProfile(
     durability=DurabilityPolicy.TRANSIENT_LOCAL,
 )
 SENSOR_QOS = QoSProfile(
+    depth=1,
+    history=HistoryPolicy.KEEP_LAST,
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    durability=DurabilityPolicy.VOLATILE,
+)
+HALT_QOS = QoSProfile(
+    depth=1,
+    history=HistoryPolicy.KEEP_LAST,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+)
+# Must match rclcpp::ClockQoS. A reliable subscription never connects to the
+# best-effort /clock publisher, so the console keeps the previous run's TF
+# and the pose arrow freezes while the camera (its own QoS) keeps moving.
+CLOCK_QOS = QoSProfile(
     depth=1,
     history=HistoryPolicy.KEEP_LAST,
     reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -68,7 +88,12 @@ async def wait_rclpy_future(future: Any, timeout: float) -> Any:
 
 class ConsoleNode(Node):
     def __init__(self, settings: Settings, video_hubs: dict[str, Any]):
-        super().__init__("mine_inspection_console")
+        super().__init__(
+            "mine_inspection_console",
+            parameter_overrides=[
+                Parameter("use_sim_time", Parameter.Type.BOOL, True),
+            ],
+        )
         self.settings = settings
         self.store = StateStore(settings.robots)
         self.store.sim_meta = {"_path": str(settings.sim_meta_path)}
@@ -78,11 +103,19 @@ class ConsoleNode(Node):
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
+        # Last pose taken from TF. Kept across a missed lookup so the map arrow
+        # does not jump to the spawn-plus-odometry estimate and back.
+        self._tf_pose: dict[str, tuple[tuple[float, float, float], float]] = {}
+        self._loop_wall: dict[str, float] = {}
 
         self.cmd_pubs: dict[str, Any] = {}
         self.nav_clients: dict[str, ActionClient] = {}
+        self.through_clients: dict[str, ActionClient] = {}
+        self.backup_clients: dict[str, ActionClient] = {}
         self.toggle_clients: dict[str, Any] = {}
         self._handles: dict[str, Any] = {}
+        self.exploration_halted = False
+        self.halt_pub = self.create_publisher(Bool, "/exploration/halt", HALT_QOS)
 
         for ns in settings.robots:
             self.cmd_pubs[ns] = self.create_publisher(
@@ -94,6 +127,18 @@ class ConsoleNode(Node):
                 f"/{ns}/navigate_to_pose",
                 callback_group=self.cb_group,
             )
+            self.through_clients[ns] = ActionClient(
+                self,
+                NavigateThroughPoses,
+                f"/{ns}/navigate_through_poses",
+                callback_group=self.cb_group,
+            )
+            self.backup_clients[ns] = ActionClient(
+                self,
+                BackUp,
+                f"/{ns}/backup",
+                callback_group=self.cb_group,
+            )
             self.toggle_clients[ns] = self.create_client(
                 Toggle, f"/{ns}/collision_monitor/toggle", callback_group=self.cb_group
             )
@@ -102,13 +147,36 @@ class ConsoleNode(Node):
         self.create_subscription(
             OccupancyGrid, "/map", self._guard(self.store.on_map), MAP_QOS
         )
-        self.create_subscription(Clock, "/clock", self._guard(self.store.on_clock), 10)
+        self.create_subscription(
+            Clock, "/clock", self._guard(self._on_clock), CLOCK_QOS
+        )
         self.create_subscription(
             MarkerArray,
             "/exploration/markers",
             self._guard(self.store.on_markers),
             5,
         )
+
+        self.cloud = CloudCache()
+        self.create_subscription(
+            PointCloud2,
+            "/points_merged",
+            self._guard(self.cloud.update),
+            QoSProfile(
+                depth=5,
+                history=HistoryPolicy.KEEP_LAST,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.VOLATILE,
+            ),
+        )
+
+        for ns in settings.robots:
+            self.create_subscription(
+                LoopClosureEvent,
+                f"/{ns}/slam_toolbox/loop_closure_event",
+                self._guard(lambda _msg, n=ns: self._on_loop_closure(n)),
+                10,
+            )
 
         self.get_logger().info(
             f"console node ready for {list(settings.robots)}; "
@@ -180,20 +248,96 @@ class ConsoleNode(Node):
             return float(entry[0]), float(entry[1]), float(entry[2])
         return 0.0, 0.0, 0.0
 
+    def _on_loop_closure(self, ns: str) -> None:
+        now = time.monotonic()
+        previous = self._loop_wall.get(ns, 0.0)
+        # The topic can chatter. A real closure is rare; a burst means the
+        # matcher is treating ordinary scans as loops and yanking the pose.
+        if now - previous < 15.0:
+            return
+        self._loop_wall[ns] = now
+        self.store.on_loop_closure(ns)
+        # Keep the accumulated cloud. A loop closure only corrects the pose;
+        # wiping the voxels here made the 3D map disappear on every closure
+        # instead of filling in as the robots explore.
+        count = self.store.loop_closures.get(ns, 0)
+        self.get_logger().info(
+            f"[{ns}] loop closure #{count}; keeping the accumulated point cloud"
+        )
+
+    def _on_clock(self, msg: Any) -> None:
+        """Drop TF when Gazebo restarts and /clock jumps backwards.
+
+        The buffer keeps the newest stamp. A new run's transforms are stamped
+        from zero, so they are treated as older than the previous run and the
+        map arrows freeze while odometry and the cameras keep moving.
+        """
+        now = float(msg.clock.sec) + float(msg.clock.nanosec) * 1e-9
+        previous = self.store.clock
+        if previous is not None and now < previous - 0.5:
+            self.get_logger().warning(
+                f"sim clock went backwards ({previous:.1f}s -> {now:.1f}s); "
+                "clearing the previous world"
+            )
+            self.reset_session()
+        elif previous is not None and now > previous + 1.0:
+            # The merge node already drops scans whose pose jumped. The
+            # accumulated cloud stays, so a clock hiccup does not erase the map.
+            self.get_logger().warning(
+                f"sim clock jumped forward ({previous:.1f}s -> {now:.1f}s); "
+                "keeping the accumulated point cloud"
+            )
+        self.store.on_clock(msg)
+
+    def _pose_from_tf(self, tf: Any) -> tuple[float, float, float]:
+        translation = tf.transform.translation
+        rotation = tf.transform.rotation
+        return (
+            float(translation.x),
+            float(translation.y),
+            yaw_from_quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+        )
+
+    def reset_session(self) -> None:
+        """Drop the previous world's map, cloud and TF.
+
+        The console process outlives Gazebo. Without this, a mine run keeps
+        the house occupancy grid and the accumulated cloud, and TF rejects
+        the new run's transforms as older than the house stamps, so the
+        coordinate readout freezes while the camera keeps moving.
+        """
+        self.tf_buffer.clear()
+        self._tf_pose.clear()
+        self._loop_wall.clear()
+        self.cloud.clear()
+        self.store.reset_world()
+        self.store.load_sim_meta()
+
     def lookup_world_pose(self, ns: str) -> tuple[float, float, float] | None:
+        # Latest TF, not the exact sim-clock instant. The latest sample is
+        # usually a few milliseconds behind /clock, and asking for that exact
+        # time raises ExtrapolationException. Falling through to the
+        # spawn-plus-odometry estimate then paints the arrow ~0.6 m away for
+        # one frame.
         try:
             tf = self.tf_buffer.lookup_transform(
                 "world", f"{ns}/base_footprint", Time()
             )
-            translation = tf.transform.translation
-            rotation = tf.transform.rotation
-            return (
-                float(translation.x),
-                float(translation.y),
-                yaw_from_quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
-            )
         except Exception:  # noqa: BLE001 - TF is expected to be missing at boot
-            pass
+            tf = None
+        if tf is not None:
+            stamp = float(tf.header.stamp.sec) + float(tf.header.stamp.nanosec) * 1e-9
+            clock = self.store.clock or 0.0
+            # A second TF publisher can stamp map->odom ahead of /clock.
+            # Clearing the buffer and falling through to spawn+odometry made
+            # the arrow jump between the two estimates every frame.
+            if not (clock > 0.0 and stamp > clock + 1.0):
+                pose = self._pose_from_tf(tf)
+                self._tf_pose[ns] = (pose, time.monotonic())
+                return pose
+        held = self._tf_pose.get(ns)
+        if held is not None and time.monotonic() - held[1] < 5.0:
+            return held[0]
         with self.store.lock:
             local = self.store.robots[ns].local_pose
         if local is None:
@@ -301,6 +445,43 @@ class ConsoleNode(Node):
                 await wait_rclpy_future(handle.cancel_goal_async(), 5.0)
             except Exception:  # noqa: BLE001
                 pass
+
+    def set_exploration_halt(self, halted: bool) -> None:
+        """Tell the coordinator to stop dispatching. Latched, so a late joiner sees it."""
+        self.exploration_halted = bool(halted)
+        msg = Bool()
+        msg.data = self.exploration_halted
+        self.halt_pub.publish(msg)
+
+    async def cancel_all_navigation(self) -> None:
+        """Cancel goals the coordinator sent, not only handles this console owns.
+
+        Exploration uses NavigateToPose, NavigateThroughPoses and sometimes
+        BackUp. ``cancel_goal`` only knows about goals this process sent, so
+        an estop during exploration used to be a no-op.
+        """
+        tasks = []
+        for ns in self.settings.robots:
+            for client in (
+                self.nav_clients.get(ns),
+                self.through_clients.get(ns),
+                self.backup_clients.get(ns),
+            ):
+                tasks.append(self._cancel_server(ns, client))
+        if tasks:
+            await asyncio.gather(*tasks)
+
+    async def _cancel_server(self, ns: str, client: ActionClient | None) -> None:
+        if client is None or not client.server_is_ready():
+            return
+        cancel = getattr(client, "cancel_all_goals_async", None)
+        if cancel is None:
+            self.get_logger().error(f"[{ns}] action client cannot cancel all goals")
+            return
+        try:
+            await wait_rclpy_future(cancel(), 3.0)
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warning(f"[{ns}] cancel_all failed: {exc!r}")
 
     def set_goal(self, ns: str, x: float, y: float, yaw: float) -> None:
         with self.store.lock:

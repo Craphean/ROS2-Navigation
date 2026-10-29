@@ -112,7 +112,8 @@ async def mjpeg_stream(hub: FrameHub, fps: float = 0.0) -> AsyncIterator[bytes]:
             continue
         now = time.monotonic()
         if min_dt and now - last_sent < min_dt:
-            continue
+            await asyncio.sleep(min_dt - (now - last_sent))
+            jpeg = hub.snapshot() or jpeg
         last_seq = seq
         last_sent = now
         yield (

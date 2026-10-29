@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -134,6 +135,7 @@ class StateStore:
         self.clock: float | None = None
         self.clock_wall = 0.0
         self.markers: dict[str, Any] = {}
+        self.loop_closures: dict[str, int] = {ns: 0 for ns in robots}
         self.sim_meta: dict[str, Any] = {}
         self.video_ok: dict[str, bool] = {ns: False for ns in robots}
 
@@ -196,9 +198,15 @@ class StateStore:
     def on_markers(self, msg: Any) -> None:
         counts: dict[str, int] = {}
         for marker in msg.markers:
-            counts[marker.namespace] = counts.get(marker.namespace, 0) + 1
+            # visualization_msgs/Marker names this field `ns`.
+            key = getattr(marker, "ns", None) or getattr(marker, "namespace", "")
+            counts[key] = counts.get(key, 0) + 1
         with self.lock:
             self.markers = counts
+
+    def on_loop_closure(self, ns: str) -> None:
+        with self.lock:
+            self.loop_closures[ns] = self.loop_closures.get(ns, 0) + 1
 
     def on_image(self, ns: str) -> None:
         with self.lock:
@@ -269,9 +277,38 @@ class StateStore:
                 "robots": robots,
                 "map": self.map_meta(),
                 "markers": dict(self.markers),
+                "loop_closures": dict(self.loop_closures),
                 "mission": mission,
             }
         return payload
+
+    def reset_world(self) -> None:
+        with self.lock:
+            self.map_msg = None
+            self.map_seq += 1
+            self.map_stamp = 0.0
+            self.clock = None
+            self.clock_wall = 0.0
+            self.markers.clear()
+            for robot in self.robots.values():
+                robot.world_pose = None
+                robot.local_pose = None
+                robot.scan = []
+                robot.goal_world = None
+            self.loop_closures = {ns: 0 for ns in self.robots}
+
+    def refresh_sim_meta(self) -> None:
+        path = self.sim_meta.get("_path")
+        if not path:
+            return
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return
+        if mtime == self.sim_meta.get("_mtime"):
+            return
+        self.load_sim_meta()
+        self.sim_meta["_mtime"] = mtime
 
     def load_sim_meta(self) -> dict[str, Any]:
         path = self.sim_meta.get("_path")

@@ -23,8 +23,10 @@ multi_robot_coordinator:
     blacklist_retry_limit: 2
     # Radius around a blacklisted point to ignore (meters)
     blacklist_radius: 0.9
-    # Minimum clearance from known obstacles for frontier safe goal retraction (meters)
-    min_clearance: 0.35
+    # Goals closer than this to a lethal cell are retracted. 0.35 m still
+    # placed viewpoints in the slot between a cabinet and the outer wall
+    # (clearance to the wall ~0.37 m); the robot drove in and could not leave.
+    min_clearance: 0.55
 
     # --- No-progress livelock breaker ---
     # A goal that succeeds almost instantly without the robot having moved
@@ -84,7 +86,7 @@ multi_robot_coordinator:
     action_wait_sec: 2.0
     tf_wait_sec: 0.1
     tour_timeout_per_waypoint: 25.0
-    tour_stall_window: 20.0
+    tour_stall_window: 12.0
     tour_stall_min_translation: 0.10
     tour_stall_min_progress: 0.20
     tour_rewrite_on_invalidation: true

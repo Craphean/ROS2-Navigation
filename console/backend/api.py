@@ -386,14 +386,14 @@ async def teleop_cmd(request: Request, body: CmdBody) -> dict[str, Any]:
 async def estop(request: Request) -> dict[str, Any]:
     await request.app.state.teleop.estop()
     request.app.state.engine.estop()
-    return {"ok": True}
+    return {"ok": True, "exploration_halted": True}
 
 
 @router.post("/estop/clear", dependencies=[Depends(require_operator)])
 async def clear_estop(request: Request) -> dict[str, Any]:
-    request.app.state.teleop.clear_estop()
+    await request.app.state.teleop.clear_estop()
     request.app.state.engine.clear_estop()
-    return {"ok": True}
+    return {"ok": True, "exploration_halted": request.app.state.node.exploration_halted}
 
 
 # ----------------------------------------------------------------------
@@ -413,19 +413,45 @@ async def sim_start(request: Request, body: SimStartBody) -> dict[str, Any]:
     proc = request.app.state.proc
     if not request.app.state.settings.manage_sim:
         raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
-    return proc.start_sim(body.world, body.mode, body.headless)
+    result = proc.start_sim(body.world, body.mode, body.headless)
+    if result.get("ok") and "已在运行" not in str(result.get("message", "")):
+        request.app.state.node.reset_session()
+    return result
 
 
 @router.post("/sim/stop", dependencies=[Depends(require_operator)])
 async def sim_stop(request: Request) -> dict[str, Any]:
     if not request.app.state.settings.manage_sim:
         raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
-    return request.app.state.proc.stop_sim()
+    result = request.app.state.proc.stop_sim()
+    request.app.state.node.reset_session()
+    return result
 
 
 @router.post("/exploration/start", dependencies=[Depends(require_operator)])
 async def exploration_start(request: Request) -> dict[str, Any]:
-    return request.app.state.proc.start_exploration()
+    node = request.app.state.node
+    if request.app.state.teleop.estopped:
+        raise HTTPException(status_code=409, detail="急停未解除，无法启动自主勘探")
+    proc = request.app.state.proc
+    was_halted = bool(node.exploration_halted)
+    was_running = bool(proc.exploration_status().get("running"))
+    # Publish before spawn so a new coordinator latches "run", not the old halt.
+    node.set_exploration_halt(False)
+    if was_running:
+        status = proc.exploration_status()
+        return {
+            "ok": True,
+            "message": "自主勘探继续" if was_halted else "自主勘探已在运行",
+            **status,
+        }
+    if "multi_robot_coordinator" in node.get_node_names():
+        return {
+            "ok": True,
+            "message": "自主勘探继续" if was_halted else "自主勘探已在外部运行",
+            "running": True,
+        }
+    return proc.start_exploration()
 
 
 @router.post("/exploration/stop", dependencies=[Depends(require_operator)])
@@ -436,6 +462,22 @@ async def exploration_stop(request: Request) -> dict[str, Any]:
 # ----------------------------------------------------------------------
 # Video
 # ----------------------------------------------------------------------
+@router.get("/cloud.bin")
+async def cloud_bin(request: Request) -> Response:
+    payload, seq, count = request.app.state.node.cloud.snapshot()
+    if not payload:
+        raise HTTPException(status_code=404, detail="暂无三维点云")
+    return Response(
+        payload,
+        media_type="application/octet-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Cloud-Seq": str(seq),
+            "X-Cloud-Count": str(count),
+        },
+    )
+
+
 @router.get("/video/{ns}.mjpeg")
 async def video_stream(request: Request, ns: str, fps: float = 0.0):
     _check_ns(request, ns)

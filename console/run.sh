@@ -31,13 +31,13 @@ if [[ ! -x "${VENV}/bin/python" ]]; then
   /usr/bin/python3 -m venv --system-site-packages "${VENV}"
   "${VENV}/bin/pip" install -q --upgrade pip \
     -i https://pypi.tuna.tsinghua.edu.cn/simple
-  "${VENV}/bin/pip" install -q fastapi uvicorn \
+  "${VENV}/bin/pip" install -q fastapi 'uvicorn[standard]' \
     -i https://pypi.tuna.tsinghua.edu.cn/simple
 fi
 
-if ! "${VENV}/bin/python" -c "import fastapi, uvicorn" >/dev/null 2>&1; then
-  echo "[console] installing fastapi/uvicorn ..."
-  "${VENV}/bin/pip" install -q fastapi uvicorn \
+if ! "${VENV}/bin/python" -c "import fastapi, uvicorn, websockets" >/dev/null 2>&1; then
+  echo "[console] installing fastapi/uvicorn[standard] ..."
+  "${VENV}/bin/pip" install -q fastapi 'uvicorn[standard]' \
     -i https://pypi.tuna.tsinghua.edu.cn/simple
 fi
 

@@ -10,7 +10,7 @@
 #   RANDOM_SPAWN=false     (set RANDOM_SPAWN=true to randomly pick 2 non-overlapping inspection stations)
 #
 # 3D point-cloud mapping (headless by default):
-#   - Each robot gets a 32-line / 5 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
+#   - Each robot gets a 16-line / 360-wide / 5 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
 #   - /robotX/points feeds the Nav2 local voxel layer and scripts/merge_pointclouds.py.
 #   - The merged cloud is published as /points_merged in the world frame and fed to
 #     octomap_server (3D map + projected_map + octomap_point_cloud_centers).
@@ -401,7 +401,71 @@ EXPLORE1_LOG="/tmp/tb3_multi_explore1.log"
 EXPLORE2_LOG="/tmp/tb3_multi_explore2.log"
 COORDINATOR_LOG="/tmp/tb3_multi_coordinator.log"
 
-# 1. Launch Gazebo server + robot1 (Nav2 + slam_toolbox in /robot1)
+# 1. Gazebo server, then the only /clock bridge, then robot1.
+# The stock tb3 spawn bridge publishes /clock in the same single-threaded
+# process as scan, imu and tf. Under load that process goes quiet for many
+# seconds and then emits only the newest stamp: the console clock freezes
+# and jumps, Nav2 freezes, diff-drive holds the last cmd_vel, and the next
+# scan is matched metres from where SLAM last saw the robot. That jump is
+# what smears the 3D map. Clock therefore has its own process and must not
+# use sim time (it is the clock source).
+WORLD_SDF="/tmp/tb3_multi_world.sdf"
+CLOCK_BRIDGE="${ROOT_DIR}/config/tb3_clock_bridge.yaml"
+GZ_LOG="/tmp/tb3_multi_gz.log"
+CLOCK_LOG="/tmp/tb3_multi_clock_bridge.log"
+GZ_PID=""
+CLOCK_PID=""
+GUI_PID=""
+
+setsid bash -c "
+source /opt/ros/lyrical/setup.bash
+source '${ROOT_DIR}/install/setup.bash'
+export LIBGL_ALWAYS_SOFTWARE='${LIBGL_ALWAYS_SOFTWARE:-}'
+export MESA_GL_VERSION_OVERRIDE='${MESA_GL_VERSION_OVERRIDE:-}'
+export DISPLAY='${DISPLAY}'
+export WAYLAND_DISPLAY='${WAYLAND_DISPLAY}'
+export XDG_RUNTIME_DIR='${XDG_RUNTIME_DIR}'
+export XAUTHORITY='${XAUTHORITY:-}'
+export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
+xacro -o '${WORLD_SDF}' headless:=${HEADLESS} '${WORLD_FILE}' && exec gz sim -r -s '${WORLD_SDF}'
+" </dev/null >"${GZ_LOG}" 2>&1 &
+GZ_PID=$!
+echo "[tb3_multi_explore_slam] Gazebo PID=${GZ_PID} log=${GZ_LOG}"
+
+setsid bash -c "
+source /opt/ros/lyrical/setup.bash
+source '${ROOT_DIR}/install/setup.bash'
+export RMW_IMPLEMENTATION='${RMW_IMPLEMENTATION}'
+export CYCLONEDDS_URI='${CYCLONEDDS_URI}'
+exec ros2 run ros_gz_bridge parameter_bridge \
+  --ros-args -r __node:=clock_bridge \
+  -p config_file:='${CLOCK_BRIDGE}' \
+  -p use_sim_time:=false
+" </dev/null >"${CLOCK_LOG}" 2>&1 &
+CLOCK_PID=$!
+echo "[tb3_multi_explore_slam] clock bridge PID=${CLOCK_PID} log=${CLOCK_LOG} (use_sim_time:=false)"
+
+if [[ "${HEADLESS,,}" != "true" ]]; then
+  setsid bash -c "
+source /opt/ros/lyrical/setup.bash
+export DISPLAY='${DISPLAY}'
+export WAYLAND_DISPLAY='${WAYLAND_DISPLAY}'
+export XDG_RUNTIME_DIR='${XDG_RUNTIME_DIR}'
+export XAUTHORITY='${XAUTHORITY:-}'
+export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
+export LIBGL_ALWAYS_SOFTWARE='${LIBGL_ALWAYS_SOFTWARE:-}'
+export MESA_GL_VERSION_OVERRIDE='${MESA_GL_VERSION_OVERRIDE:-}'
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
+exec gz sim -g
+" </dev/null >/tmp/tb3_multi_gz_gui.log 2>&1 &
+  GUI_PID=$!
+  echo "[tb3_multi_explore_slam] Gazebo GUI PID=${GUI_PID}"
+fi
+
+sleep 3
+
+# robot1 Nav2 + slam, with the no-clock bridge. Gazebo is already running.
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
@@ -414,30 +478,46 @@ export WAYLAND_DISPLAY='${WAYLAND_DISPLAY}'
 export XDG_RUNTIME_DIR='${XDG_RUNTIME_DIR}'
 export XAUTHORITY='${XAUTHORITY:-}'
 export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
-exec ros2 launch nav2_bringup tb3_simulation_launch.py \
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
+
+ros2 run robot_state_publisher robot_state_publisher \
+  --ros-args -r __ns:=/robot1 \
+  -p use_sim_time:=true \
+  -p \"robot_description:=\$(cat '${SIM_SHARE}/urdf/turtlebot3_waffle.urdf')\" \
+  -r /tf:=tf -r /tf_static:=tf_static &
+
+ros2 run ros_gz_sim create \
+  -name robot1 \
+  -string \"\$(xacro namespace:=robot1 '${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro')\" \
+  -x '${ROBOT1_X}' -y '${ROBOT1_Y}' -z 0.01 \
+  -R 0.0 -P 0.0 -Y '${ROBOT1_YAW}' \
+  --ros-args -r __ns:=/robot1 &
+
+ros2 run ros_gz_bridge parameter_bridge \
+  --ros-args -r __ns:=/robot1 \
+  -p config_file:='${ROOT_DIR}/config/tb3_bridge_no_clock.yaml' \
+  -p use_sim_time:=true \
+  -p expand_gz_topic_names:=true &
+
+sleep 2
+
+exec ros2 launch nav2_bringup bringup_launch.py \
   namespace:=robot1 \
-  robot_name:=robot1 \
+  use_namespace:=True \
   slam:=True \
   use_keepout_zones:=False \
   use_speed_zones:=False \
-  use_simulator:=True \
-  use_rviz:=False \
-  robot_sdf:='${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro' \
-  headless:='${HEADLESS}' \
-  use_composition:='${USE_COMPOSITION}' \
-  use_respawn:=True \
   use_sim_time:=True \
-  world:='${WORLD_FILE}' \
   params_file:='${PARAMS_FILE}' \
-  x_pose:='${ROBOT1_X}' \
-  y_pose:='${ROBOT1_Y}' \
-  yaw:='${ROBOT1_YAW}'
+  autostart:=True \
+  use_composition:='${USE_COMPOSITION}' \
+  use_respawn:=True
 " </dev/null >"${ROBOT1_LOG}" 2>&1 &
 R1_PID=$!
-echo "[tb3_multi_explore_slam] Launched Gazebo + robot1 (PID=${R1_PID}, log=${ROBOT1_LOG})"
+echo "[tb3_multi_explore_slam] Launched robot1 (PID=${R1_PID}, log=${ROBOT1_LOG})"
 
-# Extra bridge for robot1's 3D point cloud. The official tb3_simulation_launch.py
-# bridge config does not include PointCloud2, so bridge it separately.
+# 3D cloud stays on its own bridge. tb3_bridge_no_clock.yaml does not carry it,
+# and mixing it with scan/odom lets the cloud conversion stall those streams.
 POINTS1_LOG="/tmp/tb3_multi_robot1_points_bridge.log"
 ros2 run ros_gz_bridge parameter_bridge \
   --ros-args -r __ns:=/robot1 \
@@ -448,11 +528,24 @@ ros2 run ros_gz_bridge parameter_bridge \
 POINTS1_PID=$!
 echo "[tb3_multi_explore_slam] robot1 points bridge PID=${POINTS1_PID} log=${POINTS1_LOG}"
 
+# Cameras stay on their own bridge. Sharing a process with the 3D cloud
+# lets image conversion fall tens of seconds behind sim time.
+CAMERA_BRIDGE="${ROOT_DIR}/config/tb3_camera_bridge.yaml"
+CAMERA1_LOG="/tmp/tb3_multi_robot1_camera_bridge.log"
+ros2 run ros_gz_bridge parameter_bridge \
+  --ros-args -r __ns:=/robot1 \
+  -p config_file:="${CAMERA_BRIDGE}" \
+  -p use_sim_time:=true \
+  -p expand_gz_topic_names:=true \
+  >"${CAMERA1_LOG}" 2>&1 &
+CAMERA1_PID=$!
+echo "[tb3_multi_explore_slam] robot1 camera bridge PID=${CAMERA1_PID} log=${CAMERA1_LOG}"
+
 sleep 4
 
 # 2. Spawn robot2 into same Gazebo server + launch robot2 (Nav2 + slam_toolbox in /robot2)
-# Uses tb3_bridge_no_clock.yaml so /clock is only bridged once (by robot1),
-# preventing duplicate /clock jumps that clear tf2 buffers.
+# Uses tb3_bridge_no_clock.yaml. /clock is published only by the dedicated
+# clock bridge above; a second publisher makes sim time jump backwards.
 BRIDGE_NO_CLOCK="${ROOT_DIR}/config/tb3_bridge_no_clock.yaml"
 URDF_FILE="${SIM_SHARE}/urdf/turtlebot3_waffle.urdf"
 SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
@@ -508,6 +601,28 @@ exec ros2 launch nav2_bringup bringup_launch.py \
 R2_PID=$!
 echo "[tb3_multi_explore_slam] Launched robot2 (PID=${R2_PID}, log=${ROBOT2_LOG})"
 
+# robot2's scan/odom bridge must not also convert the 3D cloud; that backlog
+# made every scan look seconds old and collision_monitor held the robot at 0.
+POINTS2_LOG="/tmp/tb3_multi_robot2_points_bridge.log"
+ros2 run ros_gz_bridge parameter_bridge \
+  --ros-args -r __ns:=/robot2 \
+  -p config_file:="${ROOT_DIR}/config/tb3_points_bridge.yaml" \
+  -p use_sim_time:=true \
+  -p expand_gz_topic_names:=true \
+  >"${POINTS2_LOG}" 2>&1 &
+POINTS2_PID=$!
+echo "[tb3_multi_explore_slam] robot2 points bridge PID=${POINTS2_PID} log=${POINTS2_LOG}"
+
+CAMERA2_LOG="/tmp/tb3_multi_robot2_camera_bridge.log"
+ros2 run ros_gz_bridge parameter_bridge \
+  --ros-args -r __ns:=/robot2 \
+  -p config_file:="${CAMERA_BRIDGE}" \
+  -p use_sim_time:=true \
+  -p expand_gz_topic_names:=true \
+  >"${CAMERA2_LOG}" 2>&1 &
+CAMERA2_PID=$!
+echo "[tb3_multi_explore_slam] robot2 camera bridge PID=${CAMERA2_PID} log=${CAMERA2_LOG}"
+
 MERGE_PID=""
 CLOUD_PID=""
 OCTOMAP_PID=""
@@ -520,7 +635,7 @@ DASH_PID=""
 
 cleanup() {
   echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & 3D mapping..."
-  local pids=("${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${DASH_PID}" "${R2_PID}" "${R1_PID}")
+  local pids=("${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${POINTS2_PID:-}" "${CAMERA1_PID:-}" "${CAMERA2_PID:-}" "${DASH_PID}" "${R2_PID}" "${R1_PID}" "${CLOCK_PID:-}" "${GUI_PID:-}" "${GZ_PID:-}")
   for pid in "${pids[@]}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
@@ -540,6 +655,14 @@ trap cleanup EXIT INT TERM
 
 echo "[tb3_multi_explore_slam] Waiting for /robot1 and /robot2 SLAM & Nav2 stacks to become active..."
 for i in $(seq 1 240); do
+  if ! kill -0 "${GZ_PID}" 2>/dev/null; then
+    echo "[tb3_multi_explore_slam] Gazebo exited early — see ${GZ_LOG}" >&2
+    exit 1
+  fi
+  if ! kill -0 "${CLOCK_PID}" 2>/dev/null; then
+    echo "[tb3_multi_explore_slam] clock bridge exited early — see ${CLOCK_LOG}" >&2
+    exit 1
+  fi
   if ! kill -0 "${R1_PID}" 2>/dev/null; then
     echo "[tb3_multi_explore_slam] robot1 bringup exited early — see ${ROBOT1_LOG}" >&2
     exit 1

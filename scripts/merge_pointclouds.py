@@ -17,6 +17,8 @@ Usage:
     -p publish_rate:=3.0
 """
 
+import math
+
 import numpy as np
 import rclpy
 from rclpy.duration import Duration
@@ -28,6 +30,8 @@ from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 from tf2_ros import Buffer, TransformException, TransformListener
+
+from cloud_stamp import pose_is_discontinuous
 
 
 def quat_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
@@ -71,6 +75,10 @@ class PointCloudMerger(Node):
         self.min_range = float(self.declare_parameter("min_range", 0.1).value)
         self.max_range = float(self.declare_parameter("max_range", 12.0).value)
         self.tf_timeout = float(self.declare_parameter("tf_timeout", 0.1).value)
+        # Latest-TF fallback is only safe for a few milliseconds of stamp skew.
+        # A stalled bridge otherwise paints the old scan at the new pose.
+        self.max_tf_skew = float(self.declare_parameter("max_tf_skew", 0.15).value)
+        self._accepted_pose: dict[str, tuple[float, float, float]] = {}
 
         # Vehicle self-reflection box filter in sensor frame (base_scan)
         # TurtleBot3 Waffle footprint: length 0.265m, width 0.265m, wheels at y=+-0.144m.
@@ -182,24 +190,29 @@ class PointCloudMerger(Node):
         stamp = msg.header.stamp
         has_stamp = bool(stamp.sec or stamp.nanosec)
         lookup_stamp = Time.from_msg(stamp) if has_stamp else Time()
-        # Prefer the cloud timestamp, but fall back to the latest available
-        # transform.  GZ cloud stamps can be a few milliseconds ahead of /
-        # behind the newest bridged TF sample, which otherwise drops frames
-        # with "extrapolation into the future/past".
-        lookup_stamps = [lookup_stamp]
-        if has_stamp:
-            lookup_stamps.append(Time(clock_type=lookup_stamp.clock_type))
         transform = None
         last_error = None
-        for candidate in lookup_stamps:
+        used_latest = False
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.world_frame,
+                source_frame,
+                lookup_stamp,
+                timeout=Duration(seconds=self.tf_timeout),
+            )
+        except TransformException as exc:
+            last_error = exc
+        if transform is None and has_stamp:
+            # GZ stamps are often a few milliseconds off the newest TF sample.
+            # Fall back only when that sample is still the same instant.
             try:
                 transform = self.tf_buffer.lookup_transform(
                     self.world_frame,
                     source_frame,
-                    candidate,
-                    timeout=Duration(seconds=self.tf_timeout),
+                    Time(clock_type=lookup_stamp.clock_type),
+                    timeout=Duration(seconds=0.0),
                 )
-                break
+                used_latest = True
             except TransformException as exc:
                 last_error = exc
         if transform is None:
@@ -209,7 +222,33 @@ class PointCloudMerger(Node):
             )
             return None, source_frame
 
+        cloud_sec = float(stamp.sec) + float(stamp.nanosec) * 1e-9
+        if used_latest and has_stamp:
+            tf_stamp = transform.header.stamp
+            tf_sec = float(tf_stamp.sec) + float(tf_stamp.nanosec) * 1e-9
+            skew = abs(tf_sec - cloud_sec)
+            if skew > self.max_tf_skew:
+                self.get_logger().warning(
+                    f"{robot}: dropping cloud, TF is {skew:.2f}s from the scan "
+                    f"(clock stall). Inserting it would ghost the walls.",
+                    throttle_duration_sec=2.0,
+                )
+                return None, source_frame
+
         t = transform.transform.translation
+        if has_stamp:
+            prev = self._accepted_pose.get(robot)
+            if prev is not None:
+                dist = float(math.hypot(t.x - prev[1], t.y - prev[2]))
+                if pose_is_discontinuous(cloud_sec - prev[0], dist):
+                    self.get_logger().warning(
+                        f"{robot}: dropping cloud, pose jumped {dist:.2f} m "
+                        f"in {cloud_sec - prev[0]:.2f}s",
+                        throttle_duration_sec=2.0,
+                    )
+                    return None, source_frame
+            self._accepted_pose[robot] = (cloud_sec, float(t.x), float(t.y))
+
         q = transform.transform.rotation
         rotation = quat_to_matrix(q.x, q.y, q.z, q.w)
         points = points @ rotation.T + np.array([t.x, t.y, t.z])

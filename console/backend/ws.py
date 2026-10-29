@@ -92,6 +92,7 @@ async def state_pump(node: Any, engine: Any, hub: WsHub, period: float = 0.1) ->
     store = node.store
     while True:
         try:
+            store.refresh_sim_meta()
             for ns in store.robots:
                 pose = node.lookup_world_pose(ns)
                 if pose is not None:
@@ -147,8 +148,10 @@ def build_ws_router() -> APIRouter:
                         await client.send_now({"type": "error", "text": str(exc)})
                 elif kind == "estop":
                     await teleop.estop()
+                    engine.estop()
                 elif kind == "clear_estop":
-                    teleop.clear_estop()
+                    await teleop.clear_estop()
+                    engine.clear_estop()
         except WebSocketDisconnect:
             pass
         except Exception:  # noqa: BLE001

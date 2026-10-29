@@ -39,6 +39,7 @@ from geometry_msgs.msg import Point, PoseStamped, Quaternion
 from nav2_msgs.action import BackUp, NavigateThroughPoses, NavigateToPose
 from nav_msgs.msg import OccupancyGrid, Path
 from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray
 
 import tf2_ros
@@ -148,6 +149,7 @@ class RobotTracker:
         self.backup_client: Optional[ActionClient] = None
         # Out-of-bounds self recovery (see _start_backup_recovery).
         self.backup_active: bool = False
+        self.backup_handle = None
         self.backup_last_time: float = -1e9
         self.backup_count: int = 0
         self.failed_goals_count: Dict[Tuple[int, int], int] = {}
@@ -209,7 +211,7 @@ class MultiRobotCoordinator(Node):
         self.declare_parameter('goal_timeout', 90.0)
         self.declare_parameter('blacklist_retry_limit', 2)
         self.declare_parameter('blacklist_radius', 0.9)
-        self.declare_parameter('min_clearance', 0.35)
+        self.declare_parameter('min_clearance', 0.55)
 
         # No-progress livelock breaker
         self.declare_parameter('no_progress_time', 2.0)
@@ -715,6 +717,27 @@ class MultiRobotCoordinator(Node):
 
         self.marker_pub = self.create_publisher(
             MarkerArray, '/exploration/markers', 10
+        )
+
+        # Latched so a halt published before this node subscribes still sticks.
+        # The console estop sets this; clear-estop does not, so exploration
+        # stays paused until the operator starts it again.
+        self._exploration_halted = False
+        halt_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        halt_topic = str(
+            self.declare_parameter('exploration_halt_topic', '/exploration/halt').value
+        )
+        self.create_subscription(
+            Bool,
+            halt_topic,
+            self._on_exploration_halt,
+            halt_qos,
+            callback_group=self.cb_group,
         )
 
         timer_period = 1.0 / max(0.1, self.rate_hz)
@@ -1344,7 +1367,39 @@ class MultiRobotCoordinator(Node):
         finally:
             self.cycle_lock.release()
 
+    def _on_exploration_halt(self, msg: Bool) -> None:
+        halted = bool(msg.data)
+        was = self._exploration_halted
+        self._exploration_halted = halted
+        if halted and not was:
+            self.get_logger().warning(
+                'Exploration halt: cancelling goals and refusing new ones.'
+            )
+            self._stop_all_robots()
+        elif was and not halted:
+            self.get_logger().info('Exploration halt cleared; dispatch resumed.')
+
+    def _stop_all_robots(self) -> None:
+        for robot in self.robots.values():
+            handle = robot.backup_handle
+            robot.backup_handle = None
+            if handle is not None:
+                try:
+                    handle.cancel_goal_async()
+                except Exception as exc:
+                    self.get_logger().warning(
+                        f'[{robot.namespace}] Error cancelling backup: {exc}'
+                    )
+            if robot.backup_active:
+                self._finish_backup_recovery(robot, 'exploration halt')
+            if robot.state != 'IDLE' or robot.current_goal_handle is not None:
+                self.cancel_robot_goal(robot)
+
     def _coordination_cycle_impl(self):
+        if self._exploration_halted:
+            self._stop_all_robots()
+            return
+
         if self.latest_map is None:
             return
 
@@ -2070,6 +2125,8 @@ class MultiRobotCoordinator(Node):
 
     def _dispatch_goal_locked(self, robot: RobotTracker, cluster) -> bool:
         """Send a single-point NavigateToPose action."""
+        if self._exploration_halted:
+            return False
         if not self._action_server_ready(robot.action_client):
             # Per-cycle detail is reported (throttled) by _check_nav_stack;
             # logging here floods the log at the auction rate.
@@ -2160,7 +2217,7 @@ class MultiRobotCoordinator(Node):
         Degrades to the first waypoint via NavigateToPose when through-poses
         is disabled, unavailable, or the tour has a single point.
         """
-        if not tour:
+        if not tour or self._exploration_halted:
             return False
 
         through_ready = self._action_server_ready(robot.through_client)
@@ -2683,13 +2740,17 @@ class MultiRobotCoordinator(Node):
             'outside' in msg and ('bounds' in msg or 'the map' in msg)
         )
 
-    def _start_backup_recovery(self, robot: RobotTracker) -> None:
+    def _start_backup_recovery(
+        self, robot: RobotTracker, reason: Optional[str] = None
+    ) -> None:
         """Drive the robot backwards onto the map with nav2_behaviors/backup.
 
         ``backup`` runs on the rolling local costmap, which always contains the
         robot, so it is the one motion still available when the global costmap
         does not.
         """
+        if self._exploration_halted:
+            return
         if not self.backup_recovery_enable:
             return
         if robot.backup_active:
@@ -2720,11 +2781,12 @@ class MultiRobotCoordinator(Node):
         # Keep the robot out of the auction until the motion finishes.
         robot.state = 'RECOVERING'
 
+        why = reason or (
+            'Start pose is outside the global costmap (SLAM map edge)'
+        )
         self.get_logger().warning(
-            f'[{robot.namespace}] Start pose is outside the global costmap '
-            f'(SLAM map edge); backing up {self.backup_distance:.2f} m at '
-            f'{self.backup_speed:.2f} m/s to re-enter the map '
-            f'(attempt {robot.backup_count}).'
+            f'[{robot.namespace}] {why}; backing up {self.backup_distance:.2f} m '
+            f'at {self.backup_speed:.2f} m/s (attempt {robot.backup_count}).'
         )
 
         try:
@@ -2747,6 +2809,12 @@ class MultiRobotCoordinator(Node):
             self._finish_backup_recovery(robot, 'response error')
             return
 
+        if self._exploration_halted:
+            if goal_handle is not None and goal_handle.accepted:
+                goal_handle.cancel_goal_async()
+            self._finish_backup_recovery(robot, 'exploration halt')
+            return
+
         if goal_handle is None or not goal_handle.accepted:
             self.get_logger().error(
                 f'[{robot.namespace}] Backup goal rejected by the behavior '
@@ -2755,6 +2823,7 @@ class MultiRobotCoordinator(Node):
             self._finish_backup_recovery(robot, 'rejected')
             return
 
+        robot.backup_handle = goal_handle
         try:
             goal_handle.get_result_async().add_done_callback(
                 lambda fut: self._backup_result(fut, robot)
@@ -2781,6 +2850,7 @@ class MultiRobotCoordinator(Node):
 
     def _finish_backup_recovery(self, robot: RobotTracker, detail: str) -> None:
         with self._state_lock:
+            robot.backup_handle = None
             robot.backup_active = False
             if robot.state == 'RECOVERING':
                 robot.state = 'IDLE'
@@ -2909,12 +2979,27 @@ class MultiRobotCoordinator(Node):
         with self._state_lock:
             self._check_stalls_locked(now)
 
+    def _blacklist_goal_point(self, x: float, y: float) -> None:
+        """Stop sending the robot back into a pocket it could not leave."""
+        if any(
+            math.hypot(x - bx, y - by) < self.blacklist_radius
+            for bx, by in self.blacklisted_goals
+        ):
+            return
+        key = (round(float(x), 2), round(float(y), 2))
+        self.blacklisted_goals.append(key)
+        self.get_logger().warning(
+            f'Goal area near {key} trapped the robot. '
+            f'Blacklisted (radius {self.blacklist_radius}m) and backing out.'
+        )
+
     def _check_stalls_locked(self, now: float):
         for ns, robot in self.robots.items():
-            if robot.state != 'NAVIGATING' or not robot.tour_is_active:
-                continue
-            n = len(robot.active_waypoints_world)
-            if n < 2 or robot.current_waypoint_index >= n - 1:
+            # Single-point goals (the fallback after NavigateThroughPoses
+            # gives up) used to skip this check and sit until the 90 s
+            # timeout, which is the "stopped forever against the furniture"
+            # symptom. Watch every navigating goal.
+            if robot.state != 'NAVIGATING' or robot.current_goal_world is None:
                 continue
             if now - robot.goal_start_time < 5.0:
                 continue
@@ -2923,37 +3008,44 @@ class MultiRobotCoordinator(Node):
                 robot.world_x - robot.stall_ref_x,
                 robot.world_y - robot.stall_ref_y,
             )
-            current_d = robot.last_distance_remaining
-            dist_progress = False
-            if math.isfinite(current_d):
-                if not math.isfinite(robot.stall_distance_ref):
-                    dist_progress = True
-                elif (
-                    robot.stall_distance_ref - current_d
-                    >= self.tour_stall_min_progress
-                ):
-                    dist_progress = True
-
-            if moved >= self.tour_stall_min_translation or dist_progress:
+            # Remaining-distance jitter from the planner must not count as
+            # motion. A robot that has not translated is stuck.
+            if moved >= self.tour_stall_min_translation:
                 robot.stall_ref_x = robot.world_x
                 robot.stall_ref_y = robot.world_y
-                robot.stall_distance_ref = (
-                    current_d if math.isfinite(current_d) else float('inf')
-                )
+                robot.stall_distance_ref = robot.last_distance_remaining
                 robot.last_progress_time = now
                 continue
 
-            if now - robot.last_progress_time >= self.tour_stall_window:
-                target = robot.current_goal_world
-                key = robot.current_residual_key
-                self.get_logger().warning(
-                    f'[{ns}] Navigation failed: tour stalled for '
-                    f'{self.tour_stall_window:.1f}s at waypoint '
-                    f'{robot.current_waypoint_index + 1}/{n}. Cancelling...'
+            if now - robot.last_progress_time < self.tour_stall_window:
+                continue
+
+            target = robot.current_goal_world
+            key = robot.current_residual_key
+            n = len(robot.active_waypoints_world)
+            where = (
+                f'waypoint {robot.current_waypoint_index + 1}/{n}'
+                if n
+                else 'goal'
+            )
+            self.get_logger().warning(
+                f'[{ns}] Navigation failed: no translation for '
+                f'{self.tour_stall_window:.1f}s at {where} '
+                f'(moved {moved:.2f} m). Cancelling...'
+            )
+            self._increment_through_failure(robot)
+            self.cancel_robot_goal(robot)
+            self.handle_goal_failure(robot, target, key)
+            if target is not None:
+                self._blacklist_goal_point(target[0], target[1])
+                self._start_backup_recovery(
+                    robot,
+                    reason=(
+                        f'Stuck with no translation for '
+                        f'{self.tour_stall_window:.0f}s near '
+                        f'({target[0]:.2f}, {target[1]:.2f})'
+                    ),
                 )
-                self._increment_through_failure(robot)
-                self.cancel_robot_goal(robot)
-                self.handle_goal_failure(robot, target, key)
 
     def _waypoint_invalid(
         self,

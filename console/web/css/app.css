@@ -283,7 +283,7 @@ h2 {
   padding: 5px 12px; border-radius: 5px; font-size: 11px; cursor: pointer;
   letter-spacing: .04em;
 }
-.tab.active { background: rgba(55, 200, 212, 0.12); color: var(--cyan); box-shadow: inset 0 0 0 1px rgba(55, 200, 212, 0.28); }
+.tab.active, .tab.on { background: rgba(55, 200, 212, 0.12); color: var(--cyan); box-shadow: inset 0 0 0 1px rgba(55, 200, 212, 0.28); }
 .view-tools { display: flex; align-items: center; gap: 8px; }
 
 .map-wrap {
@@ -299,6 +299,21 @@ h2 {
 }
 #map-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
 #map-canvas.dragging { cursor: grabbing; }
+#cloud-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: none;
+  cursor: grab;
+}
+#cloud-canvas.visible { display: block; }
+#cloud-canvas.dragging { cursor: grabbing; }
+#cloud-empty { display: none; }
+#map-wrap.show-3d #cloud-empty { display: flex; }
+#map-wrap.show-3d #cloud-empty.has-cloud { display: none; }
+#map-wrap.show-3d #map-canvas,
+#map-wrap.show-3d #map-empty,
+#map-wrap.show-3d .map-legend,
+#map-wrap.show-3d .map-scale { display: none; }
 
 .map-empty {
   position: absolute; inset: 0;
