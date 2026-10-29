@@ -192,9 +192,16 @@
         <button class="btn small ghost" id="btn-recall-1">召回 R1</button>
         <button class="btn small ghost" id="btn-recall-2">召回 R2</button>
         <button class="btn small ghost" id="btn-save-map">保存地图</button>
-        <button class="btn small ghost" id="btn-start-sim">启动仿真</button>
+      </div>
+      <div class="btn-row">
+        <select class="select small" id="select-world" title="选择仿真世界"></select>
+        <button class="btn small ghost" id="btn-restart-sim" title="停止当前仿真后按所选世界重新拉起">重启仿真</button>
         <button class="btn small ghost" id="btn-stop-sim">停止仿真</button>
       </div>
+      <label class="check-row" for="chk-clean">
+        <input type="checkbox" id="chk-clean" checked />
+        <span>重启前清除旧缓存</span>
+      </label>
       <span class="hint" id="sim-state">仿真：未管理</span>
     </div>
 

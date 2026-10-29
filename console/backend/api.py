@@ -47,6 +47,22 @@ class SimStartBody(BaseModel):
     headless: bool = True
 
 
+class SimRestartBody(SimStartBody):
+    clean: bool = True
+
+
+# Worlds tb3_multi_explore_slam.sh can load; the UI only offers these.
+WORLDS: tuple[dict[str, str], ...] = (
+    {"id": "mine", "label": "矿井 mine"},
+    {"id": "house", "label": "住宅 house"},
+    {"id": "hospital", "label": "医院 hospital"},
+    {"id": "sandbox", "label": "沙盒 sandbox"},
+    {"id": "empty", "label": "空地 empty"},
+    {"id": "warehouse", "label": "仓储 warehouse"},
+    {"id": "depot", "label": "补给站 depot"},
+)
+
+
 class DetectionBox(BaseModel):
     cls: str
     conf: float = Field(ge=0.0, le=1.0)
@@ -424,6 +440,30 @@ async def sim_stop(request: Request) -> dict[str, Any]:
     if not request.app.state.settings.manage_sim:
         raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
     result = request.app.state.proc.stop_sim()
+    request.app.state.node.reset_session()
+    return result
+
+
+@router.get("/sim/worlds")
+async def sim_worlds(request: Request) -> dict[str, Any]:
+    meta = request.app.state.proc.sim_meta() or {}
+    return {
+        "worlds": [dict(world) for world in WORLDS],
+        "active": meta.get("world_name"),
+        "default": request.app.state.settings.default_world,
+    }
+
+
+@router.post("/sim/restart", dependencies=[Depends(require_operator)])
+async def sim_restart(request: Request, body: SimRestartBody) -> dict[str, Any]:
+    if not request.app.state.settings.manage_sim:
+        raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
+    proc = request.app.state.proc
+    # Stopping the launch script can take up to 25 s; keep the event loop free
+    # so the map / video streams to other viewers do not stall meanwhile.
+    result = await asyncio.to_thread(
+        proc.restart_sim, body.world, body.mode, body.headless, body.clean
+    )
     request.app.state.node.reset_session()
     return result
 

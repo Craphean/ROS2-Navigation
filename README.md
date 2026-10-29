@@ -78,7 +78,7 @@ SKIP_DDS_SHM_CLEAN=1 WORLD=mine EXPLORATION_MODE=off HEADLESS=True \
 ./scripts/console.sh          # 打开 http://127.0.0.1:8080 ，口令 mine2026
 ```
 
-也可以在控制台里点「启动仿真」，由控制台自己拉起 `WORLD=mine`。公网访问：
+也可以在控制台里选世界后点「重启仿真」，由控制台自己拉起 `WORLD=mine`。公网访问：
 
 ```bash
 cpolar http 8080              # 只映射这一个端口
@@ -91,6 +91,7 @@ cpolar http 8080              # 只映射这一个端口
 | 巡检任务 | 多航点顺序执行、到点停留、进度/状态、暂停/继续/跳过/终止、失败重试与跳过 |
 | 召回 / 保存 | 返回出生点、保存合并地图为 `maps/inspection_<时间>.yaml` |
 | 勘探切换 | 「开始/停止勘探」启停 `multi_robot_coordinator.py`，巡检时不会被抢目标 |
+| 换世界 / 重启 | 下拉选世界，一键重启仿真；可勾选「重启前清除旧缓存」清 DDS 段、日志并重置地图/点云 |
 | 公网 | cpolar 单端口；只读匿名，控制需登录；未登录看不到控制按钮 |
 | YOLO 预留 | `POST /api/detections` + WS `detections` + 视频叠加层接口 |
 

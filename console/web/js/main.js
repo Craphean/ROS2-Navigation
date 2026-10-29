@@ -499,15 +499,30 @@ function wireActions() {
     if (payload) toast(`已保存 ${payload.path}`, "ok");
   });
 
-  $("#btn-start-sim")?.addEventListener("click", async () => {
+  $("#btn-restart-sim")?.addEventListener("click", async () => {
     if (!requireOperator()) return;
-    toast("正在启动仿真（约 60–90 秒）…");
-    const payload = await call("/api/sim/start", {
-      world: "house",
+    const world = $("#select-world")?.value || "mine";
+    const clean = $("#chk-clean")?.checked ?? true;
+    const label = $("#select-world")?.selectedOptions?.[0]?.textContent || world;
+    if (
+      !window.confirm(
+        `重启仿真到「${label}」？\n${clean ? "重启前会清除旧缓存（地图、点云、残留 DDS 段）。" : ""}`
+      )
+    )
+      return;
+    toast("正在重启仿真（约 60–120 秒）…");
+    const payload = await call("/api/sim/restart", {
+      world,
       mode: "off",
       headless: true,
+      clean,
     });
-    if (payload && !payload.ok) toast(payload.message || "启动失败", "error");
+    if (payload?.ok) {
+      const removed = (payload.cleaned || []).length;
+      toast(removed ? `仿真已重启，清理 ${removed} 项旧缓存` : "仿真已重启", "ok");
+    } else if (payload) {
+      toast(payload.message || "重启失败", "error");
+    }
     pollSim();
   });
 
@@ -549,6 +564,21 @@ async function triggerEstop() {
 /* ------------------------------------------------------------------ */
 /* sim polling                                                         */
 /* ------------------------------------------------------------------ */
+async function loadWorlds() {
+  try {
+    const payload = await api("/api/sim/worlds");
+    const select = $("#select-world");
+    if (!select) return;
+    select.innerHTML = (payload.worlds || [])
+      .map((world) => `<option value="${world.id}">${world.label}</option>`)
+      .join("");
+    const active = payload.active || payload.default;
+    if (active) select.value = active;
+  } catch {
+    /* console offline — keep the list empty */
+  }
+}
+
 async function pollSim() {
   try {
     const payload = await api("/api/sim/status");
@@ -556,8 +586,12 @@ async function pollSim() {
     const sim = payload.sim || {};
     const exploration = payload.exploration || {};
     $("#sim-state").textContent = sim.running
-      ? `仿真：运行 ${Math.round(sim.uptime || 0)}s`
+      ? `仿真：运行 ${Math.round(sim.uptime || 0)}s${sim.world ? " · " + sim.world : ""}`
       : "仿真：未受控";
+    const select = $("#select-world");
+    if (sim.running && sim.world && select && select.value !== sim.world) {
+      select.value = sim.world;
+    }
     $("#pill-mode").querySelector("b").textContent = exploration.running
       ? "勘探"
       : "巡检";
@@ -572,6 +606,7 @@ async function pollSim() {
 async function boot() {
   wireActions();
   await refreshSession();
+  await loadWorlds();
   await refreshMissions();
   link.connect();
   pollSim();

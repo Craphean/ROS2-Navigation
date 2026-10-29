@@ -121,6 +121,25 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 - 控制台**不调用** `kill_nav2_sim.sh`（会删 `/dev/shm`）；子进程继承 `SKIP_DDS_SHM_CLEAN=1`。
 - 不用 `pkill -f` 模糊匹配，避免误杀控制台本身。
 
+### 4.5 换世界 / 重启 / 清缓存
+
+控制台底部的「快捷操作」里可直接换世界，不必再回终端：
+
+| 控件 | 行为 |
+| --- | --- |
+| 世界下拉框 | `mine` / `house` / `hospital` / `sandbox` / `empty` / `warehouse` / `depot`，取值即 `tb3_multi_explore_slam.sh` 的 `WORLD` |
+| 重启仿真 | `POST /api/sim/restart`：先 `killpg` 停掉旧仿真，再按所选世界拉起；`clean=true` 时清理旧缓存 |
+| 停止仿真 | 只停不启，保留当前世界选择 |
+| 重启前清除旧缓存 | 勾选后清理上表中主进程已退出的 `/dev/shm` DDS 段、`/tmp/tb3_multi_*.log`，并重置控制台里的地图/点云/TF |
+
+清理的关键是**只删没人用的**：控制台自己的 rclpy 节点也挂在同一批 `/dev/shm` 段上，
+直接 `rm /dev/shm/cyclonedds*` 会让后续仿真进到另一个 shm 命名空间、与控制台互相收不到消息
+（这也是控制台不调用 `kill_nav2_sim.sh` 的原因）。所以 `_clean_runtime()` 用 `fuser` 判断
+每个段是否仍被活进程映射，被占用的保留；`fuser` 不可用时一律保留，宁可留着也不误删。
+
+重启流程约 60–120 秒（Nav2 + SLAM + map_merge 依次就绪），期间 `/api/sim/status` 会一直返回
+`running: true`（进程已起），前端靠地图/时钟恢复来判断真正可用。
+
 ## 5. HTTP / WebSocket
 
 | 方法 | 路径 | 鉴权 | 说明 |
@@ -136,6 +155,8 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | GET/POST | `/api/missions`、`/{id}/start|pause|resume|skip|stop|waypoints` | 写操作需登录 | 任务 |
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |
+| GET | `/api/sim/worlds` | 否 | 可选世界列表 + 当前世界 |
+| POST | `/api/sim/restart` | 是 | 停 → 可选清缓存 → 按 `world`/`mode`/`headless` 重启 |
 | POST | `/api/detections` | 是 | YOLO 结果注入（预留） |
 
 WebSocket `/ws?token=<口令>`：连接后先收到 `snapshot`、`role`，随后 10 Hz `snapshot`。控制消息：`{"type":"teleop","ns":"robot1","vx":0.2,"wz":0.0}`、`{"type":"estop"}`、`{"type":"clear_estop"}`、`{"type":"ping"}`。只读角色发送控制消息会收到 `{"type":"error"}`。
