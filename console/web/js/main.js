@@ -45,8 +45,8 @@ const teleop = new Teleop({
     const element = $("#teleop-state");
     if (element) {
       element.textContent = active
-        ? `已接管 ${state.target.toUpperCase()} · WASD / 摇杆`
-        : "未接管 · WASD / 摇杆";
+        ? `已接管 ${state.target.toUpperCase()} · WASD`
+        : "未接管 · WASD";
     }
     $("#btn-lease")?.classList.toggle("on", active);
   },
@@ -171,18 +171,6 @@ function updatePills(snapshot) {
       : "闭环 0";
   }
 
-  const clockPill = $("#pill-clock").querySelector("b");
-  const clock = snapshot.sim?.clock;
-  clockPill.textContent =
-    snapshot.sim?.stale || clock === null || clock === undefined
-      ? "暂停"
-      : `T+${Math.floor(clock)}s`;
-
-  const mapPill = $("#pill-map").querySelector("b");
-  const meta = snapshot.map;
-  mapPill.textContent = meta
-    ? `${meta.width}×${meta.height} @ ${Number(meta.resolution).toFixed(2)}m`
-    : "--";
 }
 
 function activeMission() {
@@ -485,7 +473,6 @@ function wireActions() {
     toast("已释放控制权");
   });
 
-  $("#btn-estop")?.addEventListener("click", triggerEstop);
   $("#btn-estop-2")?.addEventListener("click", triggerEstop);
   $("#btn-clear-estop")?.addEventListener("click", async () => {
     await call("/api/estop/clear", undefined, "急停已解除，自主勘探需重新启动");
@@ -632,6 +619,10 @@ async function pollSim() {
     $("#sim-state").textContent = sim.running
       ? `仿真：运行 ${Math.round(sim.uptime || 0)}s${sim.world ? " · " + sim.world : ""}`
       : "仿真：未受控";
+    const worldPill = $("#pill-world");
+    if (worldPill) {
+      worldPill.querySelector("b").textContent = sim.running && sim.world ? sim.world : "--";
+    }
     const select = $("#select-world");
     if (sim.running && sim.world && select && select.value !== sim.world) {
       select.value = sim.world;

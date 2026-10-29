@@ -87,7 +87,7 @@ cpolar http 8080              # 只映射这一个端口
 | 能力 | 说明 |
 | --- | --- |
 | 实时监控 | 合并地图 `/map` 转 PNG、双车位姿、激光点、双路 320×240 车载视频、事件流 |
-| 远程遥控 | 虚拟摇杆 + WASD，20 Hz `TwistStamped`，300 ms deadman，接管时自动关闭 `collision_monitor` |
+| 远程遥控 | WASD / 方向键，20 Hz `TwistStamped`，300 ms deadman，接管时自动关闭 `collision_monitor` |
 | 巡检任务 | 多航点顺序执行、到点停留、进度/状态、暂停/继续/跳过/终止、失败重试与跳过 |
 | 召回 / 保存 | 返回出生点；保存 2D 合并地图为 `maps/inspection_<时间>.yaml`，导出 3D 点云为 `maps/inspection_<时间>.pcd` |
 | 勘探切换 | 「开始/停止勘探」启停 `multi_robot_coordinator.py`，巡检时不会被抢目标 |
@@ -374,7 +374,7 @@ HEADLESS=True USE_RVIZ=False WORLD=house ./scripts/tb3_multi_explore_slam.sh
 5. benchmark 基准测试，设计对比试验
 
 6. [x] **中控台（基础版已完成，2026-10）**：自研 Web 控制台 `console/`，单端口 8080。
-    已完成：实时全局地图（/map → PNG Canvas）、双车位姿/激光/状态、双路 320×240 车载视频、多航点巡检任务（顺序执行/停留/进度/暂停/继续/跳过/终止/失败重试）、虚拟摇杆与 WASD 遥控（20 Hz TwistStamped + 300 ms deadman + collision_monitor 交接）、单点导航、召回、保存地图、一键启停仿真、勘探/巡检模式切换、cpolar 公网入口与只读/操作员权限、YOLO 检测结果接口预留。
+    已完成：实时全局地图（/map → PNG Canvas）、双车位姿/激光/状态、双路 320×240 车载视频、多航点巡检任务（顺序执行/停留/进度/暂停/继续/跳过/终止/失败重试）、WASD 遥控（20 Hz TwistStamped + 300 ms deadman + collision_monitor 交接）、单点导航、召回、保存地图、一键启停仿真、勘探/巡检模式切换、cpolar 公网入口与只读/操作员权限、YOLO 检测结果接口预留。
     未完成（后续）：Gazebo 3D 数字孪生（环境 Mesh + URDF）、Foxglove 作为内置面板、真机适配。
     详见 `docs/console.md`。
 

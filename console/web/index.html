@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#080b0e" />
   <title>矿井智能巡检机器人控制台</title>
-  <link rel="stylesheet" href="css/app.css?v=3" />
+  <link rel="stylesheet" href="css/app.css?v=4" />
 </head>
 <body>
 <div class="app">
@@ -17,21 +17,19 @@
       </div>
       <div class="brand-text">
         <h1>矿井智能巡检控制台</h1>
-        <p>MINE INSPECTION CONSOLE · TB3 ×2</p>
+        <p>MINE INSPECTION CONSOLE</p>
       </div>
     </div>
 
     <div class="status-cluster">
       <span class="pill" id="pill-link"><i class="led"></i><span>链路</span></span>
-      <span class="pill" id="pill-clock"><span>仿真时钟</span><b>--</b></span>
-      <span class="pill" id="pill-map"><span>地图</span><b>--</b></span>
+      <span class="pill" id="pill-world"><span>世界</span><b>--</b></span>
       <span class="pill" id="pill-mode"><span>模式</span><b>巡检</b></span>
     </div>
 
     <div class="top-actions">
       <button class="btn ghost" id="btn-explore" title="启动自主勘探协调器">开始勘探</button>
       <button class="btn ghost" id="btn-stop-explore" title="停止自主勘探">停止勘探</button>
-      <button class="btn danger" id="btn-estop">急停</button>
       <button class="btn" id="btn-login">操作员登录</button>
     </div>
   </header>
@@ -162,17 +160,6 @@
   </main>
 
   <footer class="controlbar">
-    <div class="joy-wrap">
-      <div class="joystick" id="joystick" aria-label="虚拟摇杆">
-        <div class="joy-ring"></div>
-        <div class="joy-stick" id="joy-stick"></div>
-      </div>
-      <div class="joy-readout">
-        <b id="joy-vx">0.00</b><span>m/s</span>
-        <b id="joy-wz">0.00</b><span>rad/s</span>
-      </div>
-    </div>
-
     <div class="control-group">
       <label>控制目标</label>
       <div class="segmented" id="teleop-target">
@@ -227,6 +214,6 @@
   </dialog>
 </div>
 
-<script type="module" src="js/main.js?v=10"></script>
+<script type="module" src="js/main.js?v=11"></script>
 </body>
 </html>
