@@ -33,6 +33,39 @@ from tf2_ros import Buffer, TransformException, TransformListener
 
 from cloud_stamp import pose_is_discontinuous
 
+_FLOAT32 = 7
+
+
+def _read_xyz(msg: PointCloud2) -> np.ndarray | None:
+    """PointCloud2 -> (N, 3) float32 in the sensor frame, NaNs dropped.
+
+    point_cloud2.read_points_numpy rebuilds a structured array field by
+    field; at ~11 clouds/s that alone was ~40% of a core.  Read the payload
+    once and slice the x/y/z float32 columns by their declared offsets.
+    """
+    fields = {field.name: field for field in msg.fields}
+    try:
+        xyz_fields = (fields["x"], fields["y"], fields["z"])
+    except KeyError:
+        return None
+    if any(field.datatype != _FLOAT32 for field in xyz_fields):
+        return None
+    step = int(msg.point_step)
+    count = int(msg.width) * int(msg.height)
+    if step < 12 or count <= 0:
+        return None
+    raw = np.frombuffer(msg.data, dtype=np.uint8)
+    if raw.size < count * step:
+        return None
+    rows = raw[: count * step].reshape(count, step)
+    out = np.empty((count, 3), dtype=np.float32)
+    for column, field in enumerate(xyz_fields):
+        offset = int(field.offset)
+        chunk = np.ascontiguousarray(rows[:, offset : offset + 4])
+        out[:, column] = np.frombuffer(chunk, dtype=np.float32)
+    finite = np.isfinite(out).all(axis=1)
+    return out[finite] if not finite.all() else out
+
 
 def quat_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
     """Return a 3x3 rotation matrix from a quaternion."""
@@ -151,22 +184,13 @@ class PointCloudMerger(Node):
     ) -> tuple[np.ndarray | None, str]:
         source_frame = self._normalized_frame(robot, msg.header.frame_id)
 
-        try:
-            points = point_cloud2.read_points_numpy(
-                msg, field_names=("x", "y", "z"), skip_nans=True
-            )
-        except Exception as exc:  # noqa: BLE001 - log and skip malformed cloud
-            self.get_logger().warning(
-                f"{robot}: failed to read point cloud: {exc}", throttle_duration_sec=5.0
-            )
+        points = _read_xyz(msg)
+        if points is None or points.shape[0] == 0:
             return None, source_frame
 
-        if points.size == 0:
-            return None, source_frame
-        points = np.asarray(points, dtype=np.float64).reshape(-1, 3)
-
-        # Range/crop in the sensor frame before the transform.
-        ranges = np.linalg.norm(points[:, :2], axis=1)
+        # Range/crop in the sensor frame before the transform.  Compare
+        # squared radii: a sqrt per point is measurable at ~11 clouds/s.
+        ranges2 = points[:, 0] ** 2 + points[:, 1] ** 2
 
         # Reject self-reflections on robot's own chassis / camera / wheels
         is_self_body = (
@@ -178,9 +202,8 @@ class PointCloudMerger(Node):
         )
 
         valid = (
-            np.isfinite(points).all(axis=1)
-            & (ranges >= self.min_range)
-            & (ranges <= self.max_range)
+            (ranges2 >= self.min_range**2)
+            & (ranges2 <= self.max_range**2)
             & (~is_self_body)
         )
         points = points[valid]
@@ -250,8 +273,8 @@ class PointCloudMerger(Node):
             self._accepted_pose[robot] = (cloud_sec, float(t.x), float(t.y))
 
         q = transform.transform.rotation
-        rotation = quat_to_matrix(q.x, q.y, q.z, q.w)
-        points = points @ rotation.T + np.array([t.x, t.y, t.z])
+        rotation = quat_to_matrix(q.x, q.y, q.z, q.w).astype(np.float32)
+        points = points @ rotation.T + np.array([t.x, t.y, t.z], dtype=np.float32)
 
         # Crop in the world frame so the floor and ceiling/outliers are removed.
         valid = (
@@ -265,9 +288,13 @@ class PointCloudMerger(Node):
     def _voxel_downsample(self, points: np.ndarray) -> np.ndarray:
         if points.size == 0:
             return points
-        keys = np.floor(points / self.voxel_size).astype(np.int64)
-        _, indices = np.unique(keys, axis=0, return_index=True)
-        return points[indices]
+        # Pack the three indices into one int64 and run a 1-D unique: sorting
+        # rows of an (N, 3) array is several times slower at this size.
+        keys = np.floor(points / self.voxel_size).astype(np.int64) + (1 << 20)
+        np.clip(keys, 0, (1 << 21) - 1, out=keys)
+        packed = (keys[:, 0] << 42) | (keys[:, 1] << 21) | keys[:, 2]
+        _, first = np.unique(packed, return_index=True)
+        return points[np.sort(first)]
 
     def publish_merged(self) -> None:
         merged = []

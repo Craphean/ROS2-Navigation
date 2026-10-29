@@ -14,6 +14,8 @@ import math
 import time
 from typing import Any
 
+import numpy as np
+
 import rclpy
 from action_msgs.msg import GoalStatusArray
 from geometry_msgs.msg import TwistStamped
@@ -513,14 +515,15 @@ class ConsoleNode(Node):
     def front_clearance(self, ns: str, half_angle: float = 0.44) -> float | None:
         """Minimum range inside a forward cone, in metres."""
         with self.store.lock:
-            samples = list(self.store.robots[ns].scan)
-        best: float | None = None
-        for rng, angle in samples:
-            if abs(angle) > half_angle or rng <= 0.02:
-                continue
-            if best is None or rng < best:
-                best = rng
-        return best
+            robot = self.store.robots[ns]
+            ranges = robot.scan
+            angles = robot.scan_angles
+        if ranges is None or angles is None or ranges.size == 0:
+            return None
+        window = (np.abs(angles) <= half_angle) & (ranges > 0.02)
+        if not window.any():
+            return None
+        return float(ranges[window].min())
 
     async def toggle_collision(self, ns: str, enable: bool) -> tuple[bool, str]:
         client = self.toggle_clients.get(ns)

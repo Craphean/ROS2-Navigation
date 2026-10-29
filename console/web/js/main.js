@@ -135,7 +135,7 @@ async function pollCloud() {
       /* keep the last cloud */
     }
   }
-  window.setTimeout(pollCloud, 800);
+  window.setTimeout(pollCloud, 2000);
 }
 
 function followCamera(ns, image) {
@@ -153,7 +153,9 @@ function followCamera(ns, image) {
     } catch {
       /* keep the last frame and try again */
     }
-    window.setTimeout(tick, 1000 / 10);
+    // 3 fps: each frame costs one HTTP round trip, and the public RTT is
+    // ~200 ms.  Ten per second per robot kept all six browser connections busy.
+    window.setTimeout(tick, 1000 / 3);
   };
   tick();
 }

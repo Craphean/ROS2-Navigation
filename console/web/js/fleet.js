@@ -3,6 +3,7 @@ const STATE_LABEL = {
   PLANNING: "规划中",
   NAVIGATING: "巡航中",
   RECOVERY: "脱困中",
+  FAILED: "失败",
   ESTOPPED: "急停",
 };
 

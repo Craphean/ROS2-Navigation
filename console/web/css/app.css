@@ -203,7 +203,7 @@ h2 {
 }
 .rc-badge.NAVIGATING, .rc-badge.PLANNING { color: var(--cyan); border-color: rgba(55, 200, 212, 0.4); background: rgba(55, 200, 212, 0.08); }
 .rc-badge.RECOVERY { color: var(--amber); border-color: rgba(242, 163, 60, 0.4); background: rgba(242, 163, 60, 0.08); }
-.rc-badge.ESTOPPED { color: var(--red); border-color: rgba(229, 72, 77, 0.5); background: rgba(229, 72, 77, 0.1); }
+.rc-badge.ESTOPPED, .rc-badge.FAILED { color: var(--red); border-color: rgba(229, 72, 77, 0.5); background: rgba(229, 72, 77, 0.1); }
 
 .rc-grid {
   margin-top: 8px;

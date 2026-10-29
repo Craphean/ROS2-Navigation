@@ -2,6 +2,14 @@
 <!-- Raise CycloneDDS auto participant limit for Nav2 multi-process bringup. -->
 <CycloneDDS>
   <Domain id="any">
+    <!-- All nodes (gz, nav2, console) live on this host.  Leaving the interface
+         unset made CycloneDDS announce on enp3s0 too: ~12 Mbps of SPDP/SEDP
+         multicast left the VM every second and ate the platform's egress. -->
+    <General>
+      <Interfaces>
+        <NetworkInterface name="lo" />
+      </Interfaces>
+    </General>
     <Discovery>
       <ParticipantIndex>auto</ParticipantIndex>
       <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>

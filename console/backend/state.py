@@ -11,8 +11,10 @@ import math
 import os
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
+
+import numpy as np
 
 
 GOAL_STATUS_TEXT = {
@@ -35,8 +37,10 @@ def nav_state_from_status(code: int) -> str:
         return "PLANNING"
     if code in (2, 3):
         return "NAVIGATING"
-    if code in (5, 6):
-        return "RECOVERY"
+    if code == 6:
+        # Aborted goals used to show up as RECOVERY ("脱困中") in the console for
+        # the rest of the session: a terminal goal status is not a recovery.
+        return "FAILED"
     return "IDLE"
 
 
@@ -46,7 +50,11 @@ class RobotState:
     world_pose: tuple[float, float, float] | None = None
     local_pose: tuple[float, float, float] | None = None
     vel: tuple[float, float] = (0.0, 0.0)
-    scan: list[list[float]] = field(default_factory=list)
+    # Ranges and their bearing in the laser frame, both float64, already
+    # filtered to finite returns.  A list of [r, angle] pairs cost ~56 B per
+    # beam and was rebuilt from Python objects on every scan (10-15 Hz).
+    scan: np.ndarray | None = None
+    scan_angles: np.ndarray | None = None
     scan_stamp: float = 0.0
     nav_state: str = "IDLE"
     nav_status: int = 0
@@ -97,6 +105,9 @@ class GoalStatusMerger:
             stamp,
             now,
         )
+
+    def reset(self) -> None:
+        self._sources.clear()
 
     def merged(self) -> tuple[str, int]:
         best: tuple[str, int, float, float] | None = None
@@ -168,16 +179,21 @@ class StateStore:
             robot.last_odom_wall = time.monotonic()
 
     def on_scan(self, ns: str, msg: Any) -> None:
+        # np.array (not asarray) so the store never pins the ROS message buffer.
+        ranges = np.array(msg.ranges, dtype=np.float64)
+        angles = msg.angle_min + np.arange(ranges.size, dtype=np.float64) * msg.angle_increment
+        # Keep only finite returns, exactly as before, but as two flat arrays:
+        # no per-beam Python objects, and the world conversion is vectorised.
+        keep = np.isfinite(ranges)
+        if not keep.all():
+            ranges = ranges[keep]
+            angles = angles[keep]
         with self.lock:
             robot = self.robots[ns]
             robot.scan_stamp = time.monotonic()
             robot.last_scan_wall = robot.scan_stamp
-            # Keep the raw scan compact; conversion to world happens in the pump.
-            robot.scan = [
-                [float(r), float(msg.angle_min + i * msg.angle_increment)]
-                for i, r in enumerate(msg.ranges)
-                if math.isfinite(r)
-            ]
+            robot.scan = ranges
+            robot.scan_angles = angles
 
     def on_goal_status(self, ns: str, source: str, msg: Any) -> None:
         merger = self.mergers[ns]
@@ -293,8 +309,19 @@ class StateStore:
             for robot in self.robots.values():
                 robot.world_pose = None
                 robot.local_pose = None
-                robot.scan = []
+                robot.scan = None
+                robot.scan_angles = None
                 robot.goal_world = None
+                robot.distance_remaining = None
+                # Goal statuses are stamped with sim time, which restarts at 0
+                # with the simulation.  Keeping the previous run's entry made
+                # the merger reject every new status as "older" and pinned the
+                # UI to the last run's ABORTED/RECOVERY state.
+                robot.nav_status = 0
+                robot.nav_state = "IDLE"
+                robot.action_uuid = ""
+            for merger in self.mergers.values():
+                merger.reset()
             self.loop_closures = {ns: 0 for ns in self.robots}
 
     def refresh_sim_meta(self) -> None:
@@ -325,19 +352,19 @@ class StateStore:
 
 
 def _scan_to_world(robot: RobotState, max_points: int = 140) -> list[list[float]]:
-    if not robot.scan or robot.world_pose is None:
+    ranges = robot.scan
+    angles = robot.scan_angles
+    if ranges is None or angles is None or ranges.size == 0 or robot.world_pose is None:
         return []
     x0, y0, yaw0 = robot.world_pose
-    step = max(1, len(robot.scan) // max_points)
-    points: list[list[float]] = []
-    for rng, angle in robot.scan[::step]:
-        if rng <= 0.05 or rng > 12.0:
-            continue
-        a = yaw0 + angle
-        points.append(
-            [
-                round(x0 + rng * math.cos(a), 3),
-                round(y0 + rng * math.sin(a), 3),
-            ]
-        )
-    return points
+    step = max(1, ranges.size // max_points)
+    ranges = ranges[::step]
+    angles = angles[::step]
+    keep = (ranges > 0.05) & (ranges <= 12.0)
+    if not keep.any():
+        return []
+    ranges = ranges[keep]
+    heading = yaw0 + angles[keep]
+    xs = np.round(x0 + ranges * np.cos(heading), 3)
+    ys = np.round(y0 + ranges * np.sin(heading), 3)
+    return np.stack((xs, ys), axis=1).tolist()

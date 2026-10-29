@@ -45,10 +45,18 @@ bt_navigator:
     global_frame: map
     robot_base_frame: base_link
     odom_topic: odom
-    bt_loop_duration: 10
+    # 10 ms ticks at 100 Hz, and every tick may issue a service call.
+    bt_loop_duration: 20
     filter_duration: 0.3
-    default_server_timeout: 20
-    default_cancel_timeout: 50
+    # Milliseconds the BT waits for a planner/controller action or service.
+    # The stock 20 ms is fine on a fast box, but here the planner needs ~0.7 s
+    # per plan while the machine is loaded: ValidatePath (is_path_valid) and
+    # ComputePathToPose timed out on healthy goals, the BT declared the goal
+    # failed and span/wait/backed up -- the "recovery as soon as it nears a
+    # wall" behaviour.
+    default_server_timeout: 2000
+    # Same story for cancel(): a 50 ms budget expires while the planner is busy.
+    default_cancel_timeout: 1000
     wait_for_service_timeout: 20000
     introspection_mode: "disabled"
     navigators: ["navigate_to_pose", "navigate_through_poses"]
@@ -92,7 +100,9 @@ bt_navigator:
 controller_server:
   ros__parameters:
     controller_frequency: 20.0
-    costmap_update_timeout: 0.30
+    # Local costmap publishes at 5 Hz; under load one update can take 0.7 s and
+    # a 0.3 s wait aborted the control loop before MPPI ever ran.
+    costmap_update_timeout: 1.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
@@ -671,7 +681,7 @@ slam_toolbox:
     use_map_saver: true
     mode: mapping
     debug_logging: false
-    throttle_scans: 1
+    throttle_scans: 2
     transform_publish_period: 0.02
     map_update_interval: 1.0
     resolution: 0.05
@@ -733,7 +743,7 @@ robot1:
       use_map_saver: true
       mode: mapping
       debug_logging: false
-      throttle_scans: 1
+      throttle_scans: 2
       transform_publish_period: 0.02
       map_update_interval: 1.0
       resolution: 0.05
@@ -795,7 +805,7 @@ robot2:
       use_map_saver: true
       mode: mapping
       debug_logging: false
-      throttle_scans: 1
+      throttle_scans: 2
       transform_publish_period: 0.02
       map_update_interval: 1.0
       resolution: 0.05

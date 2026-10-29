@@ -357,7 +357,9 @@ if [[ ! -f "${WORLD_FILE}" ]]; then
   exit 1
 fi
 
-# Spawn poses in Gazebo world (meters / radians) — also passed to map_merge init_pose_*
+# Spawn poses in Gazebo world (meters / radians).  Odometry is now the model's
+# true pose (gz OdometryPublisher), so each SLAM map is already in the Gazebo
+# world frame and map_merge starts from the identity, not the spawn offset.
 ROBOT1_X="${ROBOT1_X:-${DEFAULT_R1_X}}"
 ROBOT1_Y="${ROBOT1_Y:-${DEFAULT_R1_Y}}"
 ROBOT1_YAW="${ROBOT1_YAW:-${DEFAULT_R1_YAW}}"
@@ -702,21 +704,21 @@ ros2 run multirobot_map_merge map_merge --ros-args \
   --params-file "${MAP_MERGE_PARAMS}" \
   -p use_sim_time:=true \
   -p known_init_poses:="${KNOWN_INIT_POSES}" \
-  -p merging_rate:=4.0 \
+  -p merging_rate:=1.5 \
   -p discovery_rate:=1.0 \
   -p world_frame:=world \
   -p merged_map_topic:=map \
   -p robot_map_topic:=map \
   -p robot_map_updates_topic:=map_updates \
   -p robot_namespace:=robot \
-  -p /robot1/map_merge/init_pose_x:="${ROBOT1_X}" \
-  -p /robot1/map_merge/init_pose_y:="${ROBOT1_Y}" \
+  -p /robot1/map_merge/init_pose_x:=0.0 \
+  -p /robot1/map_merge/init_pose_y:=0.0 \
   -p /robot1/map_merge/init_pose_z:=0.0 \
-  -p /robot1/map_merge/init_pose_yaw:="${ROBOT1_YAW}" \
-  -p /robot2/map_merge/init_pose_x:="${ROBOT2_X}" \
-  -p /robot2/map_merge/init_pose_y:="${ROBOT2_Y}" \
+  -p /robot1/map_merge/init_pose_yaw:=0.0 \
+  -p /robot2/map_merge/init_pose_x:=0.0 \
+  -p /robot2/map_merge/init_pose_y:=0.0 \
   -p /robot2/map_merge/init_pose_z:=0.0 \
-  -p /robot2/map_merge/init_pose_yaw:="${ROBOT2_YAW}" \
+  -p /robot2/map_merge/init_pose_yaw:=0.0 \
   >"${MERGE_LOG}" 2>&1 &
 MERGE_PID=$!
 echo "[tb3_multi_explore_slam] map_merge PID=${MERGE_PID} log=${MERGE_LOG}"
@@ -732,7 +734,7 @@ python3 "${ROOT_DIR}/scripts/merge_pointclouds.py" --ros-args \
   -p robots:="['robot1', 'robot2']" \
   -p world_frame:=world \
   -p voxel_size:=0.02 \
-  -p publish_rate:=3.0 \
+  -p publish_rate:=2.0 \
   >"${CLOUD_LOG}" 2>&1 &
 CLOUD_PID=$!
 echo "[tb3_multi_explore_slam] point-cloud merger PID=${CLOUD_PID} log=${CLOUD_LOG}"
