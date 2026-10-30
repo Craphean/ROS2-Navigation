@@ -16,6 +16,7 @@ const state = {
   target: "robot1",
   leased: false,
   events: [],
+  detections: {},
   sim: { sim: { running: false }, exploration: { running: false } },
 };
 
@@ -64,6 +65,11 @@ const link = new Link({
   onEvent: (event) => appendEvent(event),
   onTelemetry: (message) => applyTelemetry(message),
   onTrail: (message) => mapView.setTrail(message.trail || {}),
+  onDetections: (message) => {
+    if (!message?.ns) return;
+    state.detections[message.ns] = message;
+    drawDetections();
+  },
   onRole: (role) => applyRole(role),
   onError: (text) => toast(text, "error"),
 });
@@ -146,6 +152,47 @@ function syncMissionOptions(mission) {
   const loop = $("#mission-loop");
   if (loop && document.activeElement !== loop) {
     loop.checked = Boolean(mission && mission.loop);
+  }
+}
+
+function drawDetections() {
+  const ttl = 2.5;
+  const now = Date.now() / 1000;
+  for (const ns of ["robot1", "robot2"]) {
+    const canvas = $(`#det-${ns}`);
+    if (!canvas) continue;
+    const box = canvas.parentElement;
+    const width = box.clientWidth || 320;
+    const height = box.clientHeight || 240;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const det = state.detections[ns];
+    if (!det || now - (det.ts || 0) > ttl) continue;
+    ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.lineWidth = 1.5;
+    for (const item of det.boxes || []) {
+      // Normalised 0..1, origin top-left, relative to the camera frame; the
+      // img is 4:3 and the box is 4:3, so coordinates map straight across.
+      const x = item.x * width;
+      const y = item.y * height;
+      const w = item.w * width;
+      const h = item.h * height;
+      ctx.strokeStyle = "rgba(255, 96, 96, 0.95)";
+      ctx.strokeRect(x, y, w, h);
+      const label = `${item.cls} ${Math.round((item.conf || 0) * 100)}%`;
+      const tw = ctx.measureText(label).width + 6;
+      const ly = y > 15 ? y - 14 : y + 1;
+      ctx.fillStyle = "rgba(229, 72, 77, 0.85)";
+      ctx.fillRect(x, ly, tw, 13);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, x + 3, ly + 10);
+    }
   }
 }
 
@@ -1056,8 +1103,15 @@ async function boot() {
   // The WebSocket pushes telemetry every second; this covers a reload before
   // the first push arrives.
   api("/api/telemetry").then(applyTelemetry).catch(() => {});
+  api("/api/detections")
+    .then((current) => {
+      Object.assign(state.detections, current || {});
+      drawDetections();
+    })
+    .catch(() => {});
   pollSim();
   setInterval(pollSim, 5000);
+  setInterval(drawDetections, 120);
   setInterval(refreshMissions, 20000);
   // Cheap: one status GET every 5 s, and only while the tab is open.
   setInterval(() => {

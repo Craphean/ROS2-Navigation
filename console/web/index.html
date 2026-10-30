@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#080b0e" />
   <title>矿井智能巡检机器人控制台</title>
-  <link rel="stylesheet" href="css/app.css?v=11" />
+  <link rel="stylesheet" href="css/app.css?v=12" />
 </head>
 <body>
 <div class="app">
@@ -180,11 +180,13 @@
         <div class="video-stack">
           <div class="video-box">
             <img id="video-robot1" alt="robot1 camera" />
+            <canvas class="video-overlay" id="det-robot1"></canvas>
             <div class="video-fallback" id="video-fallback-robot1">无信号</div>
             <span class="video-tag r1">ROBOT 1</span>
           </div>
           <div class="video-box">
             <img id="video-robot2" alt="robot2 camera" />
+            <canvas class="video-overlay" id="det-robot2"></canvas>
             <div class="video-fallback" id="video-fallback-robot2">无信号</div>
             <span class="video-tag r2">ROBOT 2</span>
           </div>
@@ -255,6 +257,6 @@
   </dialog>
 </div>
 
-<script type="module" src="js/main.js?v=29"></script>
+<script type="module" src="js/main.js?v=30"></script>
 </body>
 </html>

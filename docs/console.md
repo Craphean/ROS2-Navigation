@@ -197,7 +197,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |
 | GET | `/api/sim/worlds` | 否 | 可选世界列表 + 当前世界 |
 | POST | `/api/sim/restart` | 是 | 停 → 可选清缓存 → 按 `world`/`mode`/`headless` 重启 |
-| POST | `/api/detections` | 是 | YOLO 结果注入（预留） |
+| POST | `/api/detections` | 是 | YOLO 结果注入（前端叠加框 2.5 s 过期） |
 
 WebSocket `/ws?token=<口令>`：连接后先收到 `snapshot`、`role`，随后 10 Hz `snapshot`。控制消息：`{"type":"teleop","ns":"robot1","vx":0.2,"wz":0.0}`、`{"type":"estop"}`、`{"type":"clear_estop"}`、`{"type":"ping"}`。只读角色发送控制消息会收到 `{"type":"error"}`。
 
