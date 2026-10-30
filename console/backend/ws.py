@@ -19,18 +19,25 @@ class WsClient:
     def __init__(self, websocket: WebSocket, role: str):
         self.websocket = websocket
         self.role = role
-        self.queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1)
+        # Snapshots are coalesced into a single slot (10 Hz, only the newest
+        # matters); everything else - events, telemetry - goes through a small
+        # queue.  A shared one-slot queue silently dropped telemetry, because
+        # the next snapshot arrived 100 ms later and overwrote it.
+        self._snapshot: dict[str, Any] | None = None
+        self._side: deque[dict[str, Any]] = deque(maxlen=64)
+        self._wake = asyncio.Event()
         self._sender: asyncio.Task | None = None
 
     def offer(self, message: dict[str, Any]) -> None:
-        if self.queue.full():
-            try:
-                self.queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
+        if message.get("type") == "snapshot":
+            self._snapshot = message
+        else:
+            self._side.append(message)
         try:
-            self.queue.put_nowait(message)
-        except asyncio.QueueFull:
+            self._wake.set()
+        except RuntimeError:
+            # Called from a non-loop thread (ROS callback); the sender will
+            # pick the message up on its next wake-up.
             pass
 
     async def send_now(self, message: dict[str, Any]) -> None:
@@ -42,8 +49,13 @@ class WsClient:
     async def _send_loop(self) -> None:
         try:
             while True:
-                message = await self.queue.get()
-                await self.websocket.send_json(message)
+                await self._wake.wait()
+                self._wake.clear()
+                while self._side:
+                    await self.websocket.send_json(self._side.popleft())
+                if self._snapshot is not None:
+                    message, self._snapshot = self._snapshot, None
+                    await self.websocket.send_json(message)
         except (WebSocketDisconnect, RuntimeError, asyncio.CancelledError):
             return
 
