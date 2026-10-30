@@ -42,6 +42,9 @@ class Settings:
     # against a mine-sized target.  Override with CONSOLE_TARGET_AREA.
     target_area: float = float(os.environ.get("CONSOLE_TARGET_AREA", "0"))
 
+    # Seconds of driving kept as the map trail ("comet tail").
+    trail_seconds: float = float(os.environ.get("CONSOLE_TRAIL_SEC", "5"))
+
     def area_target(self, world: str | None) -> float:
         if self.target_area > 0:
             return self.target_area

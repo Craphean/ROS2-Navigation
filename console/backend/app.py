@@ -46,7 +46,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.node = runtime.node
         app.state.world_preview = WorldPreview(settings, runtime.node)
 
-        telemetry = Telemetry(settings.robots, settings.target_area)
+        telemetry = Telemetry(
+            settings.robots, settings.target_area, settings.trail_seconds
+        )
         app.state.telemetry = telemetry
 
         engine = MissionEngine(runtime.node, settings, emit=hub.publish_nowait)
@@ -84,7 +86,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.hub = hub
     app.state.video_hubs = video_hubs
     app.state.world_hub = world_hub
-    app.state.telemetry = Telemetry(settings.robots, settings.target_area)
+    app.state.telemetry = Telemetry(
+        settings.robots, settings.target_area, settings.trail_seconds
+    )
     app.state.proc = ProcSupervisor(settings)
     app.state.map_cache = {}
     app.state.detections = {}

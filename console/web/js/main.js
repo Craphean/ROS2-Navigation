@@ -1,5 +1,5 @@
 import { $, api, toast } from "./utils.js";
-import { Link } from "./ws.js?v=2";
+import { Link } from "./ws.js?v=3";
 import { MapView } from "./map2d.js?v=5";
 import { CloudView } from "./cloud3d.js?v=8";
 import { updateFleet } from "./fleet.js";
@@ -69,6 +69,7 @@ const link = new Link({
   },
   onEvent: (event) => appendEvent(event),
   onTelemetry: (message) => applyTelemetry(message),
+  onTrail: (message) => mapView.setTrail(message.trail || {}),
   onRole: (role) => applyRole(role),
   onError: (text) => toast(text, "error"),
 });

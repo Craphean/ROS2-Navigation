@@ -13,9 +13,10 @@ import time
 from collections import deque
 from typing import Any
 
-# One point per half second of motion - roughly ten minutes of walking.
+# Comet trail: only the last few seconds of motion stay on the map, so the
+# picture keeps following the robot instead of turning into a permanent
+# scribble of every route ever driven this session.
 _TRAIL_MAX = 1200
-_TRAIL_MIN_DT = 0.5
 _TRAIL_MIN_DIST = 0.05
 # Coverage moves slowly; a sample every two seconds is plenty.
 _COV_MAX = 900
@@ -23,8 +24,14 @@ _COV_MIN_DT = 2.0
 
 
 class Telemetry:
-    def __init__(self, robots: tuple[str, ...], target_area: float = 300.0) -> None:
+    def __init__(
+        self,
+        robots: tuple[str, ...],
+        target_area: float = 300.0,
+        trail_seconds: float = 5.0,
+    ) -> None:
         self.target_area = max(1.0, float(target_area))
+        self.trail_seconds = max(0.5, float(trail_seconds))
         self._lock = threading.Lock()
         self._trail: dict[str, deque] = {ns: deque(maxlen=_TRAIL_MAX) for ns in robots}
         self._last_pose: dict[str, tuple[float, float, float]] = {}
@@ -35,8 +42,10 @@ class Telemetry:
         self._t0 = time.monotonic()
         self._last_cov = -1e9
         self._last_pub = 0.0
+        self._last_trail = 0.0
 
-    def add_pose(self, ns: str, x: float, y: float, t: float) -> None:
+    def add_pose(self, ns: str, x: float, y: float, _clock: float = 0.0) -> None:
+        now = time.monotonic()
         with self._lock:
             prev = self._last_pose.get(ns)
             if prev is not None:
@@ -44,8 +53,15 @@ class Telemetry:
                 # otherwise it logs the same spot twice a second.
                 if math.hypot(x - prev[0], y - prev[1]) < _TRAIL_MIN_DIST:
                     return
-            self._last_pose[ns] = (x, y, t)
-            self._trail[ns].append([round(x, 2), round(y, 2)])
+            self._last_pose[ns] = (x, y, now)
+            points = self._trail[ns]
+            points.append((round(x, 2), round(y, 2), now))
+            self._prune_locked(points, now)
+
+    def _prune_locked(self, points: deque, now: float) -> None:
+        limit = now - self.trail_seconds
+        while points and points[0][2] < limit:
+            points.popleft()
 
     def add_coverage(self, _clock: float, area: float, target: float | None = None) -> None:
         """Record explored area; the bar is area against a configured target.
@@ -75,11 +91,33 @@ class Telemetry:
             self._last_pub = now
             return True
 
+    def due_trail(self, now: float, period: float = 0.33) -> bool:
+        """Trail alone, 3 Hz: a one-second comet looks like it teleports."""
+        with self._lock:
+            if now - self._last_trail < period:
+                return False
+            self._last_trail = now
+            return True
+
+    def trail_snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            now = time.monotonic()
+            trail = {}
+            for ns, points in self._trail.items():
+                self._prune_locked(points, now)
+                trail[ns] = [[p[0], p[1]] for p in points]
+            return {"type": "trail", "trail": trail, "server_time": time.time()}
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
+            now = time.monotonic()
+            trail = {}
+            for ns, points in self._trail.items():
+                self._prune_locked(points, now)
+                trail[ns] = [[p[0], p[1]] for p in points]
             return {
                 "type": "telemetry",
-                "trail": {ns: list(points) for ns, points in self._trail.items()},
+                "trail": trail,
                 "coverage": [list(row) for row in self._coverage],
                 "target_area": self.target_area,
                 "server_time": time.time(),

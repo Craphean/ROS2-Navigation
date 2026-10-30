@@ -127,8 +127,10 @@ async def state_pump(
                     if telemetry is not None:
                         telemetry.add_pose(ns, pose[0], pose[1], clock)
             if telemetry is not None and telemetry.due(time.time()):
-                # 1 Hz: the trail is a context drawing, not the state itself.
+                # 1 Hz: coverage history only changes every couple of seconds.
                 hub.publish_nowait(telemetry.snapshot())
+            if telemetry is not None and telemetry.due_trail(time.time()):
+                hub.publish_nowait(telemetry.trail_snapshot())
             hub.publish_nowait(store.snapshot(engine.snapshot(), time.time()))
         except Exception:  # noqa: BLE001 - never kill the pump
             pass
