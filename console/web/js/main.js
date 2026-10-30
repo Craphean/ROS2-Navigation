@@ -156,7 +156,6 @@ function syncMissionOptions(mission) {
 }
 
 function applySnapshot(snapshot) {
-  updatePills(snapshot);
   updateFleet($("#robot-cards"), snapshot, activeMission());
   mapView.setSnapshot(snapshot);
   if (viewMode === "3d") cloudView.setPoses(snapshot.robots || {});
@@ -465,19 +464,6 @@ function followCamera(ns, image) {
     window.setTimeout(tick, 1000 / 3);
   };
   tick();
-}
-
-function updatePills(snapshot) {
-  const loops = snapshot.loop_closures || {};
-  const loopTotal = Object.values(loops).reduce((sum, value) => sum + Number(value || 0), 0);
-  const loopEl = $("#loop-status");
-  if (loopEl) {
-    const parts = Object.entries(loops).map(([ns, count]) => `${ns.slice(-1)}:${count}`);
-    loopEl.textContent = loopTotal
-      ? `闭环 ${loopTotal}（${parts.join(" ")}）`
-      : "闭环 0";
-  }
-
 }
 
 function activeMission() {

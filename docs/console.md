@@ -1,6 +1,6 @@
 # 矿井智能巡检机器人控制台
 
-浏览器控制台，用于在双 TurtleBot3 仿真上演示矿井巡检：实时建图、双车位姿与激光、双路车载视频、WASD 遥控、单点导航、多航点巡检任务、一键启停与公网访问。
+浏览器控制台，用于在双 TurtleBot3 仿真上演示矿井巡检：实时建图、双车位姿与激光、双路车载摄像头、WASD 遥控、单点导航、多航点巡检任务、一键启停与公网访问。
 
 ## 1. 组成
 
@@ -156,7 +156,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 「世界」标签页看的是 gz-sim 自己渲染的画面，不是浏览器的三维重建：
 
 - 控制台启动时用 `gz service /world/<w>/create` 往当前世界塞一个 `preview_cam` 模型（camera sensor，960×540@15 Hz），
-  `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再走和车载视频相同的 MJPEG 管线。
+  `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再走和车载摄像头相同的 MJPEG 管线。
   渲染走 EGL（无窗口、用 GPU），所以不需要 X / Gazebo GUI。
 - 相机是**自由飞行视角**，和 Gazebo 视口一样：左键拖拽转头（往下拖就看地板）、右键或 Shift+左键平移机身、滚轮沿视线前后移动。
   位置/朝向就是状态本身，俯仰 ±89°。「对准 R1/R2」把机位放回该车肩膀高度（1.55 m）并朝车头。
