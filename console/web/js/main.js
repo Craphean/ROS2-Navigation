@@ -134,7 +134,13 @@ function drawCoverageChart(series) {
   ctx.fill();
 }
 
+let missionOptionLock = { id: "", until: 0 };
+
 function syncMissionOptions(mission) {
+  // While a click is in flight, do not let the 10 Hz snapshot paint the old
+  // robot back over it.
+  if (Date.now() < missionOptionLock.until) return;
+  if (!mission) return;
   const box = $("#mission-robot");
   if (box) {
     const robot = (mission && mission.robot) || "robot1";
@@ -564,9 +570,14 @@ async function refreshMissions() {
     const payload = await api("/api/missions");
     state.missions = payload.missions || [];
     renderMissionSelect($("#mission-select"), state.missions, state.selectedId);
-    if (!state.selectedId && state.missions.length) {
+    // A stale id in localStorage (a mission deleted or renamed since) used to
+    // leave missionDetail null for the whole session: the panel then showed no
+    // mission and the robot selector snapped back to R1 on every snapshot.
+    const known = state.missions.some((mission) => mission.id === state.selectedId);
+    if (!known && state.missions.length) {
       state.selectedId = state.missions[0].id;
       $("#mission-select").value = state.selectedId;
+      localStorage.setItem("mine_selected_mission", state.selectedId);
     }
     await loadMissionDetail(state.selectedId);
   } catch (error) {
@@ -697,12 +708,26 @@ function wireActions() {
         toast("请先选择任务", "error");
         return;
       }
+      const ns = button.dataset.ns;
+      // Paint immediately: the snapshot loop runs at 10 Hz and would otherwise
+      // repaint the previous robot before the POST returns.
+      document.querySelectorAll("#mission-robot button").forEach((other) => {
+        other.classList.toggle("active", other === button);
+      });
+      missionOptionLock = { id, until: Date.now() + 2500 };
       const payload = await call(
         `/api/missions/${id}/options`,
-        { robot: button.dataset.ns },
-        `执行车已切换为 ${button.dataset.ns.toUpperCase()}`
+        { robot: ns },
+        `执行车已切换为 ${ns.toUpperCase()}`
       );
-      if (payload?.mission) await refreshMissions();
+      if (payload?.mission) {
+        if (state.missionDetail?.id === id) state.missionDetail.robot = payload.mission.robot;
+        if (state.snapshot?.mission?.id === id) state.snapshot.mission.robot = payload.mission.robot;
+        await loadMissionDetail(id);
+      } else {
+        missionOptionLock.until = 0;
+        syncMissionOptions(displayMission());
+      }
     });
   });
 
@@ -713,12 +738,18 @@ function wireActions() {
       return;
     }
     const enabled = event.target.checked;
+    missionOptionLock = { id, until: Date.now() + 2500 };
     const payload = await call(
       `/api/missions/${id}/options`,
       { loop: enabled },
       enabled ? "已开启循环执行" : "已关闭循环执行"
     );
-    if (!payload) event.target.checked = !enabled;
+    if (!payload) {
+      missionOptionLock.until = 0;
+      event.target.checked = !enabled;
+    } else if (payload.mission && state.missionDetail?.id === id) {
+      state.missionDetail.loop = payload.mission.loop;
+    }
   });
 
   $("#btn-mission-start")?.addEventListener("click", async () => {
