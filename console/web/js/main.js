@@ -42,12 +42,6 @@ const teleop = new Teleop({
     link.send({ type: "teleop", ns: state.target, vx, wz });
   },
   onState: (active) => {
-    const element = $("#teleop-state");
-    if (element) {
-      element.textContent = active
-        ? `已接管 ${state.target.toUpperCase()} · WASD`
-        : "未接管 · WASD";
-    }
     $("#btn-lease")?.classList.toggle("on", active);
   },
 });
