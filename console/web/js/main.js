@@ -160,11 +160,11 @@ function applySnapshot(snapshot) {
   // The strip mirrors the running inspection; while the robots are exploring
   // (or idle) it would keep showing the last waypoint that was reached, so it
   // collapses instead of lying.
-  const stripLive = Boolean(
-    mission &&
-      ["RUNNING", "PAUSED", "ESTOP", "ESTOPPED", "INTERRUPTED"].includes(mission.state)
-  );
-  $("#mission-strip")?.classList.toggle("hidden", !stripLive);
+  // Only a mission that is actually moving the robots earns the strip; a
+  // COMPLETED / ABORTED / INTERRUPTED one just shows the waypoint it died on.
+  const stripLive = Boolean(mission && ["RUNNING", "PAUSED"].includes(mission.state));
+  const strip = $("#mission-strip") || document.querySelector(".mission-strip");
+  strip?.classList.toggle("hidden", !stripLive);
   if (mission) mapView.setWaypoints(mission.waypoints || []);
 
   for (const ns of ["robot1", "robot2"]) {
