@@ -488,6 +488,27 @@ function displayMission() {
 /* ------------------------------------------------------------------ */
 /* events                                                              */
 /* ------------------------------------------------------------------ */
+const EVENT_LABELS = {
+  MISSION_START: "任务开始",
+  MISSION_DONE: "任务完成",
+  MISSION_ABORT: "任务中止",
+  MISSION_PAUSE: "任务暂停",
+  MISSION_RESUME: "任务继续",
+  MISSION_SKIP: "跳过航点",
+  MISSION_STOP: "任务终止",
+  WAYPOINT_FAIL: "航点失败",
+  WAYPOINT_SKIP: "航点跳过",
+  ESTOP: "急停",
+  MANUAL_TAKEOVER: "人工接管",
+};
+
+function eventLabel(code) {
+  // 前往 / 到达 already read as plain Chinese in event.text, so the chip is
+  // dropped for those two instead of printing "WAYPOINT_GO 前往 …".
+  if (code === "WAYPOINT_GO" || code === "WAYPOINT_DONE") return "";
+  return EVENT_LABELS[code] || code;
+}
+
 function appendEvent(event) {
   state.events.unshift(event);
   state.events = state.events.slice(0, 60);
@@ -495,11 +516,11 @@ function appendEvent(event) {
   if (!list) return;
   const item = document.createElement("li");
   item.className = event.level || "info";
+  const label = eventLabel(event.code);
+  const tag = label ? `<span class="tag">${escapeHtml(label)}</span> ` : "";
   item.innerHTML = `<time>${new Date(event.ts * 1000).toLocaleTimeString("zh-CN", {
     hour12: false,
-  })}</time><span><span class="tag">${event.code}</span> ${escapeHtml(
-    event.text
-  )}</span>`;
+  })}</time><span>${tag}${escapeHtml(event.text)}</span>`;
   list.prepend(item);
   while (list.children.length > 60) list.lastChild.remove();
   $("#event-count").textContent = String(state.events.length);
