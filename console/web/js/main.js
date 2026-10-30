@@ -212,7 +212,7 @@ function applySnapshot(snapshot) {
   const stripLive = Boolean(mission && ["RUNNING", "PAUSED"].includes(mission.state));
   const strip = $("#mission-strip") || document.querySelector(".mission-strip");
   strip?.classList.toggle("hidden", !stripLive);
-  if (mission) mapView.setWaypoints(mission.waypoints || []);
+  updateMapWaypoints();
 
   for (const ns of ["robot1", "robot2"]) {
     const robot = snapshot.robots?.[ns];
@@ -519,6 +519,25 @@ function activeMission() {
   return state.snapshot?.mission || null;
 }
 
+function updateMapWaypoints() {
+  const mission = displayMission();
+  if (!mission) {
+    mapView.setWaypoints([]);
+    return;
+  }
+  const live = ["RUNNING", "PAUSED"].includes(mission.state);
+  const world = String(state.sim?.sim?.world || "");
+  const belongsTo = String(mission.world || "");
+  // A route only makes sense inside the world it was taught in, and only while
+  // it is actually driving the robots: a mine route drawn over the hospital
+  // reads as if those points were real targets.
+  if (!live || (belongsTo && world && belongsTo !== world)) {
+    mapView.setWaypoints([]);
+    return;
+  }
+  mapView.setWaypoints(mission.waypoints || []);
+}
+
 function displayMission() {
   const active = activeMission();
   const selected = selectedMissionId() || state.selectedId;
@@ -647,7 +666,7 @@ async function loadMissionDetail(missionId) {
   try {
     state.missionDetail = await api(`/api/missions/${missionId}`);
     renderMission(state.missionDetail, missionRefs);
-    mapView.setWaypoints(state.missionDetail.waypoints || []);
+    updateMapWaypoints();
   } catch (error) {
     console.warn(error);
   }
@@ -689,7 +708,7 @@ async function handleMapPick(point) {
       });
       state.missionDetail = mission.mission;
       renderMission(state.missionDetail, missionRefs);
-      mapView.setWaypoints(state.missionDetail.waypoints);
+      updateMapWaypoints();
       toast("已追加巡检点", "ok");
     } catch (error) {
       toast(error.message, "error");

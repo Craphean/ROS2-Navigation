@@ -97,6 +97,10 @@ class Mission:
     robot: str
     waypoints: list[Waypoint] = field(default_factory=list)
     loop: bool = False
+    # Which world these coordinates belong to ("mine", "house", ...).  Empty
+    # means "any": the console only draws the waypoints on the 2D map while
+    # that world is running, so a mine route does not appear over a hospital.
+    world: str = ""
     on_fail: str = "retry_then_skip"
     state: str = IDLE
     cursor: int = 0
@@ -111,6 +115,7 @@ class Mission:
             "name": self.name,
             "robot": self.robot,
             "loop": self.loop,
+            "world": self.world,
             "on_fail": self.on_fail,
             "state": self.state,
             "cursor": self.cursor,
@@ -137,6 +142,7 @@ class Mission:
             robot=str(data.get("robot", "robot1")),
             waypoints=waypoints,
             loop=bool(data.get("loop", False)),
+            world=str(data.get("world", "")),
             on_fail=str(data.get("on_fail", "retry_then_skip")),
             state=str(data.get("state", IDLE)),
             cursor=int(data.get("cursor", 0)),
@@ -269,6 +275,7 @@ class MissionEngine:
             robot=robot,
             waypoints=waypoints,
             loop=bool(payload.get("loop", False)),
+            world=str(payload.get("world", "")),
             on_fail=str(payload.get("on_fail", "retry_then_skip")),
         )
         self.missions[mission.id] = mission
