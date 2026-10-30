@@ -509,7 +509,8 @@ async def sim_start(request: Request, body: SimStartBody) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
     result = proc.start_sim(body.world, body.mode, body.headless)
     if result.get("ok") and "已在运行" not in str(result.get("message", "")):
-        request.app.state.node.reset_session()
+        request.app.state.telemetry.clear()
+    request.app.state.node.reset_session()
     return result
 
 
@@ -519,6 +520,7 @@ async def sim_stop(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="控制台未启用仿真管理")
     result = request.app.state.proc.stop_sim()
     request.app.state.world_preview.stop()
+    request.app.state.telemetry.clear()
     request.app.state.node.reset_session()
     return result
 
@@ -545,6 +547,7 @@ async def sim_restart(request: Request, body: SimRestartBody) -> dict[str, Any]:
     )
     # The preview camera model lives inside the old world; it is gone now.
     request.app.state.world_preview.stop()
+    request.app.state.telemetry.clear()
     request.app.state.node.reset_session()
     return result
 
@@ -602,6 +605,11 @@ async def cloud_bin(request: Request) -> Response:
 # ----------------------------------------------------------------------
 # Gazebo world preview
 # ----------------------------------------------------------------------
+@router.get("/telemetry")
+async def telemetry(request: Request) -> dict[str, Any]:
+    return request.app.state.telemetry.snapshot()
+
+
 @router.get("/world/preview/status")
 async def world_preview_status(request: Request) -> dict[str, Any]:
     return {

@@ -17,6 +17,7 @@ from .procman import ProcSupervisor
 from .ros_runtime import RosRuntime
 from .teleop import TeleopGate
 from .video import FrameHub
+from .telemetry import Telemetry
 from .worldview import WorldPreview
 from .ws import WsHub, build_ws_router, state_pump
 
@@ -45,6 +46,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.node = runtime.node
         app.state.world_preview = WorldPreview(settings, runtime.node)
 
+        telemetry = Telemetry(settings.robots, settings.target_area)
+        app.state.telemetry = telemetry
+
         engine = MissionEngine(runtime.node, settings, emit=hub.publish_nowait)
         app.state.engine = engine
 
@@ -53,7 +57,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.teleop = teleop
 
         pump = asyncio.create_task(
-            state_pump(runtime.node, engine, hub, period=0.1), name="state-pump"
+            state_pump(runtime.node, engine, hub, period=0.1, telemetry=telemetry),
+            name="state-pump",
         )
         app.state.started_at = time.time()
         try:
@@ -79,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.hub = hub
     app.state.video_hubs = video_hubs
     app.state.world_hub = world_hub
+    app.state.telemetry = Telemetry(settings.robots, settings.target_area)
     app.state.proc = ProcSupervisor(settings)
     app.state.map_cache = {}
     app.state.detections = {}

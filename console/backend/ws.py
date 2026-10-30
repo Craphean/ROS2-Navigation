@@ -88,15 +88,30 @@ class WsHub:
             await client.close()
 
 
-async def state_pump(node: Any, engine: Any, hub: WsHub, period: float = 0.1) -> None:
+async def state_pump(
+    node: Any,
+    engine: Any,
+    hub: WsHub,
+    period: float = 0.1,
+    telemetry: Any = None,
+) -> None:
     store = node.store
     while True:
         try:
             store.refresh_sim_meta()
+            clock = store.clock if store.clock is not None else time.time()
+            stats = store.map_stats_snapshot()
+            if telemetry is not None and stats:
+                telemetry.add_coverage(clock, float(stats.get("area", 0.0)))
             for ns in store.robots:
                 pose = node.lookup_world_pose(ns)
                 if pose is not None:
                     store.set_world_pose(ns, pose)
+                    if telemetry is not None:
+                        telemetry.add_pose(ns, pose[0], pose[1], clock)
+            if telemetry is not None and telemetry.due(time.time()):
+                # 1 Hz: the trail is a context drawing, not the state itself.
+                hub.publish_nowait(telemetry.snapshot())
             hub.publish_nowait(store.snapshot(engine.snapshot(), time.time()))
         except Exception:  # noqa: BLE001 - never kill the pump
             pass
@@ -119,6 +134,9 @@ def build_ws_router() -> APIRouter:
         client = await hub.register(websocket, role)
         try:
             await client.send_now(store.snapshot(engine.snapshot(), time.time()))
+            telemetry = getattr(websocket.app.state, "telemetry", None)
+            if telemetry is not None:
+                await client.send_now(telemetry.snapshot())
             await client.send_now(
                 {"type": "role", "role": role, "server_time": time.time()}
             )

@@ -1,6 +1,6 @@
 import { $, api, toast } from "./utils.js";
 import { Link } from "./ws.js";
-import { MapView } from "./map2d.js?v=4";
+import { MapView } from "./map2d.js?v=5";
 import { CloudView } from "./cloud3d.js?v=8";
 import { updateFleet } from "./fleet.js";
 import { renderMission, renderMissionSelect } from "./mission.js";
@@ -68,6 +68,7 @@ const link = new Link({
     applySnapshot(snapshot);
   },
   onEvent: (event) => appendEvent(event),
+  onTelemetry: (message) => applyTelemetry(message),
   onRole: (role) => applyRole(role),
   onError: (text) => toast(text, "error"),
 });
@@ -75,6 +76,63 @@ const link = new Link({
 /* ------------------------------------------------------------------ */
 /* snapshot                                                            */
 /* ------------------------------------------------------------------ */
+function applyTelemetry(message) {
+  const series = message.coverage || [];
+  const last = series.length ? series[series.length - 1] : null;
+  const pct = last ? last[1] * 100 : 0;
+  const area = last ? last[2] : 0;
+  const bar = $("#cov-bar");
+  if (bar) bar.style.width = `${Math.min(100, pct).toFixed(1)}%`;
+  const pctEl = $("#cov-pct");
+  if (pctEl) pctEl.textContent = last ? `${pct.toFixed(1)}%` : "--";
+  const areaEl = $("#cov-area");
+  const target = Number(message.target_area || 0);
+  if (areaEl) {
+    areaEl.textContent = last
+      ? `已勘探 ${area.toFixed(0)}${target ? ` / ${target.toFixed(0)}` : ""} m²`
+      : "等待地图";
+  }
+  const knownEl = $("#cov-known");
+  if (knownEl) knownEl.textContent = `${series.length} 点`;
+  mapView.setTrail(message.trail || {});
+  drawCoverageChart(series);
+}
+
+function drawCoverageChart(series) {
+  const canvas = $("#cov-chart");
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth || 240;
+  const height = canvas.clientHeight || 64;
+  if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  if (series.length < 2) return;
+  const values = series.map((row) => Number(row[1]) * 100);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const span = Math.max(1e-6, max - min);
+  ctx.beginPath();
+  values.forEach((value, index) => {
+    const x = (index / (values.length - 1)) * (width - 2) + 1;
+    const y = height - 2 - ((value - min) / span) * (height - 6);
+    if (index) ctx.lineTo(x, y);
+    else ctx.moveTo(x, y);
+  });
+  ctx.strokeStyle = "#37c8d4";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.lineTo(width - 1, height);
+  ctx.lineTo(1, height);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(55, 200, 212, 0.14)";
+  ctx.fill();
+}
+
 function applySnapshot(snapshot) {
   updatePills(snapshot);
   updateFleet($("#robot-cards"), snapshot, activeMission());
@@ -871,6 +929,9 @@ async function boot() {
   await loadWorlds();
   await refreshMissions();
   link.connect();
+  // The WebSocket pushes telemetry every second; this covers a reload before
+  // the first push arrives.
+  api("/api/telemetry").then(applyTelemetry).catch(() => {});
   pollSim();
   setInterval(pollSim, 5000);
   setInterval(refreshMissions, 20000);

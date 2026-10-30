@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#080b0e" />
   <title>矿井智能巡检机器人控制台</title>
-  <link rel="stylesheet" href="css/app.css?v=7" />
+  <link rel="stylesheet" href="css/app.css?v=8" />
 </head>
 <body>
 <div class="app">
@@ -43,6 +43,21 @@
           <span class="hint" id="fleet-hint">2 台在线</span>
         </div>
         <div id="robot-cards" class="robot-cards"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>勘探进度</h2>
+          <span class="hint" id="cov-pct">--</span>
+        </div>
+        <div class="progress">
+          <div class="progress-bar"><i id="cov-bar"></i></div>
+          <div class="progress-meta">
+            <span id="cov-area">等待地图</span>
+            <span id="cov-known">0 点</span>
+          </div>
+        </div>
+        <canvas id="cov-chart" class="cov-chart" height="64"></canvas>
       </section>
 
       <section class="panel grow">
@@ -232,6 +247,6 @@
   </dialog>
 </div>
 
-<script type="module" src="js/main.js?v=16"></script>
+<script type="module" src="js/main.js?v=17"></script>
 </body>
 </html>

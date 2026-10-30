@@ -143,6 +143,9 @@ class StateStore:
         self.map_seq = 0
         self.map_stamp = 0.0
         self.map_wall = 0.0
+        # Occupancy summary, recomputed once per map message (1 Hz) rather than
+        # per snapshot (10 Hz): counting a million cells is not free.
+        self.map_stats: dict[str, float] = {}
         self.clock: float | None = None
         self.clock_wall = 0.0
         self.markers: dict[str, Any] = {}
@@ -154,8 +157,10 @@ class StateStore:
     # ROS callbacks
     # ------------------------------------------------------------------
     def on_map(self, msg: Any) -> None:
+        stats = _occupancy_stats(msg)
         with self.lock:
             self.map_msg = msg
+            self.map_stats = stats
             self.map_seq += 1
             self.map_stamp = (
                 float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
@@ -232,6 +237,10 @@ class StateStore:
     # ------------------------------------------------------------------
     # Snapshot
     # ------------------------------------------------------------------
+    def map_stats_snapshot(self) -> dict[str, float]:
+        with self.lock:
+            return dict(self.map_stats)
+
     def map_meta(self) -> dict[str, Any] | None:
         with self.lock:
             msg = self.map_msg
@@ -368,3 +377,32 @@ def _scan_to_world(robot: RobotState, max_points: int = 140) -> list[list[float]
     xs = np.round(x0 + ranges * np.cos(heading), 3)
     ys = np.round(y0 + ranges * np.sin(heading), 3)
     return np.stack((xs, ys), axis=1).tolist()
+
+def _occupancy_stats(msg: Any) -> dict[str, float]:
+    """Known / unknown split of an OccupancyGrid.
+
+    "Known" is anything the SLAM front end has committed (free 0 or occupied
+    100); -1 is unexplored.  Coverage over the *current* map extent is what the
+    console shows - the merged map grows as the robots explore, so the ratio
+    dips when a new area appears and climbs again as it gets filled.
+    """
+    try:
+        width = int(msg.info.width)
+        height = int(msg.info.height)
+        resolution = float(msg.info.resolution)
+        data = np.asarray(msg.data, dtype=np.int8)
+    except (AttributeError, TypeError, ValueError):
+        return {}
+    total = int(data.size) or (width * height)
+    if total <= 0:
+        return {}
+    known = int(np.count_nonzero(data >= 0))
+    return {
+        "coverage": known / total,
+        "known": float(known),
+        "total": float(total),
+        "area": known * resolution * resolution,
+        "width": float(width),
+        "height": float(height),
+        "resolution": resolution,
+    }

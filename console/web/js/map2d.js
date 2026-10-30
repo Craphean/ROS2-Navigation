@@ -19,6 +19,7 @@ export class MapView {
     this.meta = null;
     this.snapshot = null;
     this.waypoints = [];
+    this.trail = {};
     // The picture on screen stays until the next PNG has fully decoded.
     // Swapping src on this same Image blanks it for the whole download, and
     // /map is republished several times a second.
@@ -79,6 +80,11 @@ export class MapView {
       this._wantedSeq = -1;
       this._loadingSeq = -1;
     }
+    this.dirty = true;
+  }
+
+  setTrail(trail) {
+    this.trail = trail || {};
     this.dirty = true;
   }
 
@@ -240,6 +246,7 @@ export class MapView {
 
     this.drawScan(ctx);
     this.drawGoals(ctx);
+    this.drawTrail(ctx);
     this.drawWaypoints(ctx);
     this.drawRobots(ctx);
     this.drawScale(ctx);
@@ -315,6 +322,36 @@ export class MapView {
       ctx.stroke();
       ctx.restore();
     }
+  }
+
+  drawTrail(ctx) {
+    const trail = this.trail || {};
+    for (const ns of Object.keys(trail)) {
+      const points = trail[ns];
+      if (!points || points.length < 2) continue;
+      const color = ROBOT_COLOR[ns] || "#ffffff";
+      // Draw in bands instead of per-segment strokes: a 1200-point trail would
+      // otherwise cost 1200 stroke() calls on every redraw.
+      const chunks = 8;
+      const per = Math.ceil(points.length / chunks);
+      ctx.lineCap = "round";
+      ctx.lineWidth = 1.6;
+      for (let chunk = 0; chunk < chunks; chunk += 1) {
+        const start = chunk * per;
+        const end = Math.min(points.length, start + per + 1);
+        if (end - start < 2) continue;
+        ctx.beginPath();
+        for (let i = start; i < end; i += 1) {
+          const point = this.worldToScreen(points[i][0], points[i][1]);
+          if (i === start) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        }
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.08 + 0.55 * ((chunk + 1) / chunks);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   drawWaypoints(ctx) {

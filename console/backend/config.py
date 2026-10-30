@@ -36,6 +36,9 @@ class Settings:
     manage_sim: bool = _env_bool("CONSOLE_MANAGE_SIM", True)
     kill_sim_on_exit: bool = _env_bool("KILL_SIM_ON_EXIT", False)
     default_world: str = os.environ.get("CONSOLE_WORLD", "mine")
+    # Floor area that counts as "the world explored" for the progress bar.  It
+    # is a demo target, not something the console can measure.
+    target_area: float = float(os.environ.get("CONSOLE_TARGET_AREA", "300"))
     default_mode: str = os.environ.get("CONSOLE_EXPLORATION_MODE", "off")
 
     @property
