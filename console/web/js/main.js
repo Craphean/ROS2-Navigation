@@ -157,6 +157,14 @@ function applySnapshot(snapshot) {
   const mission = displayMission();
   renderMission(mission, missionRefs);
   syncMissionOptions(mission);
+  // The strip mirrors the running inspection; while the robots are exploring
+  // (or idle) it would keep showing the last waypoint that was reached, so it
+  // collapses instead of lying.
+  const stripLive = Boolean(
+    mission &&
+      ["RUNNING", "PAUSED", "ESTOP", "ESTOPPED", "INTERRUPTED"].includes(mission.state)
+  );
+  $("#mission-strip")?.classList.toggle("hidden", !stripLive);
   if (mission) mapView.setWaypoints(mission.waypoints || []);
 
   for (const ns of ["robot1", "robot2"]) {
