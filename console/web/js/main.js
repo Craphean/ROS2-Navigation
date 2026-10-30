@@ -134,6 +134,20 @@ function drawCoverageChart(series) {
   ctx.fill();
 }
 
+function syncMissionOptions(mission) {
+  const box = $("#mission-robot");
+  if (box) {
+    const robot = (mission && mission.robot) || "robot1";
+    box.querySelectorAll("button").forEach((button) => {
+      button.classList.toggle("active", button.dataset.ns === robot);
+    });
+  }
+  const loop = $("#mission-loop");
+  if (loop && document.activeElement !== loop) {
+    loop.checked = Boolean(mission && mission.loop);
+  }
+}
+
 function applySnapshot(snapshot) {
   updatePills(snapshot);
   updateFleet($("#robot-cards"), snapshot, activeMission());
@@ -142,6 +156,7 @@ function applySnapshot(snapshot) {
 
   const mission = displayMission();
   renderMission(mission, missionRefs);
+  syncMissionOptions(mission);
   if (mission) mapView.setWaypoints(mission.waypoints || []);
 
   for (const ns of ["robot1", "robot2"]) {
@@ -673,6 +688,37 @@ function wireActions() {
     state.selectedId = event.target.value;
     localStorage.setItem("mine_selected_mission", state.selectedId);
     loadMissionDetail(state.selectedId);
+  });
+
+  document.querySelectorAll("#mission-robot button").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const id = selectedMissionId();
+      if (!id) {
+        toast("请先选择任务", "error");
+        return;
+      }
+      const payload = await call(
+        `/api/missions/${id}/options`,
+        { robot: button.dataset.ns },
+        `执行车已切换为 ${button.dataset.ns.toUpperCase()}`
+      );
+      if (payload?.mission) await refreshMissions();
+    });
+  });
+
+  $("#mission-loop")?.addEventListener("change", async (event) => {
+    const id = selectedMissionId();
+    if (!id) {
+      toast("请先选择任务", "error");
+      return;
+    }
+    const enabled = event.target.checked;
+    const payload = await call(
+      `/api/missions/${id}/options`,
+      { loop: enabled },
+      enabled ? "已开启循环执行" : "已关闭循环执行"
+    );
+    if (!payload) event.target.checked = !enabled;
   });
 
   $("#btn-mission-start")?.addEventListener("click", async () => {

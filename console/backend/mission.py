@@ -287,6 +287,27 @@ class MissionEngine:
         self.store.save_definition(mission)
         return mission
 
+    def update_options(
+        self,
+        mission_id: str,
+        robot: str | None = None,
+        loop: bool | None = None,
+    ) -> Mission:
+        """Change the executing robot / looping without touching waypoints."""
+        mission = self.missions.get(mission_id)
+        if mission is None:
+            raise ValueError("任务不存在")
+        if mission.state in (RUNNING, PAUSED, ESTOPPED):
+            raise ValueError("任务运行中，不能修改执行设置")
+        if robot:
+            if robot not in self.settings.robots:
+                raise ValueError(f"未知机器人 {robot}")
+            mission.robot = robot
+        if loop is not None:
+            mission.loop = bool(loop)
+        self.store.save_definition(mission)
+        return mission
+
     def start(self, mission_id: str) -> Mission:
         mission = self.missions.get(mission_id)
         if mission is None:

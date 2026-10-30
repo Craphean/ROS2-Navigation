@@ -69,7 +69,7 @@ CONSOLE_MANAGE_SIM=0 ./console/run.sh
 - **左栏**：两车状态卡（位姿、速度、导航状态、剩余距离）；巡检任务选择、进度、航点状态。
 - **中栏**：2D 建图（OccupancyGrid + 激光点 + 车辆 + 航点 + 目标连线），支持拖拽平移、滚轮缩放、点击拾取。
 - **右栏**：双路 320×240 视频；事件流（任务、航点、失败、急停）。
-- **左栏**：车队状态、勘探进度（进度条 + 面积曲线）、巡检任务。
+- **左栏**：车队状态、勘探进度（进度条 + 面积曲线）、巡检任务（可选执行车 R1/R2、勾选循环执行）。
 - **中部视图**：2D 建图 / 3D 点云 / 世界（Gazebo 实时预览）三个标签页；2D 图上叠加两条渐隐的行驶轨迹。
 - **底栏**：WASD/方向键、接管/释放、召回、保存地图（2D 栅格）、导出 PCD（3D 点云）、换世界/重启仿真、急停。
 
@@ -186,6 +186,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | POST | `/api/teleop/lease`、`release`、`cmd` | 是 | 遥控 |
 | POST | `/api/estop`、`/api/estop/clear` | 是 | 急停 |
 | GET/POST | `/api/missions`、`/{id}/start|pause|resume|skip|stop|waypoints` | 写操作需登录 | 任务 |
+| POST | `/api/missions/{id}/options` | 是 | 改执行车（robot）与是否循环（loop） |
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
 | GET | `/api/telemetry` | 否 | 轨迹与勘探进度时间序列（WS 每秒推送同结构） |
 | GET | `/api/world/preview.mjpeg` | 否 | Gazebo 世界预览视频流 |

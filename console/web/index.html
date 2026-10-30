@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#080b0e" />
   <title>矿井智能巡检机器人控制台</title>
-  <link rel="stylesheet" href="css/app.css?v=8" />
+  <link rel="stylesheet" href="css/app.css?v=9" />
 </head>
 <body>
 <div class="app">
@@ -68,6 +68,17 @@
 
         <select id="mission-select" class="select"></select>
 
+        <div class="mission-opts">
+          <div class="segmented" id="mission-robot" title="执行巡检的车">
+            <button data-ns="robot1" class="active">R1</button>
+            <button data-ns="robot2">R2</button>
+          </div>
+          <label class="check-row tight" for="mission-loop">
+            <input type="checkbox" id="mission-loop" />
+            <span>循环执行</span>
+          </label>
+        </div>
+
         <div class="progress">
           <div class="progress-bar"><i id="mission-progress"></i></div>
           <div class="progress-meta">
@@ -78,7 +89,7 @@
 
         <ol id="waypoint-list" class="waypoints"></ol>
 
-        <div class="btn-row">
+        <div class="btn-row mission-actions">
           <button class="btn small" id="btn-mission-start">开始</button>
           <button class="btn small ghost" id="btn-mission-pause">暂停</button>
           <button class="btn small ghost" id="btn-mission-resume">继续</button>
@@ -247,6 +258,6 @@
   </dialog>
 </div>
 
-<script type="module" src="js/main.js?v=19"></script>
+<script type="module" src="js/main.js?v=20"></script>
 </body>
 </html>

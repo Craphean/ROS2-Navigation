@@ -394,6 +394,24 @@ async def append_waypoint(
     return {"ok": True, "mission": mission.to_dict()}
 
 
+class MissionOptionsBody(BaseModel):
+    robot: str | None = None
+    loop: bool | None = None
+
+
+@router.post("/missions/{mission_id}/options", dependencies=[Depends(require_operator)])
+async def mission_options(
+    request: Request, mission_id: str, body: MissionOptionsBody
+) -> dict[str, Any]:
+    try:
+        mission = request.app.state.engine.update_options(
+            mission_id, robot=body.robot, loop=body.loop
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"ok": True, "mission": mission.to_dict()}
+
+
 @router.post("/missions/{mission_id}/start", dependencies=[Depends(require_operator)])
 async def start_mission(request: Request, mission_id: str) -> dict[str, Any]:
     engine = request.app.state.engine
