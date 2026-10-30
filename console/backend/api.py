@@ -59,6 +59,8 @@ class WorldViewBody(BaseModel):
     ns: str | None = None
     yaw: float | None = None
     pitch: float | None = None
+    pos: list[float] | None = None
+    # Kept so an older tab does not 422 while it is still open.
     distance: float | None = None
     target: list[float] | None = None
 
@@ -615,8 +617,7 @@ async def world_preview_start(request: Request, body: WorldViewBody) -> dict[str
             request.app.state.world_preview.start,
             yaw=body.yaw,
             pitch=body.pitch,
-            distance=body.distance,
-            target=body.target,
+            pos=body.pos,
             ns=body.ns,
         )
     except RuntimeError as exc:
@@ -630,8 +631,7 @@ async def world_preview_view(request: Request, body: WorldViewBody) -> dict[str,
         request.app.state.world_preview.set_view,
         yaw=body.yaw,
         pitch=body.pitch,
-        distance=body.distance,
-        target=body.target,
+        pos=body.pos,
         ns=body.ns,
     )
 

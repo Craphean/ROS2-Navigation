@@ -72,16 +72,13 @@ class WorldPreview:
         # walls in every indoor world; the space right behind a robot that got
         # there by driving is the one place guaranteed to be free.
         self.ns = settings.robots[0]
-        # Orbit camera, like dragging in the Gazebo GUI: the eye circles a
-        # pivot in the world, right-drag slides that pivot and the wheel decides
-        # the radius.  A fixed "camera on the robot" view cannot be navigated -
-        # this one lets the operator fly out of a room and look back in.
-        self.target = [0.0, 0.0, 0.8]
-        self.yaw = 0.0        # degrees, camera azimuth around the pivot
-        self.pitch = 12.0     # degrees, elevation above the pivot
-        # Roofed worlds hide everything above the ceiling slab, so the default
-        # stays at eye level; orbit up only in open worlds.
-        self.distance = 3.0
+        # Free-fly camera, like the Gazebo viewport: the eye itself is the
+        # state.  An orbit camera has to climb above its pivot to look down,
+        # and every bundled world has a ceiling slab there, so "look at the
+        # floor" was impossible; here pitching down is just a rotation.
+        self.pos = [0.0, 0.0, 1.6]
+        self.yaw = 0.0      # degrees, direction the camera looks
+        self.pitch = -12.0  # degrees, negative looks down
         self.active = False
         self._lock = threading.Lock()
 
@@ -145,8 +142,7 @@ class WorldPreview:
             "ns": self.ns,
             "yaw": round(self.yaw, 1),
             "pitch": round(self.pitch, 1),
-            "distance": round(self.distance, 2),
-            "target": [round(v, 2) for v in self.target],
+            "pos": [round(v, 2) for v in self.pos],
         }
 
     def start(self, **view: Any) -> dict[str, Any]:
@@ -173,16 +169,19 @@ class WorldPreview:
             if ns and ns in self.settings.robots:
                 self.ns = ns
                 self._recenter(ns)
-            target_xyz = view.get("target")
-            if isinstance(target_xyz, (list, tuple)) and len(target_xyz) == 3:
-                self.target = [float(v) for v in target_xyz]
+            pos = view.get("pos")
+            if isinstance(pos, (list, tuple)) and len(pos) == 3:
+                self.pos = [
+                    max(-200.0, min(200.0, float(pos[0]))),
+                    max(-200.0, min(200.0, float(pos[1]))),
+                    max(0.1, min(60.0, float(pos[2]))),
+                ]
             if view.get("yaw") is not None:
                 self.yaw = float(view["yaw"]) % 360.0
             if view.get("pitch") is not None:
-                self.pitch = min(88.0, max(2.0, float(view["pitch"])))
-            if view.get("distance") is not None:
-                self.distance = min(40.0, max(1.5, float(view["distance"])))
-            eye, quat, target = self._eye()
+                # ±89: straight down at the floor, straight up at the roof.
+                self.pitch = min(89.0, max(-89.0, float(view["pitch"])))
+            eye, quat, look = self._eye()
             world = self.world_name()
             request = (
                 f'name: "{MODEL}" '
@@ -198,8 +197,7 @@ class WorldPreview:
         return {
             "ok": True,
             **self.status(),
-            "eye": [round(v, 2) for v in eye],
-            "target": [round(v, 2) for v in target],
+            "look": [round(v, 2) for v in look],
         }
 
     def stop(self) -> dict[str, Any]:
@@ -381,10 +379,11 @@ class WorldPreview:
         return (float(pose[0]), float(pose[1]), float(pose[2]))
 
     def _recenter(self, ns: str) -> None:
-        """Put the pivot on a robot and look along its heading."""
+        """Stand at the robot's shoulder and look where it is heading."""
         x, y, heading = self._robot_pose(ns)
-        self.target = [x, y, 0.8]
-        self.yaw = (math.degrees(heading) + 180.0) % 360.0
+        self.pos = [x, y, 1.55]
+        self.yaw = (math.degrees(heading) + 360.0) % 360.0
+        self.pitch = -12.0
 
     def _eye(
         self,
@@ -393,21 +392,17 @@ class WorldPreview:
         tuple[float, float, float, float],
         tuple[float, float, float],
     ]:
-        azimuth = math.radians(self.yaw)
-        elevation = math.radians(self.pitch)
-        ce = math.cos(elevation)
-        eye = (
-            self.target[0] + self.distance * ce * math.cos(azimuth),
-            self.target[1] + self.distance * ce * math.sin(azimuth),
-            self.target[2] + self.distance * math.sin(elevation),
+        yaw = math.radians(self.yaw)
+        # gz's camera looks along +X and Ry(+) tilts it *down*, so the UI
+        # convention (negative pitch = look down) has to be flipped here.
+        gp = math.radians(-self.pitch)
+        eye = (self.pos[0], self.pos[1], self.pos[2])
+        look = (
+            eye[0] + 5.0 * math.cos(gp) * math.cos(yaw),
+            eye[1] + 5.0 * math.cos(gp) * math.sin(yaw),
+            eye[2] - 5.0 * math.sin(gp),
         )
-        dx = self.target[0] - eye[0]
-        dy = self.target[1] - eye[1]
-        dz = self.target[2] - eye[2]
-        yaw = math.atan2(dy, dx)
-        pitch = math.atan2(dz, math.hypot(dx, dy))
-        # Camera +X looks at the pivot: q = qz(yaw) * qy(pitch).
         cy, sy = math.cos(yaw / 2), math.sin(yaw / 2)
-        cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
+        cp, sp = math.cos(gp / 2), math.sin(gp / 2)
         quat = (-sy * sp, cy * sp, sy * cp, cy * cp)
-        return eye, quat, (self.target[0], self.target[1], self.target[2])
+        return eye, quat, look

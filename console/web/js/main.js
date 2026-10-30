@@ -132,9 +132,8 @@ const worldState = {
   active: false,
   ns: "robot1",
   yaw: 0,
-  pitch: 12,
-  distance: 3,
-  target: [0, 0, 0.8],
+  pitch: -12,
+  pos: [0, 0, 1.55],
 };
 let worldViewTimer = 0;
 let worldViewQueued = false;
@@ -144,8 +143,7 @@ function applyWorldStatus(status) {
   if (status.ns) worldState.ns = status.ns;
   if (status.yaw !== undefined) worldState.yaw = status.yaw;
   if (status.pitch !== undefined) worldState.pitch = status.pitch;
-  if (status.distance !== undefined) worldState.distance = status.distance;
-  if (Array.isArray(status.target)) worldState.target = status.target.slice(0, 3);
+  if (Array.isArray(status.pos)) worldState.pos = status.pos.slice(0, 3);
 }
 
 async function refreshWorldPreview() {
@@ -183,7 +181,7 @@ async function startWorldPreview() {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ns: worldState.ns, pitch: worldState.pitch, distance: worldState.distance }),
+    body: JSON.stringify({ ns: worldState.ns }),
   })
     .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
     .catch((error) => ({ ok: false, body: { detail: error.message } }));
@@ -221,8 +219,7 @@ async function sendWorldView(extra = {}) {
         ns: worldState.ns,
         yaw: worldState.yaw,
         pitch: worldState.pitch,
-        distance: worldState.distance,
-        target: worldState.target,
+        pos: worldState.pos,
         ...extra,
       }),
     });
@@ -252,7 +249,7 @@ function bindWorldPreview() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ns, pitch: 12, distance: 3 }),
+        body: JSON.stringify({ ns, pitch: -12 }),
       });
       applyWorldStatus(await response.json());
     } catch {
@@ -298,25 +295,26 @@ function bindWorldPreview() {
     drag.x = event.clientX;
     drag.y = event.clientY;
     if (drag.pan) {
-      // Grab-and-drag: the world follows the cursor, so the pivot moves the
-      // other way along the camera's right / up axes.
-      const height = img.clientHeight || 540;
-      const scale = worldState.distance / Math.max(240, height);
+      // Grab-and-drag: the world follows the cursor, so the eye moves the
+      // other way along its own right / up axes.
       const yaw = (worldState.yaw * Math.PI) / 180;
       const pitch = (worldState.pitch * Math.PI) / 180;
+      const scale = 0.006;
       const rx = -Math.sin(yaw);
       const ry = Math.cos(yaw);
       const ux = -Math.cos(yaw) * Math.sin(pitch);
       const uy = -Math.sin(yaw) * Math.sin(pitch);
       const uz = Math.cos(pitch);
-      worldState.target = [
-        worldState.target[0] + (-dx * rx + dy * ux) * scale,
-        worldState.target[1] + (-dx * ry + dy * uy) * scale,
-        worldState.target[2] + dy * uz * scale,
+      worldState.pos = [
+        worldState.pos[0] + (-dx * rx + dy * ux) * scale,
+        worldState.pos[1] + (-dx * ry + dy * uy) * scale,
+        Math.max(0.1, worldState.pos[2] + dy * uz * scale),
       ];
     } else {
+      // Look around: dragging down tilts the view down, so the floor is one
+      // drag away without having to climb over the ceiling.
       worldState.yaw = (worldState.yaw - dx * 0.3 + 360) % 360;
-      worldState.pitch = Math.min(88, Math.max(2, worldState.pitch + dy * 0.25));
+      worldState.pitch = Math.min(89, Math.max(-89, worldState.pitch - dy * 0.3));
     }
     queueWorldView();
   });
@@ -333,10 +331,15 @@ function bindWorldPreview() {
     (event) => {
       if (!worldState.active) return;
       event.preventDefault();
-      worldState.distance = Math.min(
-        40,
-        Math.max(1.5, worldState.distance * Math.exp(event.deltaY * 0.0012))
-      );
+      // Wheel = dolly along the view direction, like the Gazebo viewport.
+      const yaw = (worldState.yaw * Math.PI) / 180;
+      const pitch = (worldState.pitch * Math.PI) / 180;
+      const step = -event.deltaY * 0.008;
+      worldState.pos = [
+        worldState.pos[0] + step * Math.cos(pitch) * Math.cos(yaw),
+        worldState.pos[1] + step * Math.cos(pitch) * Math.sin(yaw),
+        Math.max(0.1, worldState.pos[2] + step * Math.sin(pitch)),
+      ];
       queueWorldView();
     },
     { passive: false }

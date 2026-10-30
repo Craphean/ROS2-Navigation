@@ -157,8 +157,10 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 - 控制台启动时用 `gz service /world/<w>/create` 往当前世界塞一个 `preview_cam` 模型（camera sensor，960×540@15 Hz），
   `ros_gz_bridge` 把它的图像接成 ROS 话题 `/preview_cam/image`，再走和车载视频相同的 MJPEG 管线。
   渲染走 EGL（无窗口、用 GPU），所以不需要 X / Gazebo GUI。
-- 相机是**环绕式自由视角**，和 Gazebo 视口一样：左键拖拽绕枢轴转，右键或 Shift+左键平移枢轴，滚轮缩放（1.5–40 m）。
-  枢轴默认落在所选车上（「对齐 R1/R2」按钮可重置），所以第一次打开就在车所在的房间里。
+- 相机是**自由飞行视角**，和 Gazebo 视口一样：左键拖拽转头（往下拖就看地板）、右键或 Shift+左键平移机身、滚轮沿视线前后移动。
+  位置/朝向就是状态本身，俯仰 ±89°。「对准 R1/R2」把机位放回该车肩膀高度（1.55 m）并朝车头。
+  早先用的是环绕相机：要把视线压低就得先升到枢轴上方，而 house / mine 都有天花板，升上去只剩一片灰，
+  所以「俯视地板」根本做不到——改成自由飞行后，低头只是转一下视角。
 - **性能**：一次拖拽如果直接调 `gz service`，进程启动 + 传输发现约 400 ms，手感就是 0.4 s 一跳。
   因此位姿走常驻助手 `console/bin/preview_pose_bridge`（源码 `tools/preview_pose_bridge.cc`）：
   它常驻一个 gz transport 节点，从 stdin 读位姿，单次约 1–2 ms。首次使用前先编译：
@@ -186,7 +188,7 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
 | GET | `/api/world/preview.mjpeg` | 否 | Gazebo 世界预览视频流 |
 | GET | `/api/world/preview/status` | 否 | 预览状态（是否开启、跟踪哪台车、视角） |
-| POST | `/api/world/preview/start|stop`、`/view` | 是 | 开启/关闭预览、调整视角（枢轴/方位/仰角/半径） |
+| POST | `/api/world/preview/start|stop`、`/view` | 是 | 开启/关闭预览、调整视角（机位/朝向） |
 | POST | `/api/cloud/save` | 是 | 导出累积点云到 `maps/inspection_<ts>.pcd` |
 | GET | `/api/cloud/file/{name}` | 是 | 把导出的 PCD 下载到操作员本机（只接受 `inspection_<时间>.pcd`） |
 | POST | `/api/sim/start|stop`、`/api/exploration/start|stop` | 是 | 进程管理 |
