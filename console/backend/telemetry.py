@@ -29,7 +29,11 @@ class Telemetry:
         self._trail: dict[str, deque] = {ns: deque(maxlen=_TRAIL_MAX) for ns in robots}
         self._last_pose: dict[str, tuple[float, float, float]] = {}
         self._coverage: deque = deque(maxlen=_COV_MAX)
-        self._last_cov = 0.0
+        # One clock for both throttling and the x axis.  Mixing the sim clock
+        # (seconds since Gazebo started) with wall time made every "now - last"
+        # negative, so the series never advanced after the first sample.
+        self._t0 = time.monotonic()
+        self._last_cov = -1e9
         self._last_pub = 0.0
 
     def add_pose(self, ns: str, x: float, y: float, t: float) -> None:
@@ -43,7 +47,7 @@ class Telemetry:
             self._last_pose[ns] = (x, y, t)
             self._trail[ns].append([round(x, 2), round(y, 2)])
 
-    def add_coverage(self, t: float, area: float) -> None:
+    def add_coverage(self, _clock: float, area: float, target: float | None = None) -> None:
         """Record explored area; the bar is area against a configured target.
 
         A ratio against the current map bbox is useless (the merged map is
@@ -52,12 +56,17 @@ class Telemetry:
         """
         if area <= 0.0:
             return
+        if target and target > 0:
+            self.target_area = float(target)
         with self._lock:
-            if t - self._last_cov < _COV_MIN_DT:
+            now = time.monotonic()
+            if now - self._last_cov < _COV_MIN_DT:
                 return
-            self._last_cov = t
+            self._last_cov = now
             progress = min(1.0, area / self.target_area)
-            self._coverage.append([round(t, 1), round(progress, 4), round(area, 1)])
+            self._coverage.append(
+                [round(now - self._t0, 1), round(progress, 4), round(area, 1)]
+            )
 
     def due(self, now: float, period: float = 1.0) -> bool:
         with self._lock:
@@ -82,4 +91,4 @@ class Telemetry:
                 points.clear()
             self._last_pose.clear()
             self._coverage.clear()
-            self._last_cov = 0.0
+            self._last_cov = -1e9

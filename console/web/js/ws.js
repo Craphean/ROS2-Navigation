@@ -41,6 +41,7 @@ export class Link {
       else if (message.type === "event") this.handlers.onEvent?.(message);
       else if (message.type === "role") this.handlers.onRole?.(message.role);
       else if (message.type === "detections") this.handlers.onDetections?.(message);
+      else if (message.type === "telemetry") this.handlers.onTelemetry?.(message);
       else if (message.type === "error") this.handlers.onError?.(message.text);
     };
     this.ws.onclose = () => {

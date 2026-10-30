@@ -102,7 +102,12 @@ async def state_pump(
             clock = store.clock if store.clock is not None else time.time()
             stats = store.map_stats_snapshot()
             if telemetry is not None and stats:
-                telemetry.add_coverage(clock, float(stats.get("area", 0.0)))
+                world_name = str(store.sim_meta.get("world_name") or "")
+                telemetry.add_coverage(
+                    clock,
+                    float(stats.get("area", 0.0)),
+                    node.settings.area_target(world_name),
+                )
             for ns in store.robots:
                 pose = node.lookup_world_pose(ns)
                 if pose is not None:

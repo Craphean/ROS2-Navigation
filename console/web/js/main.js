@@ -1,5 +1,5 @@
 import { $, api, toast } from "./utils.js";
-import { Link } from "./ws.js";
+import { Link } from "./ws.js?v=2";
 import { MapView } from "./map2d.js?v=5";
 import { CloudView } from "./cloud3d.js?v=8";
 import { updateFleet } from "./fleet.js";

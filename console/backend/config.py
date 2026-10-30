@@ -36,9 +36,24 @@ class Settings:
     manage_sim: bool = _env_bool("CONSOLE_MANAGE_SIM", True)
     kill_sim_on_exit: bool = _env_bool("KILL_SIM_ON_EXIT", False)
     default_world: str = os.environ.get("CONSOLE_WORLD", "mine")
-    # Floor area that counts as "the world explored" for the progress bar.  It
-    # is a demo target, not something the console can measure.
-    target_area: float = float(os.environ.get("CONSOLE_TARGET_AREA", "300"))
+    # Floor area that counts as "the world explored" for the progress bar.
+    # 0 means "pick by world": the bundled worlds differ by an order of
+    # magnitude, and a house that is fully mapped at 94 m² must not show 31%
+    # against a mine-sized target.  Override with CONSOLE_TARGET_AREA.
+    target_area: float = float(os.environ.get("CONSOLE_TARGET_AREA", "0"))
+
+    def area_target(self, world: str | None) -> float:
+        if self.target_area > 0:
+            return self.target_area
+        return {
+            "house": 100.0,
+            "mine": 400.0,
+            "sandbox": 200.0,
+            "empty": 400.0,
+            "warehouse": 600.0,
+            "hospital": 800.0,
+            "depot": 400.0,
+        }.get((world or "").lower(), 300.0)
     default_mode: str = os.environ.get("CONSOLE_EXPLORATION_MODE", "off")
 
     @property
