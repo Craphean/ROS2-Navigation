@@ -23,7 +23,7 @@ const missionRefs = {
   state: $("#mission-state"),
   progress: $("#mission-progress"),
   step: $("#mission-step"),
-  robot: $("#mission-robot"),
+  robot: $("#mission-robot-label"),
   list: $("#waypoint-list"),
   stripName: $("#strip-name"),
   stripWaypoint: $("#strip-waypoint"),
@@ -142,6 +142,7 @@ function syncMissionOptions(mission) {
   if (Date.now() < missionOptionLock.until) return;
   if (!mission) return;
   const box = $("#mission-robot");
+  if (box && !box.querySelector("button")) ensureMissionPicker();
   if (box) {
     const robot = (mission && mission.robot) || "robot1";
     box.querySelectorAll("button").forEach((button) => {
@@ -666,20 +667,30 @@ async function call(path, body, okText) {
   }
 }
 
+const PICKER_HTML =
+  '<div class="segmented" id="mission-robot" title="执行巡检的车">' +
+  '<button data-ns="robot1" class="active">R1</button>' +
+  '<button data-ns="robot2">R2</button></div>' +
+  '<label class="check-row tight" for="mission-loop">' +
+  '<input type="checkbox" id="mission-loop" /><span>循环执行</span></label>';
+
 function ensureMissionPicker() {
-  // Belt and braces: if the cached document predates the picker, build it so
-  // the handlers below have something to attach to.
-  if ($("#mission-robot")) return;
+  // The picker must own the id: mission.js used to write the robot name into
+  // #mission-robot, which (with a duplicate id on the progress line) wiped the
+  // buttons out of the DOM on the next snapshot - the panel looked fine and
+  // clicked nowhere.  Rebuild whenever the row exists but has no buttons.
+  const existing = $("#mission-robot");
+  if (existing && existing.querySelector("button")) return;
   const select = $("#mission-select");
   if (!select) return;
+  if (existing) {
+    existing.parentElement.classList.add("mission-opts");
+    existing.parentElement.innerHTML = PICKER_HTML;
+    return;
+  }
   const row = document.createElement("div");
   row.className = "mission-opts";
-  row.innerHTML =
-    '<div class="segmented" id="mission-robot" title="执行巡检的车">' +
-    '<button data-ns="robot1" class="active">R1</button>' +
-    '<button data-ns="robot2">R2</button></div>' +
-    '<label class="check-row tight" for="mission-loop">' +
-    '<input type="checkbox" id="mission-loop" /><span>循环执行</span></label>';
+  row.innerHTML = PICKER_HTML;
   select.insertAdjacentElement("afterend", row);
 }
 

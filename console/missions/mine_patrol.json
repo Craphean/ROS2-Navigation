@@ -1,7 +1,7 @@
 {
   "id": "mine_patrol",
   "name": "主巷例行巡检",
-  "robot": "robot2",
+  "robot": "robot1",
   "loop": true,
   "on_fail": "retry_then_skip",
   "waypoints": [
