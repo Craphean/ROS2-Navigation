@@ -666,7 +666,25 @@ async function call(path, body, okText) {
   }
 }
 
+function ensureMissionPicker() {
+  // Belt and braces: if the cached document predates the picker, build it so
+  // the handlers below have something to attach to.
+  if ($("#mission-robot")) return;
+  const select = $("#mission-select");
+  if (!select) return;
+  const row = document.createElement("div");
+  row.className = "mission-opts";
+  row.innerHTML =
+    '<div class="segmented" id="mission-robot" title="执行巡检的车">' +
+    '<button data-ns="robot1" class="active">R1</button>' +
+    '<button data-ns="robot2">R2</button></div>' +
+    '<label class="check-row tight" for="mission-loop">' +
+    '<input type="checkbox" id="mission-loop" /><span>循环执行</span></label>';
+  select.insertAdjacentElement("afterend", row);
+}
+
 function wireActions() {
+  ensureMissionPicker();
   $("#btn-login")?.addEventListener("click", async () => {
     if (state.role === "operator") {
       await api("/api/logout", { method: "POST" }).catch(() => {});
