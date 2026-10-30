@@ -597,7 +597,15 @@ async function loadMissionDetail(missionId) {
 }
 
 function selectedMissionId() {
-  return $("#mission-select")?.value || state.selectedId;
+  // The <select> can be empty for a moment (or permanently, if the list failed
+  // to load) - fall back through the remembered id to the first mission
+  // instead of silently doing nothing on every click.
+  return (
+    $("#mission-select")?.value ||
+    state.selectedId ||
+    state.missions?.[0]?.id ||
+    ""
+  );
 }
 
 /* ------------------------------------------------------------------ */

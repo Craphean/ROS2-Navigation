@@ -132,6 +132,10 @@ body::before {
 }
 
 .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
+/* Fixed-content panels keep their natural height; only .grow absorbs the
+   remainder.  Without this they shrink and their content spills over the next
+   panel (covering controls and swallowing clicks). */
+.col > .panel:not(.grow) { flex: none; }
 
 .panel {
   position: relative;

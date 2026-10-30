@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections import deque
 import time
 from contextlib import asynccontextmanager
 
@@ -82,6 +83,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    recent = deque(maxlen=60)
+    app.state.recent_requests = recent
+
+    @app.middleware("http")
+    async def track_api(request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/debug"):
+            recent.append(
+                {
+                    "t": round(time.time(), 1),
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": response.status_code,
+                }
+            )
+        return response
+
+    @app.middleware("http")
+    async def no_store_html(request, call_next):
+        """Never let the browser keep a stale index.html.
+
+        The page is versioned only through its ?v= query strings, so a cached
+        document pins the old markup: new controls simply do not exist in the
+        DOM and their handlers are never wired.
+        """
+        response = await call_next(request)
+        if "text/html" in response.headers.get("content-type", ""):
+            response.headers["Cache-Control"] = "no-store, must-revalidate"
+        return response
+
     app.state.settings = settings
     app.state.hub = hub
     app.state.video_hubs = video_hubs

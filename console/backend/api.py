@@ -623,6 +623,13 @@ async def cloud_bin(request: Request) -> Response:
 # ----------------------------------------------------------------------
 # Gazebo world preview
 # ----------------------------------------------------------------------
+@router.get("/debug/requests")
+async def debug_requests(request: Request) -> dict[str, Any]:
+    """Last mutating/API calls, so a "the button does nothing" report can be
+    checked from the server side: no entry means the click never reached us."""
+    return {"requests": list(request.app.state.recent_requests)}
+
+
 @router.get("/telemetry")
 async def telemetry(request: Request) -> dict[str, Any]:
     return request.app.state.telemetry.snapshot()
