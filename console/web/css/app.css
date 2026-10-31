@@ -524,6 +524,21 @@ h2 {
 .btn.small { padding: 4px 9px; font-size: 10px; border-radius: 5px; }
 .btn.big { padding: 10px 18px; line-height: 1.15; font-size: 12px; }
 .btn.big small { font-size: 8px; letter-spacing: .16em; opacity: .7; }
+/* The one action an operator presses first: solid amber, not a ghost chip. */
+.btn.primary {
+  border-color: #f0a323;
+  background: linear-gradient(180deg, #f7b23c, #dd8a0a);
+  color: #22150a;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(247, 178, 60, .18), 0 3px 12px rgba(221, 138, 10, .28);
+}
+.btn.primary:hover {
+  border-color: #ffc152;
+  background: linear-gradient(180deg, #ffc257, #ed9612);
+  box-shadow: 0 0 0 1px rgba(255, 193, 82, .3), 0 4px 16px rgba(237, 150, 18, .4);
+}
+.btn.primary:active { box-shadow: 0 1px 6px rgba(237, 150, 18, .35); }
+
 .btn.on { border-color: rgba(55, 200, 212, .7); color: var(--cyan); background: rgba(55, 200, 212, .16); }
 
 .estop-group { margin-left: auto; align-items: flex-end; }
