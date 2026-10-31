@@ -142,6 +142,29 @@ Gazebo 相机传感器（`intel_realsense_r200_depth`，`type="camera"`，320×2
 重启流程约 60–120 秒（Nav2 + SLAM + map_merge 依次就绪），期间 `/api/sim/status` 会一直返回
 `running: true`（进程已起），前端靠地图/时钟恢复来判断真正可用。
 
+#### 4.5.1 warehouse / depot 需要预下载 Fuel 模型
+
+其余世界（mine / house / hospital / sandbox / empty）是 `worlds/*.sdf.xacro`，资源都在本地，秒开。
+`warehouse` 和 `depot` 只是 `/opt/ros/lyrical/share/nav2_minimal_tb4_sim/worlds/` 里的薄壳，
+内容全部是 Fuel 的 `<include>`：**模型没缓存就会一直等下载**，Gazebo 不发布 /clock，
+SLAM 永远不 active，控制台就一直停在「等待 /map」。
+
+| 世界 | 依赖 | 体积 |
+| --- | --- | --- |
+| depot | OpenRobotics/Depot | 82 MB |
+| warehouse | OpenRobotics/Warehouse + MovAi/shelf ×8、shelf_big ×5 + pallet_box_mobile + plateau/Casual female + 若干家具 | 约 15 MB |
+
+这台机器到 fuel.gazebosim.org 的单连接吞吐只有 ~14 KB/s，`gz fuel download` 拉 Depot 会跑几十分钟后
+自己 abort。改用 `scripts/fuel_prefetch.py`：12 路 Range 请求（实测 ~170 KB/s）+ 按 gz 缓存布局落盘。
+
+```bash
+./scripts/download_fuel_models.sh            # 全部世界
+./scripts/download_fuel_models.sh warehouse  # 只补某个世界
+```
+
+下载位置 `~/.gz/fuel/fuel.gazebosim.org/<owner>/models/<name>/<version>/`（chroot 内即 `/root/.gz/fuel`）。
+装好后离线也能加载：实测两个世界 `gz sim -s` 都在 3 秒内加载完成、无任何下载请求。
+
 ### 4.6 导出 PCD
 
 「导出 PCD」不重新订阅话题，直接把控制台自己的体素缓存落盘：`/api/cloud/save` → `maps/inspection_<ts>.pcd`。
