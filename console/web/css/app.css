@@ -268,7 +268,7 @@ h2 {
 }
 .wp {
   display: grid;
-  grid-template-columns: 20px 1fr auto;
+  grid-template-columns: 20px 1fr auto 14px;
   align-items: center;
   gap: 8px;
   padding: 6px 7px;
@@ -293,6 +293,19 @@ h2 {
 .wp.SKIPPED .wp-index { color: var(--dim); opacity: .6; }
 .wp.FAILED .wp-index { background: rgba(229, 72, 77, .12); border-color: rgba(229, 72, 77, .5); color: var(--red); }
 .wp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Delete affordance: dim until the row is hovered, so a list of 80 points does
+   not read as a wall of crosses. */
+.wp-del {
+  border: 0; background: transparent; padding: 0;
+  width: 14px; height: 14px; line-height: 1;
+  display: grid; place-items: center;
+  color: var(--dim); font-size: 10px; cursor: pointer;
+  opacity: 0; transition: opacity .12s, color .12s;
+}
+.wp:hover .wp-del { opacity: .75; }
+.wp-del:hover { opacity: 1; color: var(--red); }
+.wp-del:disabled { cursor: not-allowed; }
+.wp-del:disabled:hover { color: var(--dim); }
 .wp-meta { font-family: var(--mono); font-size: 9px; color: var(--dim); }
 
 /* ---------------------------------------------------------------- center */

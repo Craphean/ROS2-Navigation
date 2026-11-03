@@ -3,7 +3,7 @@ import { Link } from "./ws.js?v=3";
 import { MapView } from "./map2d.js?v=5";
 import { CloudView } from "./cloud3d.js?v=8";
 import { updateFleet } from "./fleet.js";
-import { renderMission, renderMissionSelect } from "./mission.js";
+import { renderMission, renderMissionSelect } from "./mission.js?v=2";
 import { Teleop } from "./teleop.js";
 
 const state = {
@@ -29,6 +29,8 @@ const missionRefs = {
   stripName: $("#strip-name"),
   stripWaypoint: $("#strip-waypoint"),
   stripDistance: $("#strip-distance"),
+  // mission.js only draws; deleting needs auth + a reload, so it lives here.
+  onDelete: (index) => deleteMissionWaypoint(index),
 };
 
 const mapView = new MapView($("#map-canvas"), {
@@ -769,6 +771,37 @@ function ensureMissionPicker() {
   select.insertAdjacentElement("afterend", row);
 }
 
+async function deleteMissionWaypoint(index) {
+  const id = selectedMissionId();
+  if (!id || !requireOperator()) return;
+  try {
+    await api(`/api/missions/${id}/waypoints/${index}`, { method: "DELETE" });
+    toast(`已删除第 ${index + 1} 个航点`, "ok");
+    await loadMissionDetail(id);
+  } catch (error) {
+    toast(error.message, "error");
+  }
+}
+
+async function clearMissionWaypoints() {
+  const id = selectedMissionId();
+  if (!id || !requireOperator()) return;
+  const mission = displayMission();
+  const total = mission?.waypoints?.length || 0;
+  if (!total) {
+    toast("当前任务没有航点", "error");
+    return;
+  }
+  if (!window.confirm(`清空「${mission.name || id}」的全部 ${total} 个航点？`)) return;
+  try {
+    await api(`/api/missions/${id}/waypoints`, { method: "DELETE" });
+    toast("航点已清空", "ok");
+    await loadMissionDetail(id);
+  } catch (error) {
+    toast(error.message, "error");
+  }
+}
+
 function wireActions() {
   ensureMissionPicker();
   $("#btn-login")?.addEventListener("click", async () => {
@@ -863,6 +896,8 @@ function wireActions() {
       state.missionDetail.loop = payload.mission.loop;
     }
   });
+
+  $("#btn-mission-clear")?.addEventListener("click", clearMissionWaypoints);
 
   $("#btn-mission-start")?.addEventListener("click", async () => {
     const id = selectedMissionId();

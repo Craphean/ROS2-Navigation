@@ -86,7 +86,19 @@ export function renderMission(mission, refs) {
     item.innerHTML = `
       <span class="wp-index">${waypoint.index + 1}</span>
       <span class="wp-label">${escapeHtml(waypoint.label || `巡检点 ${index + 1}`)}</span>
-      <span class="wp-meta">${STATUS_LABEL[waypoint.status] || waypoint.status} · ${Number(waypoint.dwell).toFixed(0)}s</span>`;
+      <span class="wp-meta">${STATUS_LABEL[waypoint.status] || waypoint.status} · ${Number(waypoint.dwell).toFixed(0)}s</span>
+      <button class="wp-del" data-index="${waypoint.index}" title="删除该航点">✕</button>`;
+    const remove = item.querySelector(".wp-del");
+    if (remove) {
+      // Editing a running route is refused by the API; grey the button out
+      // instead of letting the click bounce off a 409.
+      const editable = !["RUNNING", "PAUSED", "ESTOP", "ESTOPPED"].includes(mission.state);
+      remove.disabled = !editable;
+      remove.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (editable) refs.onDelete?.(waypoint.index);
+      });
+    }
     refs.list.appendChild(item);
   });
 }

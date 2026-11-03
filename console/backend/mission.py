@@ -297,6 +297,42 @@ class MissionEngine:
         self.store.save_definition(mission)
         return mission
 
+    def delete_waypoint(self, mission_id: str, index: int) -> Mission:
+        """Drop one waypoint and renumber the rest.
+
+        The panel can only append, so a stray click on the map used to be
+        permanent unless someone edited the JSON by hand.
+        """
+        mission = self.missions.get(mission_id)
+        if mission is None:
+            raise ValueError("任务不存在")
+        if mission.state in (RUNNING, PAUSED, ESTOPPED):
+            raise ValueError("任务运行中，不能修改航点")
+        if index < 0 or index >= len(mission.waypoints):
+            raise ValueError("航点不存在")
+        mission.waypoints.pop(index)
+        self._renumber(mission)
+        self.store.save_definition(mission)
+        return mission
+
+    def clear_waypoints(self, mission_id: str) -> Mission:
+        mission = self.missions.get(mission_id)
+        if mission is None:
+            raise ValueError("任务不存在")
+        if mission.state in (RUNNING, PAUSED, ESTOPPED):
+            raise ValueError("任务运行中，不能修改航点")
+        mission.waypoints.clear()
+        self._renumber(mission)
+        self.store.save_definition(mission)
+        return mission
+
+    @staticmethod
+    def _renumber(mission: Mission) -> None:
+        for position, waypoint in enumerate(mission.waypoints):
+            waypoint.index = position
+        if mission.cursor > len(mission.waypoints):
+            mission.cursor = len(mission.waypoints)
+
     def update_options(
         self,
         mission_id: str,

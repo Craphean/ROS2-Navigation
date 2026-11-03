@@ -75,6 +75,9 @@ CONSOLE_MANAGE_SIM=0 ./console/run.sh
 
 ### 巡检任务
 
+航点只能追加或删除，**运行中（RUNNING / PAUSED / ESTOPPED）一律拒绝修改**，返回 409；
+删除后其余点的 `index` 会重排，`world` / `loop` / `robot` 不变。
+
 `console/missions/*.json` 是任务定义，例如 `mine_patrol.json`：
 
 ```json
@@ -210,6 +213,8 @@ SLAM 永远不 active，控制台就一直停在「等待 /map」。
 | POST | `/api/estop`、`/api/estop/clear` | 是 | 急停 |
 | GET/POST | `/api/missions`、`/{id}/start|pause|resume|skip|stop|waypoints` | 写操作需登录 | 任务 |
 | POST | `/api/missions/{id}/options` | 是 | 改执行车（robot）与是否循环（loop） |
+| DELETE | `/api/missions/{id}/waypoints/{index}` | 是 | 删除某个航点（面板每行的 ✕） |
+| DELETE | `/api/missions/{id}/waypoints` | 是 | 清空全部航点（面板「清空航点」） |
 | POST | `/api/map/save` | 是 | 保存合并地图到 `maps/inspection_<ts>.yaml` |
 | GET | `/api/telemetry` | 否 | 轨迹与勘探进度时间序列（WS 每秒推送同结构） |
 | GET | `/api/world/preview.mjpeg` | 否 | Gazebo 世界预览视频流 |

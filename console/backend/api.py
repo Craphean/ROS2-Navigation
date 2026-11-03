@@ -394,6 +394,30 @@ async def append_waypoint(
     return {"ok": True, "mission": mission.to_dict()}
 
 
+@router.delete(
+    "/missions/{mission_id}/waypoints/{index}", dependencies=[Depends(require_operator)]
+)
+async def delete_waypoint(
+    request: Request, mission_id: str, index: int
+) -> dict[str, Any]:
+    try:
+        mission = request.app.state.engine.delete_waypoint(mission_id, index)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"ok": True, "mission": mission.to_dict()}
+
+
+@router.delete(
+    "/missions/{mission_id}/waypoints", dependencies=[Depends(require_operator)]
+)
+async def clear_waypoints(request: Request, mission_id: str) -> dict[str, Any]:
+    try:
+        mission = request.app.state.engine.clear_waypoints(mission_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"ok": True, "mission": mission.to_dict()}
+
+
 class MissionOptionsBody(BaseModel):
     robot: str | None = None
     loop: bool | None = None
