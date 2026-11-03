@@ -203,6 +203,9 @@ class MissionStore:
             "name": mission.name,
             "robot": mission.robot,
             "loop": mission.loop,
+            # world must survive every UI edit: dropping it made the route show
+            # up in every world, because an empty world means "any".
+            "world": mission.world,
             "on_fail": mission.on_fail,
             "waypoints": [
                 {
