@@ -1,0 +1,118 @@
+# 矿井巡检控制台 YOLO 视觉模型配置
+# ---------------------------------------------------------------------------
+# detect.onnx  : YOLO11n，3 类目标检测（人员 / 明火 / 烟雾）
+# pose.onnx    : YOLO11n-pose，人体姿态（COCO 17 关键点）
+#
+# 两个模型的输入规格一致：
+#   images  float32 [1, 3, 640, 640]，RGB，0~1，letterbox（等比例缩放 + 边缘补 114）
+# 输出均未做 NMS，需要在调用侧解码后处理。
+# ---------------------------------------------------------------------------
+
+detect:
+  file: detect.onnx
+  task: detect
+  imgsz: 640
+  opset: 12
+  nc: 3
+  # 类别名与 ultralytics 的 names 一致，可直接喂给常见 YOLO 推理封装
+  names:
+    0: person
+    1: fire
+    2: smoke
+  # 控制台展示用中文名
+  labels:
+    0: 人员
+    1: 明火
+    2: 烟雾
+  # 前端叠加层配色（RGB），按需调整
+  colors:
+    0: [64, 158, 255]
+    1: [255, 72, 72]
+    2: [255, 176, 46]
+  conf_thres: 0.35      # 建议 0.25~0.45；烟雾误检多时调高
+  iou_thres: 0.45
+  output:
+    name: output0
+    shape: [1, 7, 8400]   # 4 (cx,cy,w,h, letterbox 像素) + 3 (类别分数)
+    layout: xywh_scores   # 转置后每行一条预测，取 argmax 类别
+
+pose:
+  file: pose.onnx
+  task: pose
+  imgsz: 640
+  opset: 12
+  nc: 1
+  names:
+    0: person
+  labels:
+    0: 人员
+  kpt_shape: [17, 3]      # 17 个关键点, (x, y, conf)
+  conf_thres: 0.35
+  iou_thres: 0.45
+  output:
+    name: output0
+    shape: [1, 56, 8400]  # 4 (cx,cy,w,h) + 1 (person 置信度) + 17*3 关键点
+    layout: xywh_conf_kpts
+  keypoints:
+    0: nose
+    1: left_eye
+    2: right_eye
+    3: left_ear
+    4: right_ear
+    5: left_shoulder
+    6: right_shoulder
+    7: left_elbow
+    8: right_elbow
+    9: left_wrist
+    10: right_wrist
+    11: left_hip
+    12: right_hip
+    13: left_knee
+    14: right_knee
+    15: left_ankle
+    16: right_ankle
+  keypoints_zh:
+    0: 鼻子
+    1: 左眼
+    2: 右眼
+    3: 左耳
+    4: 右耳
+    5: 左肩
+    6: 右肩
+    7: 左肘
+    8: 右肘
+    9: 左腕
+    10: 右腕
+    11: 左胯
+    12: 右胯
+    13: 左膝
+    14: 右膝
+    15: 左踝
+    16: 右踝
+  # COCO 骨架连线（关键点索引对），前端画姿态用
+  skeleton:
+    - [15, 13]
+    - [13, 11]
+    - [16, 14]
+    - [14, 12]
+    - [11, 12]
+    - [5, 11]
+    - [6, 12]
+    - [5, 6]
+    - [5, 7]
+    - [6, 8]
+    - [7, 9]
+    - [8, 10]
+    - [1, 2]
+    - [0, 1]
+    - [0, 2]
+    - [1, 3]
+    - [2, 4]
+    - [3, 5]
+    - [4, 6]
+
+# 控制台推送格式（POST /api/detections）：坐标全部为 0~1 归一化，左上角原点
+console:
+  endpoint: /api/detections
+  box_fields: [cls, conf, x, y, w, h]
+  ttl_seconds: 2.5
