@@ -81,12 +81,14 @@ mine 世界本身没有火焰/人物模型，车载相机拍不到目标，所�
 
 ```bash
 cd /home/ubuntu/ros2_navigation/models
-python3 infer.py --image samples/fire_smoke.jpg --draw /tmp/out_fire.jpg --no-pose
-python3 infer.py --image samples/firefighters.jpg --draw /tmp/out_person.jpg --merge-person
+python3 infer.py --image samples/fire_smoke.jpg --draw samples/out_fire.jpg --no-pose
+python3 infer.py --image samples/firefighters.jpg --draw samples/out_person.jpg --merge-person
 ```
 
-`--draw` 会把检测框和 17 点骨架画出来；控制台前端目前只画框，不画骨架，
-所以姿态效果要用这种方式看。实测：fire_smoke 出 2 个 fire + 1 个 smoke，
+`--draw` 只是把结果**写成一张 JPEG 文件**，不会在终端或网页弹窗；路径写相对路径
+最稳妥（`/tmp` 在 chroot/容器/远程终端里往往不是你查看文件时的那个 `/tmp`）。
+仓库里已经预生成了 `samples/out_fire.jpg`、`samples/out_person.jpg` 可直接看。
+控制台前端目前只画框，不画骨架，所以姿态效果要用这种方式看。实测：fire_smoke 出 2 个 fire + 1 个 smoke，
 firefighters 出 2 个人、置信度 0.88/0.78。
 
 **2. 看控制台前端叠加层（端到端）**
@@ -105,7 +107,7 @@ python3 infer.py --video samples/test.mp4 --repeat \
 **3. 自己的视频批量过一遍**
 
 ```bash
-python3 infer.py --video /path/to/clip.mp4 --stride 5 --draw /tmp/annotated --no-pose
+python3 infer.py --video /path/to/clip.mp4 --stride 5 --draw ./annotated --no-pose
 python3 infer.py --video /path/to/clip.mp4 --repeat --url http://127.0.0.1:18080 \
   --token mine2026 --push --loop 2 --no-pose
 ```
