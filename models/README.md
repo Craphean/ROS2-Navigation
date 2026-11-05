@@ -139,9 +139,9 @@ python3 infer.py --video /path/to/clip.mp4 --repeat --url http://127.0.0.1:18080
 
 `pose.onnx` 在一段验证视频上的输出（COCO 17 关键点 + person 框，检出 14/17 点、置信度 85%）：
 
-[![姿态估计效果](samples/pose_fall.jpg)](samples/pose_fall.mp4)
+[![姿态估计效果](samples/pose_fall.webp)](samples/pose_fall.mp4)
 
-*点图播放 6.6 s 视频。画面右上角的「跌倒 FALL」标签是演示时叠加的判定，本仓库只输出关键点坐标，判定逻辑留给上层。*
+*循环动图，点图播放完整 6.6 s 视频。画面右上角的「跌倒 FALL」标签是演示时叠加的判定，本仓库只输出关键点坐标，判定逻辑留给上层。*
 
 ## 已知限制
 
