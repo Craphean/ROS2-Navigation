@@ -102,11 +102,13 @@ cpolar http 8080              # 只映射这一个端口
 
 双车在 `mine` 世界协同建图、按点巡检的实录。点任意截图播放对应视频（30 fps 压缩版，原片 2.5K / 60 fps）。
 
-| 二维合并地图 | 激光点云 |
+| **二维合并地图** | **激光点云** |
 | :---: | :---: |
 | [![二维合并地图](docs/figures/console/map2d.png)](docs/figures/console/map2d.mp4) | [![激光点云](docs/figures/console/pointcloud.png)](docs/figures/console/pointcloud.mp4) |
 | `/map` 合并地图随两车推进逐块补全，前沿、车体位姿与事件流同屏 | 32 线点云在巷道与硐室里的实时轮廓，悬空结构一并可见 |
+
 | **世界预览** | **控制台总览** |
+| :---: | :---: |
 | [![世界预览](docs/figures/console/world.png)](docs/figures/console/world.mp4) | [![控制台总览](docs/figures/console/overview.png)](docs/figures/console/overview.mp4) |
 | 「世界」标签页是 Gazebo 视口实时画面，可自由飞行查看房间陈设 | 巡检执行中：左列车队与任务进度，中部地图，右侧双路车载画面 |
 
