@@ -94,9 +94,21 @@ cpolar http 8080              # 只映射这一个端口
 | 换世界 / 重启 | 下拉选世界，一键重启仿真；可勾选「重启前清除旧缓存」清 DDS 段、日志并重置地图/点云 |
 | 世界预览 | 「世界」标签页是 Gazebo 视口的实时画面：自由飞行，左键转头、右键平移、滚轮前后移动 |
 | 公网 | cpolar 单端口；只读匿名，控制需登录；未登录看不到控制按钮 |
-| YOLO 预留 | `POST /api/detections` + WS `detections` + 视频叠加层接口 |
+| 语义检测 | YOLO11n 检测 / 姿态 ONNX + `models/infer.py`，结果经 `POST /api/detections` 叠加到车载画面，见 [models/README.md](models/README.md) |
 
 详细架构、接口与排障见 [docs/console.md](docs/console.md)。
+
+### 控制台实拍
+
+双车在 `mine` 世界协同建图、按点巡检的实录。点任意截图播放对应视频（30 fps 压缩版，原片 2.5K / 60 fps）。
+
+| 二维合并地图 | 激光点云 |
+| :---: | :---: |
+| [![二维合并地图](docs/figures/console/map2d.png)](docs/figures/console/map2d.mp4) | [![激光点云](docs/figures/console/pointcloud.png)](docs/figures/console/pointcloud.mp4) |
+| `/map` 合并地图随两车推进逐块补全，前沿、车体位姿与事件流同屏 | 32 线点云在巷道与硐室里的实时轮廓，悬空结构一并可见 |
+| **世界预览** | **控制台总览** |
+| [![世界预览](docs/figures/console/world.png)](docs/figures/console/world.mp4) | [![控制台总览](docs/figures/console/overview.png)](docs/figures/console/overview.mp4) |
+| 「世界」标签页是 Gazebo 视口实时画面，可自由飞行查看房间陈设 | 巡检执行中：左列车队与任务进度，中部地图，右侧双路车载画面 |
 
 > 从终端启动仿真时记得带 `SKIP_DDS_SHM_CLEAN=1`：仿真退出会调用 `kill_nav2_sim.sh`，默认清理 `/dev/shm/cyclonedds*`，会把同时在跑的控制台 DDS 连接弄断。
 

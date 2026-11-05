@@ -135,6 +135,14 @@ python3 infer.py --video /path/to/clip.mp4 --repeat --url http://127.0.0.1:18080
 | fire | 0.309 | 0.152 |
 | smoke | 0.155 | 0.051 |
 
+## 效果
+
+`pose.onnx` 在一段验证视频上的输出（COCO 17 关键点 + person 框，检出 14/17 点、置信度 85%）：
+
+[![姿态估计效果](samples/pose_fall.jpg)](samples/pose_fall.mp4)
+
+*点图播放 6.6 s 视频。画面右上角的「跌倒 FALL」标签是演示时叠加的判定，本仓库只输出关键点坐标，判定逻辑留给上层。*
+
 ## 已知限制
 
 - **当前 mine 世界里既没有火/烟模型也没有人物模型**，仿真画面里检测结果为空是正常的；
