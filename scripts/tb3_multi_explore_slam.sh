@@ -384,12 +384,12 @@ echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_
 # initial poses to (a) convert map clicks into each robot's local map frame and
 # (b) send a "recall to portal" goal.  Written before Nav2 starts so a console
 # that is already running can pick it up.
-mkdir -p "${ROOT_DIR}/console/run"
+mkdir -p "${ROOT_DIR}/extras/console/run"
 printf '{"world":"%s","world_name":"%s","robot1":[%s,%s,%s],"robot2":[%s,%s,%s],"mode":"%s"}\n' \
   "${WORLD_FILE}" "${WORLD:-custom}" \
   "${ROBOT1_X}" "${ROBOT1_Y}" "${ROBOT1_YAW}" \
   "${ROBOT2_X}" "${ROBOT2_Y}" "${ROBOT2_YAW}" \
-  "${EXPLORATION_MODE}" > "${ROOT_DIR}/console/run/sim_meta.json"
+  "${EXPLORATION_MODE}" > "${ROOT_DIR}/extras/console/run/sim_meta.json"
 if command -v free >/dev/null 2>&1; then
   LC_ALL=C free -h | awk '/^Mem:/ {printf "[tb3_multi_explore_slam] memory: %s total, %s available\n", $2, $7}'
 fi

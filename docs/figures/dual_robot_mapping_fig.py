@@ -74,13 +74,13 @@ def build(lang):
     T = {
         "en": dict(
             bands=["Sensing", "Mapping", "Decision", "Execution"],
-            gaz="Gazebo simulation — 2 × TurtleBot3 Waffle",
-            gazsub="2D LiDAR 360 × 1 @ 5 Hz  ·  3D LiDAR 32 × 720 @ 5 Hz  ·  "
+            gaz="Gazebo simulation — N × TurtleBot3 Waffle",
+            gazsub="2D LiDAR 360 × 1 @ 5 Hz  ·  3D LiDAR 16 × 360 @ 5 Hz  ·  "
                    "ros_gz_bridge → /robotX/{scan, points, odom}",
-            sl="2D SLAM × 2", slsub="slam_toolbox, per robot",
-            mm="Map merge", mmsub="known initial poses",
+            sl="2D SLAM × N", slsub="slam_toolbox, per robot",
+            mm="Map merge", mmsub="online SE(2) alignment",
             mp="/map · world · 0.05 m",
-            cm="Cloud merger", cmsub="TF → world · 2 cm voxel · 3 Hz",
+            cm="Cloud merger", cmsub="TF → world · 2 cm voxel · 2 Hz",
             oc="OctoMap", ocsub="0.10 m voxel · 3D occupancy",
             oct="/octomap_point_cloud_centers",
             co="Exploration coordinator", cosub="frontier clustering · 3D gain · "
@@ -97,13 +97,13 @@ def build(lang):
         ),
         "zh": dict(
             bands=["感知", "建图", "决策", "执行"],
-            gaz="Gazebo 仿真 · 2 × TurtleBot3 Waffle",
-            gazsub="2D 激光 360×1 @5 Hz  ·  3D 激光 32×720 @5 Hz  ·  "
+            gaz="Gazebo 仿真 · N × TurtleBot3 Waffle",
+            gazsub="2D 激光 360×1 @5 Hz  ·  3D 激光 16×360 @5 Hz  ·  "
                    "ros_gz_bridge → /robotX/{scan, points, odom}",
-            sl="2D SLAM × 2", slsub="slam_toolbox，每车独立",
-            mm="地图合并", mmsub="已知初始位姿",
+            sl="2D SLAM × N", slsub="slam_toolbox，每车独立",
+            mm="地图合并", mmsub="在线 SE(2) 动态配准",
             mp="/map · world · 0.05 m",
-            cm="点云合并", cmsub="TF→world · 2 cm 体素 · 3 Hz",
+            cm="点云合并", cmsub="TF→world · 2 cm 体素 · 2 Hz",
             oc="OctoMap", ocsub="0.10 m 体素 · 三维占据",
             oct="/octomap_point_cloud_centers",
             co="探索协调器", cosub="前沿聚类 · 3D 增益 · 本地/全局归属 · 竞拍 · 0.5 Hz",
@@ -226,11 +226,13 @@ def build(lang):
     box(ax, 143, 6.8, 175, 14.0, T["f5"], T["f5s"], edge=C3D, face=F3D,
         tsize=4.9, ssize=4.2)
 
+    from pathlib import Path
+    out_dir = Path(__file__).resolve().parent
     stem = f"dual_robot_mapping_{lang}"
-    out = "/home/qing/ros2_navigation/docs/figures/" + stem
-    fig.savefig(out + ".svg", format="svg")
-    fig.savefig(out + ".pdf", format="pdf")
-    fig.savefig(out + ".png", format="png", dpi=600)
+    out = out_dir / stem
+    fig.savefig(str(out) + ".svg", format="svg")
+    fig.savefig(str(out) + ".pdf", format="pdf")
+    fig.savefig(str(out) + ".png", format="png", dpi=600)
     plt.close(fig)
     print("wrote", out)
 

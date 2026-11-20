@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
+CONSOLE_DIR = Path(__file__).resolve().parents[1]
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -20,6 +21,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 @dataclass(frozen=True)
 class Settings:
     root: Path = ROOT
+    console_dir: Path = CONSOLE_DIR
     robots: tuple[str, ...] = ("robot1", "robot2")
     # Bind all interfaces by default so the host machine / phone on the LAN can
     # reach the console.  Use CONSOLE_HOST=127.0.0.1 to restrict to loopback
@@ -61,15 +63,15 @@ class Settings:
 
     @property
     def web_dir(self) -> Path:
-        return self.root / "console" / "web"
+        return self.console_dir / "web"
 
     @property
     def run_dir(self) -> Path:
-        return self.root / "console" / "run"
+        return self.console_dir / "run"
 
     @property
     def mission_dir(self) -> Path:
-        return self.root / "console" / "missions"
+        return self.console_dir / "missions"
 
     @property
     def sim_meta_path(self) -> Path:

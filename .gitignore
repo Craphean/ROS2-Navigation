@@ -6,7 +6,16 @@ log/
 .vscode/
 __pycache__/
 *.pyc
+*.so
 *.pcd
+.venv/
+.pytest_cache/
+benchmark_results/
+maps/gt/
 console/.venv/
 console/bin/
 console/run/
+extras/console/.venv/
+extras/console/bin/
+extras/console/run/
+

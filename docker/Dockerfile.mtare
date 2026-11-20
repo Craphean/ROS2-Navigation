@@ -1,0 +1,47 @@
+# Official M-TARE baseline container (ROS 1 Noetic, Ubuntu 20.04) for
+# apples-to-apples benchmarking under identical Docker CPU/RAM quotas (--cpus=4 --memory=8g)
+# and identical CMU benchmark worlds (indoor, tunnel).
+#
+# Build on RTX 5090 server:
+#   docker build -f docker/Dockerfile.mtare -t lite-hmre:mtare .
+
+FROM osrf/ros:noetic-desktop-full
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    ROS_DISTRO=noetic \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential \
+      cmake \
+      git \
+      wget \
+      curl \
+      python3-pip \
+      python3-catkin-tools \
+      libusb-dev \
+      libgoogle-glog-dev \
+      ros-noetic-pcl-ros \
+      ros-noetic-tf2-sensor-msgs \
+      ros-noetic-gazebo-ros-pkgs \
+      ros-noetic-gazebo-ros-control \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir numpy scipy psutil pyyaml
+
+WORKDIR /mtare_ws/src
+
+# Pin CMU M-TARE multi-robot exploration stack.
+# Override REPO_URL / REPO_BRANCH if using a mirror or custom fork.
+ARG MTARE_REPO=https://github.com/caochao39/mtare_planner.git
+ARG MTARE_BRANCH=master
+RUN git clone --depth 1 --branch "${MTARE_BRANCH}" "${MTARE_REPO}" mtare_planner || true
+
+WORKDIR /mtare_ws
+RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && \
+      if [ -d src/mtare_planner ]; then catkin_make -DCMAKE_BUILD_TYPE=Release; fi"
+
+RUN mkdir -p /results
+VOLUME ["/results"]
+
+CMD ["/bin/bash", "-c", "source /opt/ros/noetic/setup.bash && [ -f /mtare_ws/devel/setup.bash ] && source /mtare_ws/devel/setup.bash; exec bash"]

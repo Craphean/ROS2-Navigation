@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build tools/preview_pose_bridge.cc into console/bin/preview_pose_bridge.
+# Build tools/preview_pose_bridge.cc into extras/console/bin/preview_pose_bridge.
 #
 # The console drives the Gazebo preview camera through this helper instead of
 # spawning 'gz service' for every drag event: spawning costs ~400 ms here, a
@@ -8,7 +8,7 @@ set -eo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="${ROOT_DIR}/tools/preview_pose_bridge.cc"
-OUT_DIR="${ROOT_DIR}/console/bin"
+OUT_DIR="${ROOT_DIR}/extras/console/bin"
 BIN="${OUT_DIR}/preview_pose_bridge"
 
 set +u

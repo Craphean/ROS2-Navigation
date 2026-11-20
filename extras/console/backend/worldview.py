@@ -243,7 +243,7 @@ class WorldPreview:
     def _start_helper(self, world: str) -> None:
         """Spawn the persistent pose helper (see tools/preview_pose_bridge.cc)."""
         self._stop_helper()
-        path = self.settings.root / "console" / "bin" / "preview_pose_bridge"
+        path = self.settings.console_dir / "bin" / "preview_pose_bridge"
         if not path.is_file():
             LOGGER.warning("preview helper missing: %s (falling back to gz service)", path)
             return

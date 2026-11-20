@@ -1,0 +1,77 @@
+services:
+  # Full-speed development / interactive simulation on RTX 5090 server
+  ros2-sim:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ros2
+    image: lite-hmre:lyrical
+    container_name: lite_hmre_sim
+    network_mode: host
+    ipc: host
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/config/cyclonedds.xml
+      - HEADLESS=${HEADLESS:-True}
+    volumes:
+      - ..:/ws
+      - ${HOME}/.gz:/root/.gz
+    stdin_open: true
+    tty: true
+
+  # Resource-constrained edge benchmark profile (4 CPU cores, 8 GB RAM)
+  # Used for Table I / Fig. 1 reproducibility on RTX 5090 server.
+  ros2-bench-edge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ros2
+    image: lite-hmre:lyrical
+    container_name: lite_hmre_bench_edge
+    cpus: "4.0"
+    mem_limit: 8g
+    shm_size: 2g
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/config/cyclonedds.xml
+      - HEADLESS=True
+      - USE_RVIZ=False
+      - LIBGL_ALWAYS_SOFTWARE=1
+    volumes:
+      - ..:/ws
+      - ${HOME}/.gz:/root/.gz
+    stdin_open: true
+    tty: true
+
+  # Physical 3D-LiDAR robot onboard deployment profile
+  ros2-real:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ros2
+    image: lite-hmre:lyrical
+    container_name: lite_hmre_real
+    network_mode: host
+    ipc: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=file:///ws/config/cyclonedds.xml
+    volumes:
+      - ..:/ws
+      - /dev:/dev
+    stdin_open: true
+    tty: true
+
+  # External SOTA baseline: CMU M-TARE under identical 4-core / 8 GB edge cap
+  mtare-bench:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mtare
+    image: lite-hmre:mtare
+    container_name: lite_hmre_mtare_bench
+    cpus: "4.0"
+    mem_limit: 8g
+    shm_size: 2g
+    volumes:
+      - ../benchmark_results:/results
+    stdin_open: true
+    tty: true

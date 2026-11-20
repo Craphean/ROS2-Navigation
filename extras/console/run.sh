@@ -9,7 +9,8 @@
 # the venv is always created from /usr/bin/python3.
 set -eo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CONSOLE_DIR="${ROOT_DIR}/extras/console"
 cd "${ROOT_DIR}"
 
 # ROS setup scripts reference unset variables, which `set -u` rejects.
@@ -24,8 +25,9 @@ set -u
 
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file://${ROOT_DIR}/config/cyclonedds.xml}"
+export PYTHONPATH="${ROOT_DIR}/extras:${PYTHONPATH:-}"
 
-VENV="${ROOT_DIR}/console/.venv"
+VENV="${CONSOLE_DIR}/.venv"
 if [[ ! -x "${VENV}/bin/python" ]]; then
   echo "[console] creating venv with /usr/bin/python3 ..."
   /usr/bin/python3 -m venv --system-site-packages "${VENV}"
@@ -41,18 +43,17 @@ if ! "${VENV}/bin/python" -c "import fastapi, uvicorn, websockets" >/dev/null 2>
     -i https://pypi.tuna.tsinghua.edu.cn/simple
 fi
 
-mkdir -p "${ROOT_DIR}/console/run/missions" "${ROOT_DIR}/console/missions"
+mkdir -p "${CONSOLE_DIR}/run/missions" "${CONSOLE_DIR}/missions"
 
 PORT="${CONSOLE_PORT:-8080}"
 HOST="${CONSOLE_HOST:-0.0.0.0}"
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 
 echo "======================================================================"
-echo " 矿井智能巡检机器人控制台"
-echo "   本机访问 : http://127.0.0.1:${PORT}"
-echo "   局域网   : http://${IP:-<vm-ip>}:${PORT}"
-echo "   操作口令 : ${CONSOLE_TOKEN:-mine2026}"
-echo "   只读模式 : 不登录即可看地图/视频/状态"
+echo " Optional Visualization Console (excluded from paper benchmarks)"
+echo "   Local : http://127.0.0.1:${PORT}"
+echo "   LAN   : http://${IP:-<vm-ip>}:${PORT}"
+echo "   Token : ${CONSOLE_TOKEN:-mine2026}"
 echo "======================================================================"
 
 exec "${VENV}/bin/python" -m console.backend
