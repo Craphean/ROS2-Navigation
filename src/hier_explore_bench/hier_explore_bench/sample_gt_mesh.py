@@ -23,9 +23,12 @@ import argparse
 import copy
 import json
 import math
+import os
 import re
 import shutil
+import struct
 import subprocess
+import urllib.parse
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -296,6 +299,183 @@ def load_obj_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
     return np.asarray(verts, dtype=np.float64), np.asarray(faces, dtype=np.int64)
 
 
+def load_stl_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
+    """Load binary or ASCII STL into (vertices, faces)."""
+    raw = path.read_bytes()
+    if len(raw) >= 84:
+        n_tri = struct.unpack_from("<I", raw, 80)[0]
+        if 84 + n_tri * 50 == len(raw) and n_tri > 0:
+            dt = np.dtype([("norm", "<f4", 3), ("v", "<f4", (3, 3)), ("attr", "<u2")])
+            arr = np.frombuffer(raw, dtype=dt, count=n_tri, offset=84)
+            verts = arr["v"].reshape(-1, 3).astype(np.float64)
+            faces = np.arange(len(verts), dtype=np.int64).reshape(-1, 3)
+            return verts, faces
+    # ASCII STL fallback
+    verts_list: List[List[float]] = []
+    for line in raw.decode("utf-8", errors="ignore").splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 4 and parts[0].lower() == "vertex":
+            verts_list.append([float(parts[1]), float(parts[2]), float(parts[3])])
+    n = (len(verts_list) // 3) * 3
+    if n == 0:
+        return np.empty((0, 3), dtype=np.float64), np.empty((0, 3), dtype=np.int64)
+    verts = np.asarray(verts_list[:n], dtype=np.float64)
+    faces = np.arange(n, dtype=np.int64).reshape(-1, 3)
+    return verts, faces
+
+
+def load_dae_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
+    """Lightweight Collada (.dae) mesh loader supporting triangles and polylists."""
+    try:
+        root = ET.parse(path).getroot()
+    except Exception:
+        return np.empty((0, 3), dtype=np.float64), np.empty((0, 3), dtype=np.int64)
+
+    unit_scale = 1.0
+    up_axis = "Z_UP"
+    for elem in root.iter():
+        _, local = _strip_ns(elem.tag)
+        if local == "unit" and "meter" in elem.attrib:
+            try:
+                unit_scale = float(elem.attrib["meter"])
+            except ValueError:
+                pass
+        elif local == "up_axis" and elem.text:
+            up_axis = elem.text.strip().upper()
+
+    all_verts: List[np.ndarray] = []
+    all_faces: List[np.ndarray] = []
+    vert_offset = 0
+
+    for geom in root.iter():
+        if _strip_ns(geom.tag)[1] != "mesh":
+            continue
+        sources: Dict[str, np.ndarray] = {}
+        vertices_map: Dict[str, str] = {}
+        for child in geom:
+            _, tag = _strip_ns(child.tag)
+            if tag == "source":
+                sid = child.attrib.get("id", "")
+                for sub in child:
+                    if _strip_ns(sub.tag)[1] == "float_array" and sub.text:
+                        vals = np.fromstring(sub.text, sep=" ", dtype=np.float64)
+                        if vals.size % 3 == 0:
+                            sources[sid] = vals.reshape(-1, 3)
+            elif tag == "vertices":
+                vid = child.attrib.get("id", "")
+                for inp in child:
+                    if _strip_ns(inp.tag)[1] == "input" and inp.attrib.get("semantic") == "POSITION":
+                        vertices_map[vid] = inp.attrib.get("source", "").lstrip("#")
+
+        for prim in geom:
+            _, tag = _strip_ns(prim.tag)
+            if tag not in ("triangles", "polylist", "polygons"):
+                continue
+            v_off = 0
+            stride = 1
+            pos_id = ""
+            p_elem = None
+            vcount_elem = None
+            for sub in prim:
+                _, stag = _strip_ns(sub.tag)
+                if stag == "input":
+                    off = int(sub.attrib.get("offset", "0"))
+                    stride = max(stride, off + 1)
+                    if sub.attrib.get("semantic") == "VERTEX":
+                        v_off = off
+                        ref = sub.attrib.get("source", "").lstrip("#")
+                        pos_id = vertices_map.get(ref, ref)
+                elif stag == "p":
+                    p_elem = sub
+                elif stag == "vcount":
+                    vcount_elem = sub
+            if pos_id not in sources or p_elem is None or not p_elem.text:
+                continue
+            verts = sources[pos_id]
+            p_vals = np.fromstring(p_elem.text, sep=" ", dtype=np.int64)
+            v_indices = p_vals[v_off::stride]
+            faces_local: List[List[int]] = []
+            if tag == "triangles":
+                n_tri = len(v_indices) // 3
+                if n_tri > 0:
+                    tri = v_indices[: n_tri * 3].reshape(-1, 3) + vert_offset
+                    all_verts.append(verts)
+                    all_faces.append(tri)
+                    vert_offset += len(verts)
+            elif vcount_elem is not None and vcount_elem.text:
+                vcounts = np.fromstring(vcount_elem.text, sep=" ", dtype=np.int64)
+                cursor = 0
+                for vc in vcounts:
+                    vc_i = int(vc)
+                    if vc_i >= 3 and cursor + vc_i <= len(v_indices):
+                        poly = v_indices[cursor : cursor + vc_i]
+                        for k in range(1, vc_i - 1):
+                            faces_local.append(
+                                [int(poly[0]) + vert_offset, int(poly[k]) + vert_offset, int(poly[k + 1]) + vert_offset]
+                            )
+                    cursor += vc_i
+                if faces_local:
+                    all_verts.append(verts)
+                    all_faces.append(np.asarray(faces_local, dtype=np.int64))
+                    vert_offset += len(verts)
+
+    if not all_verts or not all_faces:
+        return np.empty((0, 3), dtype=np.float64), np.empty((0, 3), dtype=np.int64)
+
+    V = np.vstack(all_verts) * unit_scale
+    if up_axis == "Y_UP":
+        # Rotate +90 deg around X: (x, y, z) -> (x, -z, y)
+        V = np.column_stack((V[:, 0], -V[:, 2], V[:, 1]))
+    F = np.vstack(all_faces)
+    return V, F
+
+
+def _load_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
+    suf = path.suffix.lower()
+    if suf == ".obj":
+        return load_obj_mesh(path)
+    if suf == ".stl":
+        return load_stl_mesh(path)
+    if suf == ".dae":
+        return load_dae_mesh(path)
+    return np.empty((0, 3), dtype=np.float64), np.empty((0, 3), dtype=np.int64)
+
+
+def _resolve_fuel_model_sdf(uri: str) -> Optional[Path]:
+    """Resolve a Gazebo Fuel URI to a cached local model.sdf if present."""
+    clean = uri.strip()
+    m = re.match(r"https?://[^/]+/[^/]+/([^/]+)/models/(.+?)(?:/(\d+|tip))?$", clean, re.IGNORECASE)
+    if not m:
+        return None
+    owner = urllib.parse.unquote(m.group(1)).strip().lower()
+    name = urllib.parse.unquote(m.group(2)).strip().lower()
+    ver = m.group(3)
+
+    candidates_roots = []
+    env_cache = os.environ.get("GZ_FUEL_CACHE")
+    if env_cache:
+        candidates_roots.append(Path(env_cache))
+    candidates_roots.append(Path.home() / ".gz" / "fuel")
+    candidates_roots.append(Path("/root/.gz/fuel"))
+
+    for root in candidates_roots:
+        model_dir = root / "fuel.gazebosim.org" / owner / "models" / name
+        if not model_dir.is_dir():
+            continue
+        if ver and ver.isdigit() and (model_dir / ver / "model.sdf").is_file():
+            return model_dir / ver / "model.sdf"
+        ver_dirs = sorted(
+            [d for d in model_dir.iterdir() if d.is_dir() and d.name.isdigit()],
+            key=lambda p: int(p.name),
+            reverse=True,
+        )
+        for vd in ver_dirs:
+            sdf = vd / "model.sdf"
+            if sdf.is_file():
+                return sdf
+    return None
+
+
 # ---------------------------------------------------------------------------
 # World sampling + 2D GT explorable occupancy map generation
 # ---------------------------------------------------------------------------
@@ -326,9 +506,10 @@ def sample_world_ground_truth(
     slice_mesh_pts: List[np.ndarray] = []
     primitive_count = 0
 
-    for model in world_elem.findall("model"):
-        T_model = _parse_pose(model.find("pose"))
-        for link in model.findall("link"):
+    def _sample_model(model_elem: ET.Element, T_parent: np.ndarray, base_dir: Path) -> None:
+        nonlocal primitive_count
+        T_model = T_parent @ _parse_pose(model_elem.find("pose"))
+        for link in model_elem.findall("link"):
             T_link = T_model @ _parse_pose(link.find("pose"))
             for col in link.findall("collision"):
                 geom = col.find("geometry")
@@ -395,9 +576,9 @@ def sample_world_ground_truth(
                     uri = (mesh.findtext("uri") or "").strip()
                     scale_txt = mesh.findtext("scale", "1 1 1").strip().split()
                     scale = np.array([float(x) for x in scale_txt[:3]], dtype=np.float64)
-                    mesh_path = _resolve_mesh_uri(uri, world_path.parent)
-                    if mesh_path is not None and mesh_path.suffix.lower() == ".obj":
-                        verts, faces = load_obj_mesh(mesh_path)
+                    mesh_path = _resolve_mesh_uri(uri, base_dir)
+                    if mesh_path is not None:
+                        verts, faces = _load_mesh(mesh_path)
                         if len(verts) and len(faces):
                             pts = sample_triangles(verts * scale, faces, sample_step, rng)
 
@@ -409,6 +590,25 @@ def sample_world_ground_truth(
                         if s_pts.size:
                             slice_mesh_pts.append(s_pts[:, :2])
                     primitive_count += 1
+
+    eye4 = np.eye(4, dtype=np.float64)
+    for model in world_elem.findall("model"):
+        _sample_model(model, eye4, world_path.parent)
+
+    for inc in world_elem.findall("include"):
+        uri = (inc.findtext("uri") or "").strip()
+        if not uri:
+            continue
+        model_sdf = _resolve_fuel_model_sdf(uri)
+        if model_sdf is None:
+            continue
+        T_inc = _parse_pose(inc.find("pose"))
+        try:
+            inc_root = ET.parse(model_sdf).getroot()
+        except Exception:
+            continue
+        for inc_model in inc_root.findall("model"):
+            _sample_model(inc_model, T_inc, model_sdf.parent)
 
     if not chunks:
         empty = np.empty((0, 3), dtype=np.float32)
@@ -511,6 +711,14 @@ def _resolve_mesh_uri(uri: str, base_dir: Path) -> Optional[Path]:
     if uri.startswith("file://"):
         p = Path(uri[7:])
         return p if p.is_file() else None
+    if uri.startswith("model://"):
+        # model://<model_name>/<rel_path> -> check relative to included model's base_dir
+        rest = uri[len("model://") :]
+        parts = rest.split("/", 1)
+        if len(parts) == 2:
+            cand = base_dir / parts[1]
+            if cand.is_file():
+                return cand
     p = Path(uri)
     if p.is_file():
         return p
@@ -558,6 +766,8 @@ def main() -> None:
         "primitive_count": int(res["primitive_count"]),
         "voxel_size": args.voxel_size,
         "resolution_2d": args.resolution_2d,
+        "min_z": args.min_z,
+        "max_z": args.max_z,
     }
     (out_dir / "gt_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(json.dumps(meta, indent=2))

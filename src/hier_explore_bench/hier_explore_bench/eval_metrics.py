@@ -369,11 +369,17 @@ def evaluate_run_directory(run_dir: Path, gt_dir: Path, max_time_s: Optional[flo
     gt_meta = json.loads(gt_meta_path.read_text(encoding="utf-8")) if gt_meta_path.is_file() else {}
     target_area = float(gt_meta.get("explorable_area_m2", 100.0))
 
-    # 3D reconstruction
+    # 3D reconstruction (clip reconstructed points to GT Z-band when defined in gt_meta.json)
     gt_pcd = gt_dir / "gt_surface.pcd"
     rec_pcd = run_dir / "cloud_final.pcd"
     if gt_pcd.is_file() and rec_pcd.is_file():
-        report.update(evaluate_3d_reconstruction(read_pcd(rec_pcd), read_pcd(gt_pcd)))
+        rec_pts = read_pcd(rec_pcd)
+        gt_pts = read_pcd(gt_pcd)
+        if rec_pts.size and ("min_z" in gt_meta or "max_z" in gt_meta):
+            z_lo = float(gt_meta.get("min_z", -1e9))
+            z_hi = float(gt_meta.get("max_z", 1e9))
+            rec_pts = rec_pts[(rec_pts[:, 2] >= z_lo) & (rec_pts[:, 2] <= z_hi)]
+        report.update(evaluate_3d_reconstruction(rec_pts, gt_pts))
 
     # 2D map
     gt_2d = gt_dir / "gt_2d.npz"

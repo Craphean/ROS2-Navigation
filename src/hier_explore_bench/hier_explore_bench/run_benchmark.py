@@ -64,11 +64,16 @@ DEFAULT_SUMMARY_METRICS = [
     "completeness_15cm",
     "chamfer_l1_m",
     "occupied_iou_tol1",
+    "ate_rmse_mean_m",
     "total_path_length_m",
     "overlap_ratio",
     "cpu_mean_pct",
+    "cloud_merger_cpu_mean_pct",
+    "map_merge_cpu_mean_pct",
     "ram_peak_mb",
     "cycle_ms_p95",
+    "se2_accept_count",
+    "se2_degenerate_count",
     "comms_avg_kbps",
     "inter_robot_collisions",
 ]
@@ -156,12 +161,24 @@ def run_single_trial(
 def main() -> None:
     ap = argparse.ArgumentParser(description="Batch headless benchmark matrix runner.")
     ap.add_argument("--worlds", nargs="+", default=["house"])
-    ap.add_argument("--profiles", nargs="+", choices=list(ABLATION_PROFILES.keys()), default=["e1_2d", "full"])
+    ap.add_argument(
+        "--profiles",
+        "--methods",
+        dest="profiles",
+        nargs="+",
+        choices=list(ABLATION_PROFILES.keys()),
+        default=["e1_2d", "full"],
+    )
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
     ap.add_argument("--robots", nargs="+", default=["robot1", "robot2"])
     ap.add_argument("--max-sim-sec", type=float, default=240.0)
     ap.add_argument("--gt-root", default=str(REPO_ROOT / "maps" / "gt"))
-    ap.add_argument("--out-root", default=str(REPO_ROOT / "benchmark_results" / "latest"))
+    ap.add_argument(
+        "--out-root",
+        "--out-dir",
+        dest="out_root",
+        default=str(REPO_ROOT / "benchmark_results" / "latest"),
+    )
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 

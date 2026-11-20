@@ -69,6 +69,7 @@ fi
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 export CYCLONEDDS_URI="${CYCLONEDDS_URI:-file://${ROOT_DIR}/config/cyclonedds.xml}"
+export GZ_IP="${GZ_IP:-127.0.0.1}"
 
 "${ROOT_DIR}/scripts/kill_nav2_sim.sh" || true
 sleep 2
@@ -467,9 +468,15 @@ GUI_PID=""
 EKF1_PID=""
 EKF2_PID=""
 
+GZ_HEADLESS_FLAG=""
+if [[ "${HEADLESS,,}" == "true" ]]; then
+  GZ_HEADLESS_FLAG="--headless-rendering"
+fi
+
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
+export GZ_IP='${GZ_IP}'
 export LIBGL_ALWAYS_SOFTWARE='${LIBGL_ALWAYS_SOFTWARE:-}'
 export MESA_GL_VERSION_OVERRIDE='${MESA_GL_VERSION_OVERRIDE:-}'
 export DISPLAY='${DISPLAY}'
@@ -477,8 +484,8 @@ export WAYLAND_DISPLAY='${WAYLAND_DISPLAY}'
 export XDG_RUNTIME_DIR='${XDG_RUNTIME_DIR}'
 export XAUTHORITY='${XAUTHORITY:-}'
 export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
-export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
-xacro -o '${WORLD_SDF}' headless:=${HEADLESS} '${WORLD_FILE}' && exec gz sim -r -s '${WORLD_SDF}'
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}'):${HOME}/.gz/models\"
+xacro -o '${WORLD_SDF}' headless:=${HEADLESS} '${WORLD_FILE}' && exec gz sim -r -s ${GZ_HEADLESS_FLAG} '${WORLD_SDF}'
 " </dev/null >"${GZ_LOG}" 2>&1 &
 GZ_PID=$!
 echo "[tb3_multi_explore_slam] Gazebo PID=${GZ_PID} log=${GZ_LOG}"
@@ -486,6 +493,7 @@ echo "[tb3_multi_explore_slam] Gazebo PID=${GZ_PID} log=${GZ_LOG}"
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
+export GZ_IP='${GZ_IP}'
 export RMW_IMPLEMENTATION='${RMW_IMPLEMENTATION}'
 export CYCLONEDDS_URI='${CYCLONEDDS_URI}'
 exec ros2 run ros_gz_bridge parameter_bridge \
@@ -506,7 +514,7 @@ export XAUTHORITY='${XAUTHORITY:-}'
 export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
 export LIBGL_ALWAYS_SOFTWARE='${LIBGL_ALWAYS_SOFTWARE:-}'
 export MESA_GL_VERSION_OVERRIDE='${MESA_GL_VERSION_OVERRIDE:-}'
-export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}'):${HOME}/.gz/models\"
 exec gz sim -g
 " </dev/null >/tmp/tb3_multi_gz_gui.log 2>&1 &
   GUI_PID=$!
@@ -522,6 +530,7 @@ SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
+export GZ_IP='${GZ_IP}'
 export RMW_IMPLEMENTATION='${RMW_IMPLEMENTATION}'
 export CYCLONEDDS_URI='${CYCLONEDDS_URI}'
 export LIBGL_ALWAYS_SOFTWARE='${LIBGL_ALWAYS_SOFTWARE:-}'
@@ -531,7 +540,7 @@ export WAYLAND_DISPLAY='${WAYLAND_DISPLAY}'
 export XDG_RUNTIME_DIR='${XDG_RUNTIME_DIR}'
 export XAUTHORITY='${XAUTHORITY:-}'
 export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
-export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}'):${HOME}/.gz/models\"
 
 ros2 run robot_state_publisher robot_state_publisher \
   --ros-args -r __ns:=/robot1 \
@@ -613,6 +622,7 @@ sleep 4
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
+export GZ_IP='${GZ_IP}'
 export RMW_IMPLEMENTATION='${RMW_IMPLEMENTATION}'
 export CYCLONEDDS_URI='${CYCLONEDDS_URI}'
 export LIBGL_ALWAYS_SOFTWARE='${LIBGL_ALWAYS_SOFTWARE:-}'
@@ -623,7 +633,7 @@ export XDG_RUNTIME_DIR='${XDG_RUNTIME_DIR}'
 export XAUTHORITY='${XAUTHORITY:-}'
 export QT_QPA_PLATFORM='${QT_QPA_PLATFORM}'
 
-export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}')\"
+export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:}${SIM_SHARE}/models:\$(dirname '${SIM_SHARE}'):${HOME}/.gz/models\"
 
 ros2 run robot_state_publisher robot_state_publisher \
   --ros-args -r __ns:=/robot2 \

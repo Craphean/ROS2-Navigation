@@ -36,14 +36,16 @@
   - `ad39411`：新增标准评测包 `src/hier_explore_bench/`（`pcd_io.py`、`sample_gt_mesh.py`、`eval_metrics.py`、`bench_recorder.py`、`run_benchmark.py`、`plot_paper_figs.py`）。离线验证 `mine`/`house`/`hospital` 真值采样已通过（`mine`: 127 primitives, $A_{\text{GT}}=280.09\text{ m}^2$; `house`: $88.16\text{ m}^2$; `hospital`: $172.16\text{ m}^2$）。
   - `94f9dd8`：同步 `README.md` 与当前仓库配置（16×360 雷达、仅局部代价图点云、Docker/Benchmark 用法）。
   - **已通过测试**：`51 passed`（`src/hier_explore_core/test`、`src/hier_explore_bench/test`、`scripts/test_exploration_3d.py`、`scripts/test_cloud_stamp.py`）。
-- [x] **M2（代码与离线测试已完成；待 5090 实跑 Gazebo 验收）：定位去作弊 + C++ `se2_map_merge` + C++ 点云合并节点**
+- [x] **M2（代码、单测与 5090 4 核实跑验收已全部通过）：定位去作弊 + C++ `se2_map_merge` + C++ 点云合并节点**
   - **WP2.1（去真值里程计 + IMU EKF）**：`config/gz_waffle_3d_lidar.sdf.xacro` 新增 `use_gt_odom` 参数（默认 `false`），恢复 `DiffDrive` 噪声轮式里程计（`wheel_odom` @ 30 Hz，不发 TF），`OdometryPublisher` 仅发评估用 `/<ns>/gt_pose`（10 Hz，不进 EKF/SLAM）；新增 `config/tb3_bridge_ekf.yaml` 与 `config/ekf_odom.yaml`（`robot_localization::ekf_node` 融合 `wheel_odom` `vx/vy` + 50 Hz `imu` `vyaw/ax`），并在 `scripts/tb3_multi_explore_slam.sh` 与 `scripts/kill_nav2_sim.sh` 中完成全链路接入（保留 `USE_GT_ODOM=true` 消融开关）。
   - **WP2.2（C++ `src/se2_map_merge/` 在线 SE(2) 动态配准 + 退化门控）**：纯 C++17 核心库 `se2_map_merge_core`（零 OpenCV/Eigen 外部头文件依赖，支持独立 CMake 与 ROS 2 `colcon` 双编译）实现 Hanning 窗 2D FFT 相位相关粗配 + 2D KD-Tree PCA 法向 + Huber 核点到线 ICP + 2×2/3×3 Jacobi 特征分解 **Solution Remapping** 长廊退化门控 + IoU 单调校验 + 步进限幅李代数平滑；`se2_map_merge_node` 支持任意 $N$ 车渐进 DAG 配准、动态 20 Hz `world -> <ns>/map` TF（带 `tf_future_offset`）、`/<ns>/tf` 与 `/<ns>/tf_static` 完整前缀中继、`/map_merge/alignment_diagnostics` JSON 诊断（已接入 `bench_recorder.py`）。
   - **WP2.3（C++ `cloud_merger_node`）**：零拷贝 `PointCloud2` 解析/打包、自反框过滤、TF 时钟偏斜/跳变拒绝、`uint64` 打包体素降采样；在 `tb3_multi_explore_slam.sh` 中设为默认（缺包自动回退 Python 版）。
-  - **已通过离线单测与基准**：
-    - C++ `ctest` (`test_se2_map_merge`) 4/4 全通过（零警告 `-O3 -Wall -Wextra -Wpedantic`）：1.2 m + 5° 滑移恢复误差 **0.016 cm / 0.0012°**（IoU `0.009 -> 1.000`, `17.0 ms`）；长直矿井走廊退化测试纵向漂移 **0.00 cm**、横向/航向误差 **0.009 cm / 0.003°**；11,520 点滤波+变换+体素降采样 **0.84 ms/帧**（纯算法核较 NumPy 快 1.84×，实跑可消除 `rclpy`/`create_cloud_xyz32` 开销）。
-    - Python `pytest` **57 passed**（含新增 `tests/test_m2_configs.py` 校验 xacro 双分支展开、EKF/Bridge/SE(2) YAML 与 Bash 语法）。
-  - **待 5090 服务器实跑验收**：`colcon build --packages-select se2_map_merge` 编译 ROS 2 节点 + 在 4 核容器内以 `USE_GT_ODOM=false` 实跑 `mine` 与 `warehouse` 对比原 `map_merge` 与 Python `merge_pointclouds.py`。
+  - **已通过离线单测与 5090 4 核 ROS 2 Lyrical 实跑验收**：
+    - `colcon build --symlink-install` 全 6 包零错编译通过；`colcon test --packages-select se2_map_merge` 4/4 全通过（零警告 `-O3 -Wall -Wextra -Wpedantic`）：1.2 m + 5° 滑移恢复误差 **0.016 cm / 0.0012°**；长直矿井走廊退化测试纵向漂移 **0.00 cm**；Python `pytest` **57 passed**。
+    - 5090 4 核隔离容器 `USE_GT_ODOM=false` 240 s A/B 实测（`legacy` vs `se2_map_merge + cloud_merger_node`）：
+      - **`mine`**：`occupied_iou_tol1` `0.635 -> 0.869`（+36.8%），`occupied_hd95_m` `0.901 -> 0.552 m`，`ate_rmse_mean_m` `0.207 -> 0.045 m`（-78.4%），同高度带 `[0.08, 2.00] m` 3D `chamfer_l1_m` `0.1334 -> 0.1277 m`（`accuracy_mean_m` `0.0513 -> 0.0407 m`，`precision_10cm` `0.943 -> 0.988`），`cloud_merger` CPU 均值 `18.97% -> 2.97%`（**-84.4%**，峰值 `184.1% -> 12.9%`），SE(2) 接受 `117` 次。
+      - **`warehouse`**：`ate_rmse_mean_m` `0.350 -> 0.049 m`（-86.0%），2D 覆盖率 `44.8% -> 46.4%`、`n_auc` `0.233 -> 0.272`、`overlap_ratio` `0.113 -> 0.0054`、3D `fscore_15cm` `0.381 -> 0.388`，`cloud_merger` CPU 均值 `20.53% -> 3.05%`（**-85.1%**，峰值 `135.3% -> 6.9%`），SE(2) 接受 `113` 次并实测触发长廊退化门控（`degenerate_trans=true`, `eig_min=10.45`, IoU `0.926 -> 0.932`）。
+    - 顺带修复 5090 无头实机适配：`kill_nav2_sim.sh` 祖先链保护、`tb3_multi_explore_slam.sh` 的 `GZ_IP=127.0.0.1` + `--headless-rendering` + `~/.gz/models` 离线资源索引、`fuel_prefetch.py` 自动建 `model://` 符号链接、`bench_recorder.py` 的 `use_sim_time` 覆盖与分节点 CPU 采样、`sample_gt_mesh.py` 的 Fuel `<include>` + `.stl`/`.dae` 支持。
 - [ ] **M3：C++ `pybind11` 几何核（测地距离 + LoS/FoV 残差视点优化 + 窄道骨架）+ 共享 `/map` 全局代价图 + 车际避碰与互斥预约** ← **下一个立即执行的里程碑**
 - [ ] **M4：参数化 $N=1\sim 4$ 启动包 `src/hier_explore_bringup/` + 导入 CMU `cmu_indoor` / `cmu_tunnel` 世界**
 - [ ] **M5：5090 服务器全量多随机种子 Benchmark + 消融 + M-TARE Docker 对照 + 论文矢量图与 LaTeX 表格生成**
@@ -66,7 +68,7 @@
    - `src/cloud_merger_node.cpp`：用 C++ 重写 `scripts/merge_pointclouds.py`（支持任意 $N$ 车、零拷贝解析 `PointCloud2`、自反框过滤、TF 时钟抖动与位姿跳变拒绝、uint64 打包排序体素降采样 0.02 m，发布 `/points_merged`）。
    - **M2 验收门禁**：
      - [x] C++ 单元测试覆盖：合成旋转 $5^\circ$ + 平移 $1.2\text{ m}$ 的 2D 栅格恢复精度 $< 2\text{ cm}, < 0.3^\circ$（实测 `0.016 cm / 0.0012°`）；长直平行墙走廊退化场景下纵向漂移为 $0$ 且横向/旋转正确收敛（实测 `0.00 cm / 0.009 cm / 0.003°`）；
-     - [ ] 5090 服务器 4 核容器内运行 `mine` 与 `warehouse`（`use_gt_odom=false`），对比原 `map_merge`，合并图 `occupied_iou_tol1` 与 3D `chamfer_l1_m` 显著提升，C++ `cloud_merger_node` CPU 占用较原 Python 版降低 $\ge 50\%$。
+     - [x] 5090 服务器 4 核容器内运行 `mine` 与 `warehouse`（`use_gt_odom=false`），对比原 `map_merge`，合并图 `occupied_iou_tol1`（`mine`: `0.635 -> 0.869`）、ATE（`mine`: `0.207 -> 0.045 m`, `warehouse`: `0.350 -> 0.049 m`）与同高度带 3D `chamfer_l1_m`（`mine`: `0.1334 -> 0.1277 m`, `precision_10cm`: `0.943 -> 0.988`）显著提升，C++ `cloud_merger_node` CPU 占用较原 Python 版降低 **84.4%（`mine`）/ 85.1%（`warehouse`）**（远超 $\ge 50\%$）。
 
 ### M3（WP3）：C++ `pybind11` 几何核 + 共享 `/map` + 窄道协同避碰
 1. **在 `src/hier_explore_core/cpp/` 新增 `pybind11` 模块 `_geom_kernel`**：
@@ -126,9 +128,9 @@ HEADLESS=True USE_RVIZ=False DASHBOARD=False WORLD=mine ./scripts/tb3_multi_expl
 # 5. A/B 对照：旧 map_merge + Python 点云合并 vs 新 C++ se2_map_merge + C++ cloud_merger_node
 #    （在 4 核 8 GB Docker 中分别测 1 轮 mine & warehouse，对比 occupied_iou_tol1, chamfer_l1_m, CPU%）
 USE_GT_ODOM=false USE_SE2_MERGE=false USE_CPP_CLOUD_MERGER=false \
-  PYTHONPATH=src/hier_explore_bench python3 -m hier_explore_bench.run_benchmark \
-  --worlds mine warehouse --methods full --seeds 0 --max-sim-sec 240 --out-dir results/m2_legacy
+  python3 -m hier_explore_bench.run_benchmark \
+  --worlds mine warehouse --methods full --seeds 0 --max-sim-sec 240 --out-dir benchmark_results/m2_legacy
 USE_GT_ODOM=false USE_SE2_MERGE=true USE_CPP_CLOUD_MERGER=true \
-  PYTHONPATH=src/hier_explore_bench python3 -m hier_explore_bench.run_benchmark \
-  --worlds mine warehouse --methods full --seeds 0 --max-sim-sec 240 --out-dir results/m2_se2
+  python3 -m hier_explore_bench.run_benchmark \
+  --worlds mine warehouse --methods full --seeds 0 --max-sim-sec 240 --out-dir benchmark_results/m2_se2
 ```

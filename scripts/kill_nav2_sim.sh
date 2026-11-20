@@ -10,6 +10,24 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SELF_PID=$$
 PARENT_PID="${PPID:-0}"
 
+# Collect the full ancestor chain (self, parent, grandparent, ...) so invoking
+# kill_nav2_sim.sh from a wrapper or subshell never kills its own callers.
+declare -A ANCESTOR_PIDS=()
+_cur_pid="${SELF_PID}"
+while [[ -n "${_cur_pid}" && "${_cur_pid}" -gt 1 && -z "${ANCESTOR_PIDS[${_cur_pid}]:-}" ]]; do
+  ANCESTOR_PIDS["${_cur_pid}"]=1
+  _next_pid="$(awk '{sub(/^.*\) /, ""); print $2}' "/proc/${_cur_pid}/stat" 2>/dev/null || true)"
+  if [[ -z "${_next_pid}" || ! "${_next_pid}" =~ ^[0-9]+$ ]]; then
+    break
+  fi
+  _cur_pid="${_next_pid}"
+done
+ANCESTOR_PIDS["${PARENT_PID}"]=1
+
+is_ancestor_pid() {
+  [[ -n "${ANCESTOR_PIDS[$1]:-}" ]]
+}
+
 echo "[kill_nav2_sim] Stopping Gazebo / Nav2 nodes / RViz ..."
 
 # Kill by matching process args via ps/awk — never embed broad pkill -f
@@ -21,7 +39,7 @@ kill_matching() {
   for re in "$@"; do
     while read -r pid; do
       [[ -z "${pid}" ]] && continue
-      [[ "${pid}" == "${SELF_PID}" || "${pid}" == "${PARENT_PID}" ]] && continue
+      is_ancestor_pid "${pid}" && continue
       kill "-${sig}" "${pid}" 2>/dev/null
     done < <(ps -eo pid=,args= | awk -v re="${re}" 'index($0, re) && $1 != '"${SELF_PID}"' {print $1}')
   done
@@ -87,7 +105,7 @@ kill_other_wrappers() {
   do
     while read -r pid; do
       [[ -z "${pid}" ]] && continue
-      [[ "${pid}" == "${SELF_PID}" || "${pid}" == "${PARENT_PID}" ]] && continue
+      is_ancestor_pid "${pid}" && continue
       kill "${pid}" 2>/dev/null
     done < <(pgrep -f "${pat}" 2>/dev/null)
   done
@@ -97,7 +115,7 @@ sleep 1
 kill_other_wrappers  # SIGTERM first pass; second pass for stragglers
 while read -r pid; do
   [[ -z "${pid}" ]] && continue
-  [[ "${pid}" == "${SELF_PID}" || "${pid}" == "${PARENT_PID}" ]] && continue
+  is_ancestor_pid "${pid}" && continue
   kill -9 "${pid}" 2>/dev/null
 done < <(pgrep -f 'scripts/tb[34]_(multi_explore_slam|explore_slam|slam_gazebo|nav_gazebo|nav_rl_gazebo)\.sh' 2>/dev/null)
 

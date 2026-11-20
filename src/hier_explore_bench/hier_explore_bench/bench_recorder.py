@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -24,6 +25,113 @@ import numpy as np
 import psutil
 
 from .pcd_io import voxel_downsample, write_pcd
+
+
+_SIM_PROC_MARKERS = (
+    "gz sim",
+    "gz-sim",
+    "ros_gz",
+    "parameter_bridge",
+    "robot_state_publisher",
+    "ekf_node",
+    "slam_toolbox",
+    "nav2_",
+    "bt_navigator",
+    "controller_server",
+    "planner_server",
+    "behavior_server",
+    "smoother_server",
+    "velocity_smoother",
+    "collision_monitor",
+    "lifecycle_manager",
+    "se2_map_merge_node",
+    "map_merge",
+    "cloud_merger_node",
+    "merge_pointclouds.py",
+    "octomap_server",
+    "multi_robot_coordinator",
+    "coordinator_node",
+    "explore_lite",
+)
+
+
+class _ProcessResourceMonitor:
+    """Track per-role and aggregate simulation CPU% and RSS using persistent psutil handles."""
+
+    def __init__(self) -> None:
+        self._self_pid = os.getpid()
+        self._procs: Dict[int, Tuple[psutil.Process, str]] = {}
+        self.refresh()
+
+    @staticmethod
+    def _cmdline_str(proc: psutil.Process) -> str:
+        try:
+            cmd = proc.cmdline()
+            if cmd:
+                return " ".join(cmd)
+            return proc.name()
+        except psutil.Error:
+            return ""
+
+    def refresh(self) -> None:
+        alive: Dict[int, Tuple[psutil.Process, str]] = {}
+        for p in psutil.process_iter(["pid"]):
+            pid = p.pid
+            if pid == self._self_pid:
+                continue
+            if pid in self._procs:
+                alive[pid] = self._procs[pid]
+                continue
+            cmd = self._cmdline_str(p)
+            if not cmd or "bench_recorder" in cmd or "run_benchmark" in cmd:
+                continue
+            if any(m in cmd for m in _SIM_PROC_MARKERS):
+                try:
+                    p.cpu_percent(interval=None)
+                    alive[pid] = (p, cmd)
+                except psutil.Error:
+                    continue
+        self._procs = alive
+
+    def sample(self) -> Dict[str, float]:
+        self.refresh()
+        total_cpu = 0.0
+        total_rss = 0.0
+        cloud_cpu = 0.0
+        merge_cpu = 0.0
+        ekf_cpu = 0.0
+        coord_cpu = 0.0
+        matched = 0
+        for proc, cmd in list(self._procs.values()):
+            try:
+                c = float(proc.cpu_percent(interval=None))
+                rss = float(proc.memory_info().rss) / (1024.0 * 1024.0)
+            except psutil.Error:
+                continue
+            matched += 1
+            total_cpu += c
+            total_rss += rss
+            if "cloud_merger_node" in cmd or "merge_pointclouds.py" in cmd:
+                cloud_cpu += c
+            elif "se2_map_merge_node" in cmd or "/multirobot_map_merge/map_merge" in cmd:
+                merge_cpu += c
+            elif "ekf_node" in cmd:
+                ekf_cpu += c
+            elif "multi_robot_coordinator" in cmd or "coordinator_node" in cmd:
+                coord_cpu += c
+
+        if matched == 0:
+            total_cpu = float(psutil.cpu_percent(interval=None))
+            total_rss = float(psutil.virtual_memory().used) / (1024.0 * 1024.0)
+
+        return {
+            "total_cpu": total_cpu,
+            "total_rss": total_rss,
+            "cloud_merger_cpu": cloud_cpu,
+            "map_merge_cpu": merge_cpu,
+            "ekf_cpu": ekf_cpu,
+            "coordinator_cpu": coord_cpu,
+        }
 
 
 def _sample_system_resources(watch_pids: Optional[List[int]] = None) -> Tuple[float, float]:
@@ -66,6 +174,7 @@ def run_ros_recorder(
     import rclpy
     from nav_msgs.msg import OccupancyGrid, Odometry
     from rclpy.node import Node
+    from rclpy.parameter import Parameter
     from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
     from rclpy.time import Time
     from sensor_msgs.msg import PointCloud2
@@ -77,10 +186,13 @@ def run_ros_recorder(
 
     class BenchRecorderNode(Node):
         def __init__(self) -> None:
-            super().__init__("bench_recorder")
-            self.declare_parameter("use_sim_time", True)
+            super().__init__(
+                "bench_recorder",
+                parameter_overrides=[Parameter("use_sim_time", value=True)],
+            )
             self.robots = robots
             self.t0_sim: Optional[float] = None
+            self.wall_start = time.monotonic()
             self.converged = False
             self.converged_since: Optional[float] = None
             self.done = False
@@ -92,12 +204,17 @@ def run_ros_recorder(
             self.cycle_ms_samples: List[float] = []
             self.cpu_samples: List[float] = []
             self.ram_samples: List[float] = []
+            self.cloud_merger_cpu_samples: List[float] = []
+            self.map_merge_cpu_samples: List[float] = []
+            self.ekf_cpu_samples: List[float] = []
+            self.coordinator_cpu_samples: List[float] = []
             self.comms_bytes = 0
             self.last_comms_bytes = 0
             self.last_sample_sim = 0.0
             self.se2_accept_count = 0
             self.se2_degenerate_count = 0
             self.se2_elapsed_ms: List[float] = []
+            self.proc_mon = _ProcessResourceMonitor()
 
             self.est_trajs: Dict[str, List[List[float]]] = {ns: [] for ns in robots}
             self.gt_trajs: Dict[str, List[List[float]]] = {ns: [] for ns in robots}
@@ -214,10 +331,17 @@ def run_ros_recorder(
         def _on_tick(self) -> None:
             now = self._sim_sec()
             if now <= 0.0:
+                if time.monotonic() - self.wall_start > 180.0:
+                    self.done = True
                 return
             if self.t0_sim is None:
+                if self.latest_map is None:
+                    if time.monotonic() - self.wall_start > 180.0:
+                        self.done = True
+                    return
                 self.t0_sim = now
                 self.last_sample_sim = now
+                self.proc_mon.sample()  # prime CPU counters at exploration start
             elapsed = now - self.t0_sim
 
             poses_now: Dict[str, Tuple[float, float]] = {}
@@ -252,9 +376,15 @@ def run_ros_recorder(
                 else:
                     self._in_collision = False
 
-            cpu, ram = _sample_system_resources()
+            res_sample = self.proc_mon.sample()
+            cpu = res_sample["total_cpu"]
+            ram = res_sample["total_rss"]
             self.cpu_samples.append(cpu)
             self.ram_samples.append(ram)
+            self.cloud_merger_cpu_samples.append(res_sample["cloud_merger_cpu"])
+            self.map_merge_cpu_samples.append(res_sample["map_merge_cpu"])
+            self.ekf_cpu_samples.append(res_sample["ekf_cpu"])
+            self.coordinator_cpu_samples.append(res_sample["coordinator_cpu"])
             dt = max(1e-3, now - self.last_sample_sim)
             kbps = (self.comms_bytes - self.last_comms_bytes) / 1024.0 / dt
             self.last_comms_bytes = self.comms_bytes
@@ -311,6 +441,10 @@ def run_ros_recorder(
             se2_ms = np.asarray(self.se2_elapsed_ms, dtype=np.float64)
             cpu = np.asarray(self.cpu_samples, dtype=np.float64)
             ram = np.asarray(self.ram_samples, dtype=np.float64)
+            cm_cpu = np.asarray(self.cloud_merger_cpu_samples, dtype=np.float64)
+            mm_cpu = np.asarray(self.map_merge_cpu_samples, dtype=np.float64)
+            ekf_cpu = np.asarray(self.ekf_cpu_samples, dtype=np.float64)
+            coord_cpu = np.asarray(self.coordinator_cpu_samples, dtype=np.float64)
             total_sim = (self.last_sample_sim - (self.t0_sim or self.last_sample_sim)) or 1.0
             resources = {
                 "converged": bool(self.converged),
@@ -318,6 +452,11 @@ def run_ros_recorder(
                 "cpu_mean_pct": float(np.mean(cpu)) if len(cpu) else 0.0,
                 "cpu_peak_pct": float(np.max(cpu)) if len(cpu) else 0.0,
                 "ram_peak_mb": float(np.max(ram)) if len(ram) else 0.0,
+                "cloud_merger_cpu_mean_pct": float(np.mean(cm_cpu)) if len(cm_cpu) else 0.0,
+                "cloud_merger_cpu_peak_pct": float(np.max(cm_cpu)) if len(cm_cpu) else 0.0,
+                "map_merge_cpu_mean_pct": float(np.mean(mm_cpu)) if len(mm_cpu) else 0.0,
+                "ekf_cpu_mean_pct": float(np.mean(ekf_cpu)) if len(ekf_cpu) else 0.0,
+                "coordinator_cpu_mean_pct": float(np.mean(coord_cpu)) if len(coord_cpu) else 0.0,
                 "cycle_ms_p50": float(np.percentile(cyc, 50)) if len(cyc) else float("nan"),
                 "cycle_ms_p95": float(np.percentile(cyc, 95)) if len(cyc) else float("nan"),
                 "cycle_ms_max": float(np.max(cyc)) if len(cyc) else float("nan"),
@@ -339,6 +478,8 @@ def run_ros_recorder(
     try:
         while rclpy.ok() and not node.done:
             rclpy.spin_once(node, timeout_sec=0.2)
+            if node.t0_sim is None and (time.monotonic() - node.wall_start) > 180.0:
+                break
     except KeyboardInterrupt:
         pass
     finally:

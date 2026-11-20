@@ -10,5 +10,6 @@ if [ -f "/ws/config/cyclonedds.xml" ] && [ -z "${CYCLONEDDS_URI:-}" ]; then
   export CYCLONEDDS_URI="file:///ws/config/cyclonedds.xml"
 fi
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
+export GZ_IP="${GZ_IP:-127.0.0.1}"
 
 exec "$@"

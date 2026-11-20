@@ -23,11 +23,13 @@ import concurrent.futures
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 
 CHUNK = 2 * 1024 * 1024
@@ -101,6 +103,38 @@ def install(blob: bytes, dest: str, name: str) -> None:
             shutil.rmtree(moved, ignore_errors=True)
 
 
+def _link_model_uri_aliases(cache: str, dest: str, name: str) -> None:
+    """Register <cache>/../models/<Alias> symlinks so Gazebo 10 resolves model:// URIs offline."""
+    models_dir = os.path.join(os.path.dirname(os.path.abspath(cache)), "models")
+    os.makedirs(models_dir, exist_ok=True)
+    aliases = {name, name.lower()}
+    cfg = os.path.join(dest, "model.config")
+    if os.path.isfile(cfg):
+        try:
+            txt = ET.parse(cfg).getroot().findtext("name")
+            if txt and txt.strip():
+                aliases.add(txt.strip())
+        except Exception:
+            pass
+    sdf = os.path.join(dest, "model.sdf")
+    if os.path.isfile(sdf):
+        try:
+            with open(sdf, encoding="utf-8", errors="ignore") as f:
+                for m in re.findall(r"model://([^/<\s]+)/", f.read()):
+                    aliases.add(m)
+        except OSError:
+            pass
+    rel_target = os.path.relpath(dest, models_dir)
+    for alias in aliases:
+        link = os.path.join(models_dir, alias)
+        try:
+            if os.path.islink(link) or os.path.exists(link):
+                os.unlink(link)
+            os.symlink(rel_target, link)
+        except OSError:
+            pass
+
+
 def prefetch(cache: str, url: str) -> bool:
     parsed = urllib.parse.urlparse(url)
     bits = [b for b in parsed.path.split("/") if b]
@@ -119,6 +153,7 @@ def prefetch(cache: str, url: str) -> bool:
         cache, parsed.netloc, owner.lower(), "models", name.lower(), version
     )
     if os.path.isfile(os.path.join(dest, "model.config")):
+        _link_model_uri_aliases(cache, dest, name)
         print(f"== {owner}/{name} v{version}: already cached", flush=True)
         return True
     if size <= 0:
@@ -132,6 +167,8 @@ def prefetch(cache: str, url: str) -> bool:
         return False
     install(blob, dest, name)
     ok = os.path.isfile(os.path.join(dest, "model.config"))
+    if ok:
+        _link_model_uri_aliases(cache, dest, name)
     print(f"{'ok' if ok else '!!'} {owner}/{name} -> {dest}", flush=True)
     return ok
 
