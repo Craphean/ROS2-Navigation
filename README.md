@@ -17,6 +17,7 @@ sudo apt update && sudo apt install -y \
   ros-lyrical-navigation2 \
   ros-lyrical-nav2-bringup \
   ros-lyrical-slam-toolbox \
+  ros-lyrical-robot-localization \
   ros-lyrical-nav2-minimal-tb3-sim \
   ros-lyrical-nav2-minimal-tb4-sim \
   ros-lyrical-octomap-server \
@@ -27,7 +28,7 @@ sudo apt update && sudo apt install -y \
   pciutils
 ```
 
-> `ros-lyrical-octomap-server` / `ros-lyrical-octomap-msgs` 只用于双机 3D 点云建图；不跑 3D 链路时可以不装。
+> `ros-lyrical-octomap-server` / `ros-lyrical-octomap-msgs` 用于双机 3D 点云建图；`ros-lyrical-robot-localization` 用于默认噪声里程计 + IMU EKF 定位（`USE_GT_ODOM=false`）。
 
 ## 快速开始 (Getting Started)
 
@@ -41,12 +42,13 @@ chmod +x scripts/*.sh
 
 ### 2. 编译工作空间
 
-本工作空间包含需要编译的源码包：`rl_nav2_controller`（TD3 局部控制器插件）、`explore_lite_msgs` 与 `explore_lite`（自主探索节点）以及 `multirobot_map_merge`（多机器人地图合并节点）。
+本工作空间包含需要编译的源码包：`se2_map_merge`（C++ 在线 SE(2) 动态配准与退化门控地图合并 + C++ 高频点云合并节点）、`hier_explore_core`（分层 2.5D-3D 多机协同探索核心包）、`hier_explore_bench`（离线真值采样与论文评测基准包）、`explore_lite_msgs` 与 `explore_lite`（旧版基线探索节点）以及 `multirobot_map_merge`（旧版对照地图合并节点）。
 
 ```bash
 cd ~/ros2_navigation
 source /opt/ros/lyrical/setup.bash
-colcon build --symlink-install --packages-select rl_nav2_controller explore_lite_msgs explore_lite multirobot_map_merge
+colcon build --symlink-install --packages-select \
+  explore_lite_msgs explore_lite multirobot_map_merge se2_map_merge hier_explore_core hier_explore_bench
 source install/setup.bash
 ```
 
@@ -242,7 +244,7 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 - 每台车在 `base_scan` 上增加一颗 **16 线（-30°..+55°）、360 水平点、5 Hz** 的 `gpu_lidar`（详见 `config/gz_waffle_3d_lidar.sdf.xacro`），桥接为 `/robotX/points`
 - `/robotX/points` 作为 Nav2 **局部 `voxel_layer`**（仅 `marking: true`，清障由 2D `scan` 承担）的 `PointCloud2` 观测源，使桌面、床面等悬空结构在局部避障可见；全局 `obstacle_layer` 保持仅订阅 2D `scan` 以避免 4 核 CPU 下的 `planner_server` 阻塞
-- `scripts/merge_pointclouds.py`（M2 将替换为 C++ `cloud_merger_node`）用 TF 把各车点云从 `robotX/base_scan` 变换到 `world`，体素降采样后发布 `/points_merged`
+- `se2_map_merge` C++ `cloud_merger_node`（默认启用，`USE_CPP_CLOUD_MERGER=false` 或未编译时自动回退至 `scripts/merge_pointclouds.py`）用 TF 把各车点云从 `robotX/base_scan` 变换到 `world`，经自反框过滤与体素降采样后发布 `/points_merged`
 - `octomap_server` 订阅 `/points_merged`，以 0.10 m 分辨率输出 `/octomap_binary`、`/octomap_full`、`/octomap_point_cloud_centers` 和 `/projected_map`
 
 2D SLAM、`/robotX/scan` 与 Nav2 规划逻辑不变；`multi_robot_coordinator.py` 现在还会消费 `/octomap_point_cloud_centers`，把占据体素结构计入前沿评分，并在 2D 前沿闭合后做残差补盲与收敛判定（见下节）。3D 图不再只是被动展示/存档。

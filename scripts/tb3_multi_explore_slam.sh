@@ -6,12 +6,17 @@
 # Defaults:
 #   HEADLESS=True          (set HEADLESS=False to open Gazebo GUI)
 #   USE_RVIZ=False         (set USE_RVIZ=True to open RViz with map_merge.rviz)
-#   KNOWN_INIT_POSES=true  (set KNOWN_INIT_POSES=false for feature-matching mode)
+#   USE_GT_ODOM=false      (false: realistic noisy DiffDrive wheel odom + IMU EKF;
+#                           true: Gazebo OdometryPublisher ground-truth odom for ablation)
+#   USE_SE2_MERGE=true     (true: C++ se2_map_merge_node with online SE(2) alignment +
+#                           corridor degeneracy gating; false: legacy multirobot_map_merge)
+#   USE_CPP_CLOUD_MERGER=true (true: C++ cloud_merger_node; false: Python merge_pointclouds.py)
+#   KNOWN_INIT_POSES=true  (legacy multirobot_map_merge option)
 #   RANDOM_SPAWN=false     (set RANDOM_SPAWN=true to randomly pick 2 non-overlapping inspection stations)
 #
 # 3D point-cloud mapping (headless by default):
 #   - Each robot gets a 16-line / 360-wide / 5 Hz 3D LiDAR from config/gz_waffle_3d_lidar.sdf.xacro.
-#   - /robotX/points feeds the Nav2 local voxel layer and scripts/merge_pointclouds.py.
+#   - /robotX/points feeds the Nav2 local voxel layer and cloud_merger_node (or scripts/merge_pointclouds.py).
 #   - The merged cloud is published as /points_merged in the world frame and fed to
 #     octomap_server (3D map + projected_map + octomap_point_cloud_centers).
 #   - Archive after exploration:
@@ -28,6 +33,7 @@
 #   HEADLESS=False USE_RVIZ=True ./scripts/tb3_multi_explore_slam.sh
 #   RANDOM_SPAWN=true ./scripts/tb3_multi_explore_slam.sh
 #   WORLD=warehouse RANDOM_SPAWN=true USE_RVIZ=True ./scripts/tb3_multi_explore_slam.sh
+#   USE_GT_ODOM=true WORLD=mine ./scripts/tb3_multi_explore_slam.sh
 #   ./scripts/tb3_multi_explore_slam.sh --random-spawn
 #
 # Save merged 2D map when done:
@@ -42,7 +48,7 @@ if [[ -f "${ROOT_DIR}/install/setup.bash" ]]; then
   source "${ROOT_DIR}/install/setup.bash"
 else
   echo "[tb3_multi_explore_slam] Missing ${ROOT_DIR}/install — build first:" >&2
-  echo "  cd ${ROOT_DIR} && colcon build --symlink-install --packages-select explore_lite_msgs explore_lite multirobot_map_merge" >&2
+  echo "  cd ${ROOT_DIR} && colcon build --symlink-install --packages-select explore_lite_msgs explore_lite multirobot_map_merge se2_map_merge" >&2
   exit 1
 fi
 set -u
@@ -82,6 +88,9 @@ fi
 HEADLESS="${HEADLESS:-True}"
 USE_COMPOSITION="${USE_COMPOSITION:-False}"
 USE_RVIZ="${USE_RVIZ:-False}"
+USE_GT_ODOM="${USE_GT_ODOM:-false}"
+USE_SE2_MERGE="${USE_SE2_MERGE:-true}"
+USE_CPP_CLOUD_MERGER="${USE_CPP_CLOUD_MERGER:-true}"
 KNOWN_INIT_POSES="${KNOWN_INIT_POSES:-true}"
 EXPLORATION_MODE="${EXPLORATION_MODE:-auction}"
 RANDOM_SPAWN="${RANDOM_SPAWN:-false}"
@@ -95,11 +104,24 @@ for arg in "$@"; do
     --fixed-spawn|--fixed|random_spawn:=false|random_spawn:=False)
       RANDOM_SPAWN="false"
       ;;
+    --gt-odom|use_gt_odom:=true|use_gt_odom:=True)
+      USE_GT_ODOM="true"
+      ;;
+    --noisy-odom|use_gt_odom:=false|use_gt_odom:=False)
+      USE_GT_ODOM="false"
+      ;;
     WORLD=*|world:=*)
       WORLD="${arg#*=}"
       ;;
   esac
 done
+
+# Normalize boolean USE_GT_ODOM for xacro ('true' or 'false')
+if [[ "${USE_GT_ODOM,,}" =~ ^(true|1|yes)$ ]]; then
+  USE_GT_ODOM="true"
+else
+  USE_GT_ODOM="false"
+fi
 
 # If random spawn is requested and WORLD is not explicitly specified, target warehouse
 if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ && -z "${WORLD:-}" ]]; then
@@ -357,9 +379,12 @@ if [[ ! -f "${WORLD_FILE}" ]]; then
   exit 1
 fi
 
-# Spawn poses in Gazebo world (meters / radians).  Odometry is now the model's
-# true pose (gz OdometryPublisher), so each SLAM map is already in the Gazebo
-# world frame and map_merge starts from the identity, not the spawn offset.
+# Spawn poses in Gazebo world (meters / radians).
+# - USE_GT_ODOM=false (default): DiffDrive wheel odom + robot_localization EKF starts
+#   each robot's local `odom` at (0, 0, 0), so map_merge initializes world -> robotX/map
+#   at the spawn pose and refines it online via SE(2) alignment.
+# - USE_GT_ODOM=true (ablation): Gazebo OdometryPublisher outputs world pose directly,
+#   so each SLAM map is already in world coordinates and map_merge starts from identity.
 ROBOT1_X="${ROBOT1_X:-${DEFAULT_R1_X}}"
 ROBOT1_Y="${ROBOT1_Y:-${DEFAULT_R1_Y}}"
 ROBOT1_YAW="${ROBOT1_YAW:-${DEFAULT_R1_YAW}}"
@@ -368,16 +393,35 @@ ROBOT2_X="${ROBOT2_X:-${DEFAULT_R2_X}}"
 ROBOT2_Y="${ROBOT2_Y:-${DEFAULT_R2_Y}}"
 ROBOT2_YAW="${ROBOT2_YAW:-${DEFAULT_R2_YAW}}"
 
+if [[ "${USE_GT_ODOM}" == "true" ]]; then
+  ROBOT_BRIDGE="${ROOT_DIR}/config/tb3_bridge_no_clock.yaml"
+  MAP_INIT_R1_X="0.0"; MAP_INIT_R1_Y="0.0"; MAP_INIT_R1_YAW="0.0"
+  MAP_INIT_R2_X="0.0"; MAP_INIT_R2_Y="0.0"; MAP_INIT_R2_YAW="0.0"
+else
+  ROBOT_BRIDGE="${ROOT_DIR}/config/tb3_bridge_ekf.yaml"
+  MAP_INIT_R1_X="${ROBOT1_X}"; MAP_INIT_R1_Y="${ROBOT1_Y}"; MAP_INIT_R1_YAW="${ROBOT1_YAW}"
+  MAP_INIT_R2_X="${ROBOT2_X}"; MAP_INIT_R2_Y="${ROBOT2_Y}"; MAP_INIT_R2_YAW="${ROBOT2_YAW}"
+  if ! ros2 pkg prefix robot_localization >/dev/null 2>&1; then
+    echo "[tb3_multi_explore_slam] ERROR: USE_GT_ODOM=false requires ros-lyrical-robot-localization." >&2
+    echo "  Install with: sudo apt install ros-lyrical-robot-localization" >&2
+    echo "  Or run with:  USE_GT_ODOM=true $0" >&2
+    exit 1
+  fi
+fi
+
 PARAMS_FILE="${PARAMS_FILE:-${ROOT_DIR}/config/nav2_multirobot_slam_params.yaml}"
+EKF_PARAMS="${EKF_PARAMS:-${ROOT_DIR}/config/ekf_odom.yaml}"
 EXPLORE_PARAMS="${EXPLORE_PARAMS:-${ROOT_DIR}/config/explore_params.yaml}"
 COORDINATOR_PARAMS="${COORDINATOR_PARAMS:-${ROOT_DIR}/config/coordinator_params.yaml}"
 # Extra coordinator overrides for A/B runs, e.g.:
 #   COORDINATOR_ARGS="-p use_3d_gain:=false -p local_scheduling_enable:=false"
 COORDINATOR_ARGS="${COORDINATOR_ARGS:-}"
+SE2_MERGE_PARAMS="${SE2_MERGE_PARAMS:-${ROOT_DIR}/config/se2_map_merge_params.yaml}"
+SE2_MERGE_ARGS="${SE2_MERGE_ARGS:-}"
 MAP_MERGE_PARAMS="${MAP_MERGE_PARAMS:-${ROOT_DIR}/src/m-explore-ros2/map_merge/config/params.yaml}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_merge.rviz}"
 
-echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} known_init_poses=${KNOWN_INIT_POSES}"
+echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} use_gt_odom=${USE_GT_ODOM} se2_merge=${USE_SE2_MERGE} cpp_cloud=${USE_CPP_CLOUD_MERGER}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
 
 # Persist spawn metadata for the web console: it needs the exact world-frame
@@ -385,17 +429,19 @@ echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_
 # (b) send a "recall to portal" goal.  Written before Nav2 starts so a console
 # that is already running can pick it up.
 mkdir -p "${ROOT_DIR}/extras/console/run"
-printf '{"world":"%s","world_name":"%s","robot1":[%s,%s,%s],"robot2":[%s,%s,%s],"mode":"%s"}\n' \
+printf '{"world":"%s","world_name":"%s","robot1":[%s,%s,%s],"robot2":[%s,%s,%s],"mode":"%s","use_gt_odom":%s}\n' \
   "${WORLD_FILE}" "${WORLD:-custom}" \
   "${ROBOT1_X}" "${ROBOT1_Y}" "${ROBOT1_YAW}" \
   "${ROBOT2_X}" "${ROBOT2_Y}" "${ROBOT2_YAW}" \
-  "${EXPLORATION_MODE}" > "${ROOT_DIR}/extras/console/run/sim_meta.json"
+  "${EXPLORATION_MODE}" "${USE_GT_ODOM}" > "${ROOT_DIR}/extras/console/run/sim_meta.json"
 if command -v free >/dev/null 2>&1; then
   LC_ALL=C free -h | awk '/^Mem:/ {printf "[tb3_multi_explore_slam] memory: %s total, %s available\n", $2, $7}'
 fi
 
 ROBOT1_LOG="/tmp/tb3_multi_robot1_bringup.log"
 ROBOT2_LOG="/tmp/tb3_multi_robot2_bringup.log"
+EKF1_LOG="/tmp/tb3_multi_robot1_ekf.log"
+EKF2_LOG="/tmp/tb3_multi_robot2_ekf.log"
 MERGE_LOG="/tmp/tb3_multi_map_merge.log"
 CLOUD_LOG="/tmp/tb3_multi_merge_clouds.log"
 OCTOMAP_LOG="/tmp/tb3_multi_octomap.log"
@@ -418,6 +464,8 @@ CLOCK_LOG="/tmp/tb3_multi_clock_bridge.log"
 GZ_PID=""
 CLOCK_PID=""
 GUI_PID=""
+EKF1_PID=""
+EKF2_PID=""
 
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
@@ -467,7 +515,10 @@ fi
 
 sleep 3
 
-# robot1 Nav2 + slam, with the no-clock bridge. Gazebo is already running.
+URDF_FILE="${SIM_SHARE}/urdf/turtlebot3_waffle.urdf"
+SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
+
+# robot1 Nav2 + slam, with the selected bridge (EKF or GT odom). Gazebo is already running.
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
@@ -485,19 +536,19 @@ export GZ_SIM_RESOURCE_PATH=\"\${GZ_SIM_RESOURCE_PATH:+\${GZ_SIM_RESOURCE_PATH}:
 ros2 run robot_state_publisher robot_state_publisher \
   --ros-args -r __ns:=/robot1 \
   -p use_sim_time:=true \
-  -p \"robot_description:=\$(cat '${SIM_SHARE}/urdf/turtlebot3_waffle.urdf')\" \
+  -p \"robot_description:=\$(cat '${URDF_FILE}')\" \
   -r /tf:=tf -r /tf_static:=tf_static &
 
 ros2 run ros_gz_sim create \
   -name robot1 \
-  -string \"\$(xacro namespace:=robot1 '${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro')\" \
+  -string \"\$(xacro namespace:=robot1 use_gt_odom:=${USE_GT_ODOM} '${SDF_XACRO}')\" \
   -x '${ROBOT1_X}' -y '${ROBOT1_Y}' -z 0.01 \
   -R 0.0 -P 0.0 -Y '${ROBOT1_YAW}' \
   --ros-args -r __ns:=/robot1 &
 
 ros2 run ros_gz_bridge parameter_bridge \
   --ros-args -r __ns:=/robot1 \
-  -p config_file:='${ROOT_DIR}/config/tb3_bridge_no_clock.yaml' \
+  -p config_file:='${ROBOT_BRIDGE}' \
   -p use_sim_time:=true \
   -p expand_gz_topic_names:=true &
 
@@ -518,7 +569,19 @@ exec ros2 launch nav2_bringup bringup_launch.py \
 R1_PID=$!
 echo "[tb3_multi_explore_slam] Launched robot1 (PID=${R1_PID}, log=${ROBOT1_LOG})"
 
-# 3D cloud stays on its own bridge. tb3_bridge_no_clock.yaml does not carry it,
+if [[ "${USE_GT_ODOM}" != "true" ]]; then
+  ros2 run robot_localization ekf_node --ros-args \
+    -r __ns:=/robot1 \
+    --params-file "${EKF_PARAMS}" \
+    -p use_sim_time:=true \
+    -r odometry/filtered:=odom \
+    -r /tf:=tf -r /tf_static:=tf_static \
+    >"${EKF1_LOG}" 2>&1 &
+  EKF1_PID=$!
+  echo "[tb3_multi_explore_slam] robot1 EKF (wheel_odom+IMU) PID=${EKF1_PID} log=${EKF1_LOG}"
+fi
+
+# 3D cloud stays on its own bridge. tb3_bridge_*.yaml does not carry it,
 # and mixing it with scan/odom lets the cloud conversion stall those streams.
 POINTS1_LOG="/tmp/tb3_multi_robot1_points_bridge.log"
 ros2 run ros_gz_bridge parameter_bridge \
@@ -546,12 +609,7 @@ echo "[tb3_multi_explore_slam] robot1 camera bridge PID=${CAMERA1_PID} log=${CAM
 sleep 4
 
 # 2. Spawn robot2 into same Gazebo server + launch robot2 (Nav2 + slam_toolbox in /robot2)
-# Uses tb3_bridge_no_clock.yaml. /clock is published only by the dedicated
-# clock bridge above; a second publisher makes sim time jump backwards.
-BRIDGE_NO_CLOCK="${ROOT_DIR}/config/tb3_bridge_no_clock.yaml"
-URDF_FILE="${SIM_SHARE}/urdf/turtlebot3_waffle.urdf"
-SDF_XACRO="${ROOT_DIR}/config/gz_waffle_3d_lidar.sdf.xacro"
-
+# Uses ROBOT_BRIDGE (no /clock; /clock is owned solely by the dedicated clock bridge above).
 setsid bash -c "
 source /opt/ros/lyrical/setup.bash
 source '${ROOT_DIR}/install/setup.bash'
@@ -575,14 +633,14 @@ ros2 run robot_state_publisher robot_state_publisher \
 
 ros2 run ros_gz_sim create \
   -name robot2 \
-  -string \"\$(xacro namespace:=robot2 '${SDF_XACRO}')\" \
+  -string \"\$(xacro namespace:=robot2 use_gt_odom:=${USE_GT_ODOM} '${SDF_XACRO}')\" \
   -x '${ROBOT2_X}' -y '${ROBOT2_Y}' -z 0.05 \
   -R 0.0 -P 0.0 -Y '${ROBOT2_YAW}' \
   --ros-args -r __ns:=/robot2 &
 
 ros2 run ros_gz_bridge parameter_bridge \
   --ros-args -r __ns:=/robot2 \
-  -p config_file:='${BRIDGE_NO_CLOCK}' \
+  -p config_file:='${ROBOT_BRIDGE}' \
   -p use_sim_time:=true \
   -p expand_gz_topic_names:=true &
 
@@ -602,6 +660,18 @@ exec ros2 launch nav2_bringup bringup_launch.py \
 " </dev/null >"${ROBOT2_LOG}" 2>&1 &
 R2_PID=$!
 echo "[tb3_multi_explore_slam] Launched robot2 (PID=${R2_PID}, log=${ROBOT2_LOG})"
+
+if [[ "${USE_GT_ODOM}" != "true" ]]; then
+  ros2 run robot_localization ekf_node --ros-args \
+    -r __ns:=/robot2 \
+    --params-file "${EKF_PARAMS}" \
+    -p use_sim_time:=true \
+    -r odometry/filtered:=odom \
+    -r /tf:=tf -r /tf_static:=tf_static \
+    >"${EKF2_LOG}" 2>&1 &
+  EKF2_PID=$!
+  echo "[tb3_multi_explore_slam] robot2 EKF (wheel_odom+IMU) PID=${EKF2_PID} log=${EKF2_LOG}"
+fi
 
 # robot2's scan/odom bridge must not also convert the 3D cloud; that backlog
 # made every scan look seconds old and collision_monitor held the robot at 0.
@@ -637,7 +707,7 @@ DASH_PID=""
 
 cleanup() {
   echo "[tb3_multi_explore_slam] Shutting down dual-robot exploration & 3D mapping..."
-  local pids=("${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${POINTS2_PID:-}" "${CAMERA1_PID:-}" "${CAMERA2_PID:-}" "${DASH_PID}" "${R2_PID}" "${R1_PID}" "${CLOCK_PID:-}" "${GUI_PID:-}" "${GZ_PID:-}")
+  local pids=("${RELAY_PID}" "${COORD_PID}" "${EXP1_PID}" "${EXP2_PID}" "${OCTOMAP_PID}" "${CLOUD_PID}" "${MERGE_PID}" "${RVIZ_PID}" "${POINTS1_PID:-}" "${POINTS2_PID:-}" "${CAMERA1_PID:-}" "${CAMERA2_PID:-}" "${EKF1_PID:-}" "${EKF2_PID:-}" "${DASH_PID}" "${R2_PID}" "${R1_PID}" "${CLOCK_PID:-}" "${GUI_PID:-}" "${GZ_PID:-}")
   for pid in "${pids[@]}"; do
     if [[ -n "${pid}" ]]; then
       kill "${pid}" 2>/dev/null || true
@@ -673,6 +743,14 @@ for i in $(seq 1 240); do
     echo "[tb3_multi_explore_slam] robot2 bringup exited early — see ${ROBOT2_LOG}" >&2
     exit 1
   fi
+  if [[ -n "${EKF1_PID}" ]] && ! kill -0 "${EKF1_PID}" 2>/dev/null; then
+    echo "[tb3_multi_explore_slam] robot1 EKF exited early — see ${EKF1_LOG}" >&2
+    exit 1
+  fi
+  if [[ -n "${EKF2_PID}" ]] && ! kill -0 "${EKF2_PID}" 2>/dev/null; then
+    echo "[tb3_multi_explore_slam] robot2 EKF exited early — see ${EKF2_LOG}" >&2
+    exit 1
+  fi
 
   r1_ok=0
   r2_ok=0
@@ -698,30 +776,53 @@ for i in $(seq 1 240); do
   sleep 1
 done
 
-# 3. Start multirobot_map_merge node
-echo "[tb3_multi_explore_slam] Starting multirobot_map_merge -> publishing merged map on /map ..."
-ros2 run multirobot_map_merge map_merge --ros-args \
-  --params-file "${MAP_MERGE_PARAMS}" \
-  -p use_sim_time:=true \
-  -p known_init_poses:="${KNOWN_INIT_POSES}" \
-  -p merging_rate:=1.5 \
-  -p discovery_rate:=1.0 \
-  -p world_frame:=world \
-  -p merged_map_topic:=map \
-  -p robot_map_topic:=map \
-  -p robot_map_updates_topic:=map_updates \
-  -p robot_namespace:=robot \
-  -p /robot1/map_merge/init_pose_x:=0.0 \
-  -p /robot1/map_merge/init_pose_y:=0.0 \
-  -p /robot1/map_merge/init_pose_z:=0.0 \
-  -p /robot1/map_merge/init_pose_yaw:=0.0 \
-  -p /robot2/map_merge/init_pose_x:=0.0 \
-  -p /robot2/map_merge/init_pose_y:=0.0 \
-  -p /robot2/map_merge/init_pose_z:=0.0 \
-  -p /robot2/map_merge/init_pose_yaw:=0.0 \
-  >"${MERGE_LOG}" 2>&1 &
-MERGE_PID=$!
-echo "[tb3_multi_explore_slam] map_merge PID=${MERGE_PID} log=${MERGE_LOG}"
+# 3. Start map merge node (C++ se2_map_merge_node by default, legacy fallback)
+HAS_SE2_PKG=0
+if ros2 pkg prefix se2_map_merge >/dev/null 2>&1; then
+  HAS_SE2_PKG=1
+fi
+
+if [[ "${USE_SE2_MERGE,,}" =~ ^(true|1|yes)$ && "${HAS_SE2_PKG}" -eq 1 ]]; then
+  echo "[tb3_multi_explore_slam] Starting C++ se2_map_merge_node (online SE(2) + degeneracy gate) -> /map ..."
+  ros2 run se2_map_merge se2_map_merge_node --ros-args \
+    --params-file "${SE2_MERGE_PARAMS}" \
+    -p use_sim_time:=true \
+    -p robot_namespaces:="['robot1', 'robot2']" \
+    -p robot1_init_pose:="[${MAP_INIT_R1_X}, ${MAP_INIT_R1_Y}, ${MAP_INIT_R1_YAW}]" \
+    -p robot2_init_pose:="[${MAP_INIT_R2_X}, ${MAP_INIT_R2_Y}, ${MAP_INIT_R2_YAW}]" \
+    ${SE2_MERGE_ARGS} \
+    >"${MERGE_LOG}" 2>&1 &
+  MERGE_PID=$!
+  echo "[tb3_multi_explore_slam] se2_map_merge_node PID=${MERGE_PID} log=${MERGE_LOG}"
+else
+  if [[ "${USE_SE2_MERGE,,}" =~ ^(true|1|yes)$ ]]; then
+    echo "[tb3_multi_explore_slam] WARNING: se2_map_merge package not built; falling back to multirobot_map_merge." >&2
+    echo "[tb3_multi_explore_slam]   Build with: colcon build --symlink-install --packages-select se2_map_merge" >&2
+  fi
+  echo "[tb3_multi_explore_slam] Starting multirobot_map_merge -> publishing merged map on /map ..."
+  ros2 run multirobot_map_merge map_merge --ros-args \
+    --params-file "${MAP_MERGE_PARAMS}" \
+    -p use_sim_time:=true \
+    -p known_init_poses:="${KNOWN_INIT_POSES}" \
+    -p merging_rate:=1.5 \
+    -p discovery_rate:=1.0 \
+    -p world_frame:=world \
+    -p merged_map_topic:=map \
+    -p robot_map_topic:=map \
+    -p robot_map_updates_topic:=map_updates \
+    -p robot_namespace:=robot \
+    -p /robot1/map_merge/init_pose_x:="${MAP_INIT_R1_X}" \
+    -p /robot1/map_merge/init_pose_y:="${MAP_INIT_R1_Y}" \
+    -p /robot1/map_merge/init_pose_z:=0.0 \
+    -p /robot1/map_merge/init_pose_yaw:="${MAP_INIT_R1_YAW}" \
+    -p /robot2/map_merge/init_pose_x:="${MAP_INIT_R2_X}" \
+    -p /robot2/map_merge/init_pose_y:="${MAP_INIT_R2_Y}" \
+    -p /robot2/map_merge/init_pose_z:=0.0 \
+    -p /robot2/map_merge/init_pose_yaw:="${MAP_INIT_R2_YAW}" \
+    >"${MERGE_LOG}" 2>&1 &
+  MERGE_PID=$!
+  echo "[tb3_multi_explore_slam] map_merge PID=${MERGE_PID} log=${MERGE_LOG}"
+fi
 
 # 3b. Merge both robots' 3D point clouds into the world frame and build OctoMap.
 sleep 2
@@ -729,15 +830,27 @@ sleep 2
 # The merger needs world -> robotX/map, which map_merge publishes once it
 # receives both SLAM maps. It retries TF lookups until then, so it is safe to
 # start right after map_merge.
-python3 "${ROOT_DIR}/scripts/merge_pointclouds.py" --ros-args \
-  -p use_sim_time:=true \
-  -p robots:="['robot1', 'robot2']" \
-  -p world_frame:=world \
-  -p voxel_size:=0.02 \
-  -p publish_rate:=2.0 \
-  >"${CLOUD_LOG}" 2>&1 &
-CLOUD_PID=$!
-echo "[tb3_multi_explore_slam] point-cloud merger PID=${CLOUD_PID} log=${CLOUD_LOG}"
+if [[ "${USE_CPP_CLOUD_MERGER,,}" =~ ^(true|1|yes)$ && "${HAS_SE2_PKG}" -eq 1 ]]; then
+  ros2 run se2_map_merge cloud_merger_node --ros-args \
+    -p use_sim_time:=true \
+    -p robots:="['robot1', 'robot2']" \
+    -p world_frame:=world \
+    -p voxel_size:=0.02 \
+    -p publish_rate:=2.0 \
+    >"${CLOUD_LOG}" 2>&1 &
+  CLOUD_PID=$!
+  echo "[tb3_multi_explore_slam] C++ cloud_merger_node PID=${CLOUD_PID} log=${CLOUD_LOG}"
+else
+  python3 "${ROOT_DIR}/scripts/merge_pointclouds.py" --ros-args \
+    -p use_sim_time:=true \
+    -p robots:="['robot1', 'robot2']" \
+    -p world_frame:=world \
+    -p voxel_size:=0.02 \
+    -p publish_rate:=2.0 \
+    >"${CLOUD_LOG}" 2>&1 &
+  CLOUD_PID=$!
+  echo "[tb3_multi_explore_slam] Python merge_pointclouds.py PID=${CLOUD_PID} log=${CLOUD_LOG}"
+fi
 
 if ros2 pkg prefix octomap_server >/dev/null 2>&1; then
   ros2 run octomap_server octomap_server_node --ros-args \

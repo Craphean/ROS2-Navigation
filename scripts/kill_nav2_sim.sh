@@ -42,14 +42,16 @@ kill_matching TERM \
   'parameter_bridge' \
   'image_bridge' \
   '/lib/robot_state_publisher/robot_state_publisher' \
+  '/lib/robot_localization/ekf_node' \
   '/lib/explore_lite/explore' \
   '/lib/multirobot_map_merge/map_merge' \
+  '/lib/se2_map_merge/se2_map_merge_node' \
+  '/lib/se2_map_merge/cloud_merger_node' \
   'merge_pointclouds.py' \
   'octomap_server_node' \
   'monitor_dashboard.py' \
   'multi_robot_coordinator.py' \
   'multi_robot_plan_relay.py' \
-  'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
 sleep 1
 kill_matching KILL \
@@ -59,13 +61,15 @@ kill_matching KILL \
   'tb3_simulation_launch' \
   'tb4_simulation_launch' \
   '/lib/rviz2/rviz2' \
+  '/lib/robot_localization/ekf_node' \
   '/lib/multirobot_map_merge/map_merge' \
+  '/lib/se2_map_merge/se2_map_merge_node' \
+  '/lib/se2_map_merge/cloud_merger_node' \
   'merge_pointclouds.py' \
   'octomap_server_node' \
   'monitor_dashboard.py' \
   'multi_robot_coordinator.py' \
   'multi_robot_plan_relay.py' \
-  'rl_cmd_vel_relay.py' \
   'lifecycle_manager_navigation/manage_nodes'
 
 # Optionally stop *other* wrapper scripts (not ourselves / our parent).

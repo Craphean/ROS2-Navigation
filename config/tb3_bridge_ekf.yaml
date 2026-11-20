@@ -1,0 +1,41 @@
+# ROS <-> Gazebo bridge for realistic noisy-odometry + IMU EKF mode (USE_GT_ODOM=false).
+# Differences vs tb3_bridge_no_clock.yaml:
+#   - Bridges noisy DiffDrive odometry on `wheel_odom` (consumed by robot_localization ekf_node).
+#   - Bridges ground-truth model pose on `gt_pose` (10 Hz, for benchmark ATE/RPE evaluation only;
+#     never fed into EKF, SLAM, or Nav2).
+#   - Does NOT bridge Gazebo `tf`, because ekf_node owns the `odom -> base_footprint` transform.
+- ros_topic_name: "cmd_vel"
+  gz_topic_name: "cmd_vel"
+  ros_type_name: "geometry_msgs/msg/TwistStamped"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ
+
+- ros_topic_name: "wheel_odom"
+  gz_topic_name: "wheel_odom"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "gt_pose"
+  gz_topic_name: "gt_pose"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "scan"
+  gz_topic_name: "scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "imu"
+  gz_topic_name: "imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "joint_states"
+  gz_topic_name: "joint_states"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  gz_type_name: "gz.msgs.Model"
+  direction: GZ_TO_ROS

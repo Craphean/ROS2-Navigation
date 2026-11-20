@@ -70,7 +70,7 @@ def run_ros_recorder(
     from rclpy.time import Time
     from sensor_msgs.msg import PointCloud2
     from sensor_msgs_py import point_cloud2
-    from std_msgs.msg import Bool, Float64
+    from std_msgs.msg import Bool, Float64, String
     import tf2_ros
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -95,6 +95,9 @@ def run_ros_recorder(
             self.comms_bytes = 0
             self.last_comms_bytes = 0
             self.last_sample_sim = 0.0
+            self.se2_accept_count = 0
+            self.se2_degenerate_count = 0
+            self.se2_elapsed_ms: List[float] = []
 
             self.est_trajs: Dict[str, List[List[float]]] = {ns: [] for ns in robots}
             self.gt_trajs: Dict[str, List[List[float]]] = {ns: [] for ns in robots}
@@ -123,11 +126,15 @@ def run_ros_recorder(
             self.create_subscription(PointCloud2, "/points_merged", self._on_merged_cloud, cloud_qos)
             self.create_subscription(Float64, "/exploration/cycle_time_ms", self._on_cycle_ms, 10)
             self.create_subscription(Bool, "/exploration/converged", self._on_converged, 10)
+            self.create_subscription(
+                String, "/map_merge/alignment_diagnostics", self._on_align_diag, 10
+            )
             for ns in robots:
                 self.create_subscription(
                     Odometry, f"/{ns}/gt_pose", lambda m, r=ns: self._on_gt_pose(r, m), 10
                 )
 
+            self.diag_file = (out_dir / "alignment_diagnostics.jsonl").open("w", encoding="utf-8")
             self.ts_file = (out_dir / "timeseries.csv").open("w", newline="", encoding="utf-8")
             self.ts_writer = csv.writer(self.ts_file)
             self.ts_writer.writerow(
@@ -180,6 +187,23 @@ def run_ros_recorder(
 
         def _on_converged(self, msg: Bool) -> None:
             self.converged = bool(msg.data)
+
+        def _on_align_diag(self, msg: String) -> None:
+            raw = msg.data.strip()
+            if not raw:
+                return
+            self.diag_file.write(raw + "\n")
+            self.diag_file.flush()
+            try:
+                rec = json.loads(raw)
+                if rec.get("accepted"):
+                    self.se2_accept_count += 1
+                if rec.get("degenerate_trans"):
+                    self.se2_degenerate_count += 1
+                if "elapsed_ms" in rec:
+                    self.se2_elapsed_ms.append(float(rec["elapsed_ms"]))
+            except Exception:
+                pass
 
         def _on_gt_pose(self, ns: str, msg: Odometry) -> None:
             self.latest_gt[ns] = (
@@ -264,6 +288,7 @@ def run_ros_recorder(
 
         def finalize(self) -> None:
             self.ts_file.close()
+            self.diag_file.close()
             if self.latest_map is not None:
                 m = self.latest_map
                 grid = np.asarray(m.data, dtype=np.int8).reshape((int(m.info.height), int(m.info.width)))
@@ -283,6 +308,7 @@ def run_ros_recorder(
                 encoding="utf-8",
             )
             cyc = np.asarray(self.cycle_ms_samples, dtype=np.float64)
+            se2_ms = np.asarray(self.se2_elapsed_ms, dtype=np.float64)
             cpu = np.asarray(self.cpu_samples, dtype=np.float64)
             ram = np.asarray(self.ram_samples, dtype=np.float64)
             total_sim = (self.last_sample_sim - (self.t0_sim or self.last_sample_sim)) or 1.0
@@ -295,6 +321,9 @@ def run_ros_recorder(
                 "cycle_ms_p50": float(np.percentile(cyc, 50)) if len(cyc) else float("nan"),
                 "cycle_ms_p95": float(np.percentile(cyc, 95)) if len(cyc) else float("nan"),
                 "cycle_ms_max": float(np.max(cyc)) if len(cyc) else float("nan"),
+                "se2_accept_count": int(self.se2_accept_count),
+                "se2_degenerate_count": int(self.se2_degenerate_count),
+                "se2_elapsed_ms_p95": float(np.percentile(se2_ms, 95)) if len(se2_ms) else float("nan"),
                 "comms_avg_kbps": float(self.comms_bytes / 1024.0 / total_sim),
                 "min_inter_robot_dist_m": (
                     float(self.min_inter_robot_dist)

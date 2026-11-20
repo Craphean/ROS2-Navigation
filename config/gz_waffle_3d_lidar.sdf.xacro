@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
     <xacro:arg name="namespace" default=""/>
+    <xacro:arg name="use_gt_odom" default="false"/>
 
     <model name="turtlebot3_waffle"> 
       <pose>0.0 0.0 0.0 0.0 0.0 0.0</pose>
@@ -522,27 +523,51 @@
         <max_angular_velocity>1.9</max_angular_velocity>
         <min_angular_velocity>-1.9</min_angular_velocity>
         <topic>$(arg namespace)/cmd_vel</topic>
-        <!-- Odometry is published by the OdometryPublisher below, from the
-             model's true pose.  DiffDrive integrates the *commanded* wheel
-             speed, so any wheel slip lands in odom: measured ~0.3 m of error
-             per 5 m driven, which slam_toolbox then takes out in 3-8 cm jumps.
-             Each jump left a copy of the walls in the accumulated 3D cloud. -->
-        <odom_publish_frequency>0</odom_publish_frequency>
+        <!-- Default (use_gt_odom:=false): realistic noisy DiffDrive wheel odometry
+             published on <ns>/wheel_odom at 30 Hz (no TF; robot_localization EKF
+             fuses wheel_odom + IMU and owns odom -> base_footprint).
+             Ablation / external SOTA parity (use_gt_odom:=true): disable DiffDrive
+             odom and let OdometryPublisher publish true pose directly on odom+tf. -->
+        <xacro:unless value="$(arg use_gt_odom)">
+          <odom_topic>$(arg namespace)/wheel_odom</odom_topic>
+          <tf_topic>$(arg namespace)/wheel_tf_unused</tf_topic>
+          <frame_id>odom</frame_id>
+          <child_frame_id>base_footprint</child_frame_id>
+          <odom_publish_frequency>30</odom_publish_frequency>
+        </xacro:unless>
+        <xacro:if value="$(arg use_gt_odom)">
+          <odom_publish_frequency>0</odom_publish_frequency>
+        </xacro:if>
       </plugin>
 
-      <!-- Ground-truth odometry: the model pose in the world, published as
-           odom -> base_footprint on <ns>/tf and as <ns>/odom.  Keeps SLAM from
-           having to fight a drifting wheel odometry. -->
-      <plugin
-        filename="gz-sim-odometry-publisher-system"
-        name="gz::sim::systems::OdometryPublisher">
-        <dimensions>2</dimensions>
-        <odom_frame>odom</odom_frame>
-        <robot_base_frame>base_footprint</robot_base_frame>
-        <odom_topic>$(arg namespace)/odom</odom_topic>
-        <tf_topic>$(arg namespace)/tf</tf_topic>
-        <odom_publish_frequency>30</odom_publish_frequency>
-      </plugin>
+      <xacro:if value="$(arg use_gt_odom)">
+        <!-- Ground-truth odometry (ablation / clean baseline toggle): model pose in
+             the world, published as odom -> base_footprint on <ns>/tf and <ns>/odom. -->
+        <plugin
+          filename="gz-sim-odometry-publisher-system"
+          name="gz::sim::systems::OdometryPublisher">
+          <dimensions>2</dimensions>
+          <odom_frame>odom</odom_frame>
+          <robot_base_frame>base_footprint</robot_base_frame>
+          <odom_topic>$(arg namespace)/odom</odom_topic>
+          <tf_topic>$(arg namespace)/tf</tf_topic>
+          <odom_publish_frequency>30</odom_publish_frequency>
+        </plugin>
+      </xacro:if>
+      <xacro:unless value="$(arg use_gt_odom)">
+        <!-- Evaluation-only ground-truth pose stream (10 Hz) on <ns>/gt_pose for
+             benchmark ATE/RPE metrics. Never bridged to tf or consumed by EKF/SLAM. -->
+        <plugin
+          filename="gz-sim-odometry-publisher-system"
+          name="gz::sim::systems::OdometryPublisher">
+          <dimensions>2</dimensions>
+          <odom_frame>world</odom_frame>
+          <robot_base_frame>base_footprint</robot_base_frame>
+          <odom_topic>$(arg namespace)/gt_pose</odom_topic>
+          <tf_topic>$(arg namespace)/gt_tf_unused</tf_topic>
+          <odom_publish_frequency>10</odom_publish_frequency>
+        </plugin>
+      </xacro:unless>
 
       <plugin
         filename="gz-sim-joint-state-publisher-system"
