@@ -1,0 +1,88 @@
+"""Lightweight 2.5D-3D hierarchical multi-robot exploration core."""
+
+from .convergence import ConvergenceParams, ConvergenceState, ConvergenceTracker
+from .frontier import (
+    FrontierCluster,
+    FrontierParams,
+    extract_frontiers,
+    find_safe_goal,
+    frontier_yaw,
+    score_frontiers,
+    split_cluster_if_large,
+)
+from .geometry import (
+    MAX_ROBOT_SPEED_MPS,
+    POSE_STEP_MARGIN_M,
+    pose_is_discontinuous,
+    se2_apply,
+    se2_compose,
+    se2_inverse,
+    wrap_angle,
+)
+from .occupancy_view import FREE, LETHAL, UNKNOWN, OccupancyView, classify_occupancy
+from .residual_nbv import ResidualCandidate, ResidualParams, detect_residuals
+from .robot_tracker import RobotTracker
+from .scheduler import (
+    AgentState,
+    Ownership,
+    RoiParams,
+    TourParams,
+    UtilityParams,
+    assign_ownership,
+    build_local_tour,
+    calculate_legacy_utility,
+    euclidean_distance,
+    exclude_near_waypoints,
+    global_bid,
+    nearest_neighbor_order,
+    open_path_2opt,
+    path_length,
+)
+from .voxel_index import InfoGainParams, VoxelColumnIndex, VoxelParams, WindowStats
+
+__all__ = [
+    "FREE",
+    "UNKNOWN",
+    "LETHAL",
+    "MAX_ROBOT_SPEED_MPS",
+    "POSE_STEP_MARGIN_M",
+    "OccupancyView",
+    "classify_occupancy",
+    "VoxelParams",
+    "InfoGainParams",
+    "WindowStats",
+    "VoxelColumnIndex",
+    "ResidualParams",
+    "ResidualCandidate",
+    "detect_residuals",
+    "FrontierParams",
+    "FrontierCluster",
+    "split_cluster_if_large",
+    "find_safe_goal",
+    "frontier_yaw",
+    "extract_frontiers",
+    "score_frontiers",
+    "TourParams",
+    "AgentState",
+    "Ownership",
+    "RoiParams",
+    "UtilityParams",
+    "euclidean_distance",
+    "nearest_neighbor_order",
+    "path_length",
+    "open_path_2opt",
+    "build_local_tour",
+    "assign_ownership",
+    "global_bid",
+    "exclude_near_waypoints",
+    "calculate_legacy_utility",
+    "ConvergenceParams",
+    "ConvergenceState",
+    "ConvergenceTracker",
+    "RobotTracker",
+    "wrap_angle",
+    "se2_apply",
+    "se2_inverse",
+    "se2_compose",
+    "pose_is_discontinuous",
+]

@@ -1,24 +1,16 @@
-"""Decide whether a 3D scan may be inserted into the world-frame map.
+"""Backwards-compatible shim re-exporting pose continuity helper from hier_explore_core."""
 
-A stalled ros_gz bridge delivers a cloud and a TF sample that do not belong
-to the same instant. Inserting that pair paints a second copy of every wall.
-The robot cannot exceed its speed limit, so a pose change faster than that
-limit is a clock/TF discontinuity and must be dropped.
-"""
+from __future__ import annotations
 
+import sys
+from pathlib import Path
 
-def pose_is_discontinuous(
-    dt: float,
-    dist: float,
-    max_speed: float = 0.7,
-    margin: float = 0.15,
-) -> bool:
-    """True when the robot could not have moved ``dist`` metres in ``dt`` seconds.
+_PKG_ROOT = Path(__file__).resolve().parents[1] / "src" / "hier_explore_core"
+if str(_PKG_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PKG_ROOT))
 
-    ``dt`` is the cloud-stamp delta. Negative means sim time went backwards.
-    ``max_speed`` sits above the TurtleBot3 limit (0.46 m/s) so a real move is
-    kept; ``margin`` absorbs one noisy TF sample.
-    """
-    if dt < 0.0:
-        return dist > margin
-    return dist > max_speed * max(dt, 0.05) + margin
+from hier_explore_core.geometry import (  # noqa: E402, F401
+    MAX_ROBOT_SPEED_MPS,
+    POSE_STEP_MARGIN_M,
+    pose_is_discontinuous,
+)
