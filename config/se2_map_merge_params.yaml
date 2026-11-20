@@ -1,0 +1,28 @@
+# Default parameters for C++ online SE(2) map alignment & degeneracy-gated map fusion
+# (package: se2_map_merge, executable: se2_map_merge_node).
+/**:
+  ros__parameters:
+    world_frame: "world"
+    merged_map_topic: "/map"
+    robot_map_topic: "map"
+    merging_rate: 1.5
+    alignment_rate: 0.5
+    tf_broadcast_rate: 20.0
+    tf_future_offset: 0.05
+    output_resolution: 0.05
+
+    # Coarse-to-fine online SE(2) alignment + corridor degeneracy gating
+    enable_online_alignment: true
+    enable_phase_corr: true
+    enable_degeneracy_gate: true
+    publish_per_robot_shared_map: false
+
+    # Step-clamped exponential smoothing (prevents OctoMap smearing from TF jumps)
+    smoothing_alpha: 0.25
+    max_step_xy_m: 0.05
+    max_step_yaw_rad: 0.0174532925
+
+    # Zhang & Singh translational Hessian degeneracy thresholds
+    min_trans_eigenvalue: 12.0
+    max_trans_cond_number: 25.0
+    max_correspondence_dist_m: 0.80
