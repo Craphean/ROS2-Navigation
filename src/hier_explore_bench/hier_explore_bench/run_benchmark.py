@@ -28,28 +28,34 @@ ABLATION_PROFILES: Dict[str, Dict[str, str]] = {
         "EXPLORATION_MODE": "auction",
         "COORDINATOR_ARGS": (
             "-p use_3d_gain:=false -p local_scheduling_enable:=false "
-            "-p residual_enable:=false -p convergence_enable:=false"
+            "-p residual_enable:=false -p convergence_enable:=false "
+            "-p use_geodesic_distance:=false -p use_los_fov_optimizer:=false "
+            "-p corridor_mutex_enable:=false"
         ),
     },
     "e2_3dgain": {
         "EXPLORATION_MODE": "auction",
         "COORDINATOR_ARGS": (
             "-p use_3d_gain:=true -p local_scheduling_enable:=false "
-            "-p residual_enable:=false -p convergence_enable:=false"
+            "-p residual_enable:=false -p convergence_enable:=false "
+            "-p use_geodesic_distance:=false -p use_los_fov_optimizer:=false"
         ),
     },
     "e3_hier": {
         "EXPLORATION_MODE": "auction",
         "COORDINATOR_ARGS": (
             "-p use_3d_gain:=true -p local_scheduling_enable:=true "
-            "-p residual_enable:=false -p convergence_enable:=true"
+            "-p residual_enable:=false -p convergence_enable:=true "
+            "-p use_geodesic_distance:=true -p corridor_mutex_enable:=true"
         ),
     },
     "full": {
         "EXPLORATION_MODE": "auction",
         "COORDINATOR_ARGS": (
             "-p use_3d_gain:=true -p local_scheduling_enable:=true "
-            "-p residual_enable:=true -p convergence_enable:=true"
+            "-p residual_enable:=true -p convergence_enable:=true "
+            "-p use_geodesic_distance:=true -p use_los_fov_optimizer:=true "
+            "-p teammate_deconfliction_enable:=true -p corridor_mutex_enable:=true"
         ),
     },
 }

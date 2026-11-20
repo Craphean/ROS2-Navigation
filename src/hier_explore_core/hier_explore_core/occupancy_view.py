@@ -9,6 +9,9 @@ from typing import Tuple
 import cv2
 import numpy as np
 
+# Avoid OpenCV spawning 128 worker threads inside a 4-core container
+cv2.setNumThreads(1)
+
 # Coarse map states shared by the 2D frontier extractor and 3D residual detector.
 FREE = 0
 UNKNOWN = 1
@@ -53,7 +56,11 @@ class OccupancyView:
         """Build from a nav_msgs/OccupancyGrid (duck-typed, no ROS import)."""
         width = int(grid_msg.info.width)
         height = int(grid_msg.info.height)
-        data = np.asarray(grid_msg.data, dtype=np.int8).reshape((height, width))
+        raw = grid_msg.data
+        try:
+            data = np.frombuffer(raw, dtype=np.int8).reshape((height, width))
+        except (TypeError, BufferError, ValueError):
+            data = np.asarray(raw, dtype=np.int8).reshape((height, width))
         return cls.from_numpy(
             data,
             float(grid_msg.info.origin.position.x),
@@ -72,21 +79,19 @@ class OccupancyView:
         is_lethal = data > 50
 
         n_labels, labels = cv2.connectedComponents(
-            is_free.astype(np.uint8), connectivity=4
+            is_free.view(np.uint8), connectivity=4, ltype=cv2.CV_32S
         )
         del n_labels
-        labels[~is_free] = 0
 
-        obstacle_binary = np.ones((height, width), dtype=np.uint8) * 255
-        obstacle_binary[is_lethal] = 0
-        obstacle_dt = cv2.distanceTransform(obstacle_binary, cv2.DIST_L2, 5)
+        not_lethal_u8 = (data <= 50).view(np.uint8)
+        obstacle_dt = cv2.distanceTransform(not_lethal_u8, cv2.DIST_L2, 3)
 
         return cls(
             data=data,
             is_free=is_free,
             is_unknown=is_unknown,
             is_lethal=is_lethal,
-            free_labels=labels.astype(np.int32),
+            free_labels=labels,
             obstacle_dt=obstacle_dt,
             origin_x=float(origin_x),
             origin_y=float(origin_y),

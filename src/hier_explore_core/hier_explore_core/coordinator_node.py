@@ -41,7 +41,15 @@ except ImportError:  # pragma: no cover
     point_cloud2 = None
 
 from .convergence import ConvergenceParams, ConvergenceTracker
+from .deconfliction import (
+    CorridorMutexManager,
+    CorridorMutexParams,
+    TeammateCloudParams,
+    build_teammate_cloud_points,
+    pack_xyz32_cloud,
+)
 from .frontier import FrontierParams, extract_frontiers, score_frontiers
+from .geom_kernel import GeodesicCache, has_cpp_kernel
 from .geometry import se2_apply, se2_inverse, wrap_angle
 from .occupancy_view import OccupancyView
 from .residual_nbv import ResidualParams, detect_residuals
@@ -54,7 +62,9 @@ from .scheduler import (
     assign_ownership,
     build_local_tour,
     calculate_legacy_utility,
+    euclidean_distance,
     exclude_near_waypoints,
+    filter_corridor_safe_candidates,
     global_bid,
     path_length,
 )
@@ -96,16 +106,22 @@ class MultiRobotCoordinator(Node):
             residual_max_attempts=self.residual_max_attempts,
         )
         self.convergence = ConvergenceTracker(self.convergence_params)
+        self.corridor_mgr = CorridorMutexManager(self.corridor_params)
 
         # Runtime state
         self._local_seen: Dict[Tuple[float, float], float] = {}
         self.latest_map: Optional[OccupancyGrid] = None
+        self._cached_map_id: int = -1
+        self._cached_occ: Optional[OccupancyView] = None
+        self._cached_clusters_key: Optional[Tuple[int, int]] = None
+        self._cached_clusters: List[object] = []
+        self._last_corridor_update_time: float = -1e9
         self._latest_cloud: Optional[PointCloud2] = None
         self._last_map_time: float = -1e9
         self._last_cloud_time: float = -1e9
         self._last_voxel_build_time: float = -1e9
         self.voxel_index: Optional[VoxelColumnIndex] = None
-        self._voxel_prev_keys: Optional[set] = None
+        self._voxel_prev_keys: Optional[object] = None
         self._voxel_new_columns: int = 0
         self._voxel_total_columns: int = 0
         self._voxel_build_count: int = 0
@@ -142,10 +158,17 @@ class MultiRobotCoordinator(Node):
         self.timer = self.create_timer(
             timer_period, self.coordination_cycle, callback_group=self.cb_group
         )
+        self.teammates_timer = None
+        if self.teammate_deconfliction_enable and len(self.robots) >= 2:
+            tm_period = 1.0 / max(1.0, self.teammate_cloud_rate_hz)
+            self.teammates_timer = self.create_timer(
+                tm_period, self._publish_teammates_clouds, callback_group=self.cb_group
+            )
         self.get_logger().info(
             f"MultiRobotCoordinator ready for {list(self.robots.keys())} @ {self.rate_hz} Hz "
-            f"(3d_gain={self.use_3d_gain}, local_sched={self.local_scheduling_enable}, "
-            f"residual={self.residual_enable})"
+            f"(cpp_kernel={has_cpp_kernel()}, 3d_gain={self.use_3d_gain}, "
+            f"geodesic={self.use_geodesic_distance}, los_fov={self.residual_params.use_los_fov_optimizer}, "
+            f"deconflict={self.teammate_deconfliction_enable}, corridor_mutex={self.corridor_mutex_enable})"
         )
 
     # ------------------------------------------------------------------
@@ -246,6 +269,26 @@ class MultiRobotCoordinator(Node):
         p("residual_blacklist_radius", 1.0)
         p("residual_max_attempts", 2)
         p("residual_coverage_hole_enable", False)
+        p("use_los_fov_optimizer", True)
+        p("residual_viewpoint_r_min", 0.8)
+        p("residual_viewpoint_r_max", 3.5)
+        p("residual_viewpoint_samples", 24)
+        p("lidar_sensor_z", 0.25)
+        p("lidar_vfov_min_deg", -30.0)
+        p("lidar_vfov_max_deg", 55.0)
+        p("residual_max_eff_range", 5.0)
+
+        # M3: Geodesic distance, teammate local-costmap deconfliction & corridor mutex
+        p("use_geodesic_distance", True)
+        p("geodesic_min_clearance", 0.22)
+        p("geodesic_max_dist", 40.0)
+        p("teammate_deconfliction_enable", True)
+        p("teammate_cloud_rate_hz", 5.0)
+        p("teammate_footprint_radius", 0.26)
+        p("teammate_predict_horizon_s", 2.0)
+        p("corridor_mutex_enable", True)
+        p("corridor_narrow_margin", 0.35)
+        p("corridor_robot_radius", 0.22)
 
         # Convergence
         p("convergence_enable", True)
@@ -386,6 +429,28 @@ class MultiRobotCoordinator(Node):
             score_scale=float(g("residual_score_scale")),
             blacklist_radius=float(g("residual_blacklist_radius")),
             coverage_hole_enable=bool(g("residual_coverage_hole_enable")),
+            use_los_fov_optimizer=bool(g("use_los_fov_optimizer")),
+            viewpoint_r_min=float(g("residual_viewpoint_r_min")),
+            viewpoint_r_max=float(g("residual_viewpoint_r_max")),
+            viewpoint_samples=int(g("residual_viewpoint_samples")),
+            sensor_z=float(g("lidar_sensor_z")),
+            vfov_min_deg=float(g("lidar_vfov_min_deg")),
+            vfov_max_deg=float(g("lidar_vfov_max_deg")),
+            max_eff_range=float(g("residual_max_eff_range")),
+        )
+        self.use_geodesic_distance = bool(g("use_geodesic_distance"))
+        self.geodesic_min_clearance = float(g("geodesic_min_clearance"))
+        self.geodesic_max_dist = float(g("geodesic_max_dist"))
+        self.teammate_deconfliction_enable = bool(g("teammate_deconfliction_enable"))
+        self.teammate_cloud_rate_hz = float(g("teammate_cloud_rate_hz"))
+        self.teammate_cloud_params = TeammateCloudParams(
+            footprint_radius=float(g("teammate_footprint_radius")),
+            predict_horizon_s=float(g("teammate_predict_horizon_s")),
+        )
+        self.corridor_mutex_enable = bool(g("corridor_mutex_enable"))
+        self.corridor_params = CorridorMutexParams(
+            robot_radius=float(g("corridor_robot_radius")),
+            narrow_margin_m=float(g("corridor_narrow_margin")),
         )
         self.convergence_params = ConvergenceParams(
             enabled=bool(g("convergence_enable")),
@@ -421,6 +486,10 @@ class MultiRobotCoordinator(Node):
                     )
             robot.goal_pub = self.create_publisher(PoseStamped, f"/{ns}/exploration_goal", 10)
             robot.plan_pub = self.create_publisher(Path, f"/{ns}/plan_world", 10)
+            if self.teammate_deconfliction_enable:
+                robot.teammates_pub = self.create_publisher(
+                    PointCloud2, f"/{ns}/teammates_cloud", 5
+                )
             robot.plan_sub = self.create_subscription(
                 Path,
                 f"/{ns}/plan",
@@ -473,13 +542,34 @@ class MultiRobotCoordinator(Node):
 
     def map_callback(self, msg: OccupancyGrid) -> None:
         self.latest_map = msg
-        self._last_map_time = self.get_sim_time_sec()
+        now = self.get_sim_time_sec()
+        self._last_map_time = now
+        try:
+            occ = OccupancyView.from_grid(msg)
+            self._cached_occ = occ
+            self._cached_map_id = id(msg)
+            bl_len = len(self.bookkeeper.blacklisted_goals)
+            self._cached_clusters = extract_frontiers(
+                occ, self.frontier_params, self.bookkeeper.blacklisted_goals
+            )
+            self._cached_clusters_key = (id(occ), bl_len)
+            if (
+                self.corridor_mutex_enable
+                and len(self.robots) >= 2
+                and (now - self._last_corridor_update_time) >= 6.0
+            ):
+                self.corridor_mgr.update_map(occ)
+                self._last_corridor_update_time = now
+        except Exception:
+            pass
 
     def cloud_callback(self, msg: PointCloud2) -> None:
         self._latest_cloud = msg
         now = self.get_sim_time_sec()
         self._last_cloud_time = now if now > 0.0 else 0.0
         self._cloud_warned = False
+        if self._cached_occ is not None and now > 0.0:
+            self._maybe_update_voxel_index(now, self._cached_occ)
 
     def _map_valid(self, now: float) -> bool:
         if self.latest_map is None:
@@ -505,9 +595,7 @@ class MultiRobotCoordinator(Node):
 
     def _world_to_local_transform(self, robot: RobotTracker) -> Tuple[float, float, float]:
         try:
-            t = self.tf_buffer.lookup_transform(
-                f"{robot.namespace}/map", "world", Time(), timeout=Duration(seconds=self.tf_wait_sec)
-            )
+            t = self.tf_buffer.lookup_transform(f"{robot.namespace}/map", "world", Time())
             return (t.transform.translation.x, t.transform.translation.y, quaternion_to_yaw(t.transform.rotation))
         except Exception:
             return se2_inverse((robot.init_x, robot.init_y, robot.init_yaw))
@@ -558,12 +646,14 @@ class MultiRobotCoordinator(Node):
         robot.prev_world_x, robot.prev_world_y = x, y
 
     def plan_callback(self, msg: Path, robot: RobotTracker) -> None:
-        if not msg.poses or robot.plan_pub is None:
+        if not msg.poses:
+            robot.latest_plan_world = []
             return
         transform = self._local_to_world_transform(robot)
         world_path = Path()
         world_path.header.stamp = self.get_clock().now().to_msg()
         world_path.header.frame_id = "world"
+        plan_xy: List[Tuple[float, float]] = []
         for p in msg.poses:
             xw, yw, yaww = se2_apply(
                 transform,
@@ -571,6 +661,7 @@ class MultiRobotCoordinator(Node):
                 p.pose.position.y,
                 quaternion_to_yaw(p.pose.orientation),
             )
+            plan_xy.append((xw, yw))
             pw = PoseStamped()
             pw.header.stamp = world_path.header.stamp
             pw.header.frame_id = "world"
@@ -579,7 +670,45 @@ class MultiRobotCoordinator(Node):
             pw.pose.position.z = p.pose.position.z
             pw.pose.orientation = yaw_to_quaternion(yaww)
             world_path.poses.append(pw)
-        robot.plan_pub.publish(world_path)
+        robot.latest_plan_world = plan_xy
+        robot.latest_plan_time = self.get_sim_time_sec()
+        if robot.plan_pub is not None:
+            robot.plan_pub.publish(world_path)
+
+    def _publish_teammates_clouds(self) -> None:
+        """5 Hz Layer-1 kinematic deconfliction: inject teammate footprints + 2s plans."""
+        if not self.teammate_deconfliction_enable or len(self.robots) < 2:
+            return
+        now = self.get_sim_time_sec()
+        if now <= 0.0:
+            return
+        self.update_robot_poses()
+        stamp_msg = self.get_clock().now().to_msg()
+        poses_world: Dict[str, Tuple[float, float, float]] = {}
+        plans_world: Dict[str, List[Tuple[float, float]]] = {}
+        for ns, robot in self.robots.items():
+            poses_world[ns] = (robot.world_x, robot.world_y, robot.world_yaw)
+            # Only inject recent plans (<= 5s old) while robot is actively moving
+            if (
+                robot.state in ("NAVIGATING", "DISPATCHING")
+                and robot.latest_plan_world
+                and (now - robot.latest_plan_time) <= 5.0
+            ):
+                plans_world[ns] = robot.latest_plan_world
+            elif robot.state in ("NAVIGATING", "DISPATCHING") and robot.current_goal_world is not None:
+                plans_world[ns] = [(robot.world_x, robot.world_y), robot.current_goal_world]
+            else:
+                plans_world[ns] = []
+
+        for ns, robot in self.robots.items():
+            if robot.teammates_pub is None:
+                continue
+            tf_w2l = self._world_to_local_transform(robot)
+            pts = build_teammate_cloud_points(
+                ns, poses_world, plans_world, tf_w2l, self.teammate_cloud_params
+            )
+            if len(pts) > 0:
+                robot.teammates_pub.publish(pack_xyz32_cloud(pts, "map", stamp_msg))
 
     # ------------------------------------------------------------------
     # Main coordination cycle
@@ -610,24 +739,65 @@ class MultiRobotCoordinator(Node):
         self._last_cycle_time = now
         self.update_robot_poses()
 
-        try:
-            occ = OccupancyView.from_grid(self.latest_map)
-        except Exception as exc:
-            self.get_logger().error(f"Failed to build occupancy view: {exc}")
-            return
+        map_msg = self.latest_map
+        map_changed = id(map_msg) != self._cached_map_id or self._cached_occ is None
+        if map_changed:
+            try:
+                occ = OccupancyView.from_grid(map_msg)
+            except Exception as exc:
+                self.get_logger().error(f"Failed to build occupancy view: {exc}")
+                return
+            self._cached_occ = occ
+            self._cached_map_id = id(map_msg)
+        else:
+            occ = self._cached_occ
 
         self._check_map_jump(occ)
         self._check_cloud_staleness(now)
-        self._maybe_update_voxel_index(now, occ)
 
         self._check_action_timeouts(now)
         self._check_stalls(now)
         self._check_goal_invalidation(occ, now)
 
-        clusters = extract_frontiers(occ, self.frontier_params, self.bookkeeper.blacklisted_goals)
+        # Layer-2 Topological Corridor Mutex: update active reservations and
+        # pre-empt head-on conflicts before dispatching new goals.
+        if (
+            self.corridor_mutex_enable
+            and len(self.robots) >= 2
+            and not self.corridor_mgr.segments
+            and (now - self._last_corridor_update_time) >= 6.0
+        ):
+            self.corridor_mgr.update_map(occ)
+            self._last_corridor_update_time = now
+        if self.corridor_mutex_enable and len(self.robots) >= 2 and self.corridor_mgr.segments:
+            self._update_corridor_reservations_and_yield(occ, None, now)
+
+        if self.voxel_index is None and self._latest_cloud is not None:
+            self._maybe_update_voxel_index(now, occ)
+
+        idle_robots = [
+            r for r in self.robots.values()
+            if r.state == "IDLE" and now >= r.yield_until_time
+        ]
+
+        geo: Optional[GeodesicCache] = None
+        if idle_robots and self.use_geodesic_distance and has_cpp_kernel():
+            geo = GeodesicCache(
+                occ,
+                min_clearance_m=self.geodesic_min_clearance,
+                max_dist_m=self.geodesic_max_dist,
+            )
+
+        ck = (id(occ), len(self.bookkeeper.blacklisted_goals))
+        if self._cached_clusters_key == ck:
+            clusters = list(self._cached_clusters)
+        else:
+            clusters = extract_frontiers(occ, self.frontier_params, self.bookkeeper.blacklisted_goals)
+            self._cached_clusters = list(clusters)
+            self._cached_clusters_key = ck
         self.frontier_empty_cycles = self.frontier_empty_cycles + 1 if not clusters else 0
 
-        skip_3d = not self._index_available(now)
+        skip_3d = (not idle_robots) or (not self._index_available(now))
         score_frontiers(
             clusters,
             resolution=occ.resolution,
@@ -657,19 +827,27 @@ class MultiRobotCoordinator(Node):
 
         candidates: List[object] = list(clusters) + list(residual)
         available = self._filter_available(candidates)
-        idle_robots = [r for r in self.robots.values() if r.state == "IDLE"]
         dispatch_allowed = not (self.convergence.converged and self.convergence_stop_dispatch)
 
         ownership = []
         dispatched = set()
         if dispatch_allowed and available:
+            if geo is not None and idle_robots:
+                robot_xy = [(r.world_x, r.world_y) for r in self.robots.values()]
+                cand_xy = [(float(c.world_x), float(c.world_y)) for c in available]
+                geo.precompute_distances(robot_xy, cand_xy)
             if self.local_scheduling_enable:
-                ownership = self._schedule_hierarchical(occ, available, idle_robots, dispatched, now)
-            else:
+                ownership = self._schedule_hierarchical(
+                    occ, available, idle_robots, dispatched, now, geo
+                )
+            elif idle_robots:
                 self._run_legacy_auction(idle_robots, available, occ.resolution, dispatched)
 
-        if dispatch_allowed and available and not dispatched:
-            still_idle = [r for r in self.robots.values() if r.state == "IDLE"]
+        if dispatch_allowed and available and idle_robots and not dispatched:
+            still_idle = [
+                r for r in self.robots.values()
+                if r.state == "IDLE" and now >= r.yield_until_time
+            ]
             if still_idle:
                 self._warn_dispatch_starved(
                     f"{len(still_idle)} idle robot(s) and {len(available)} candidate(s) undispatched; falling back to utility auction."
@@ -681,6 +859,81 @@ class MultiRobotCoordinator(Node):
             self.get_clock().now().to_msg(), self.robots, available, ownership, residual
         )
         self.marker_pub.publish(markers)
+
+    # ------------------------------------------------------------------
+    # Corridor mutex & yield staging helpers
+    # ------------------------------------------------------------------
+    def _geodesic_path_fn(self, geo: Optional[GeodesicCache], occ: OccupancyView):
+        if geo is not None:
+            return geo.shortest_path
+
+        def _fallback(a: Tuple[float, float], b: Tuple[float, float]) -> Tuple[float, np.ndarray]:
+            return math.hypot(b[0] - a[0], b[1] - a[1]), np.array([a, b], dtype=np.float64)
+
+        return _fallback
+
+    def _update_corridor_reservations_and_yield(
+        self, occ: OccupancyView, geo: Optional[GeodesicCache], now: float
+    ) -> None:
+        poses = {ns: (r.world_x, r.world_y, r.world_yaw) for ns, r in self.robots.items()}
+        active_paths: Dict[str, List[Tuple[float, float]]] = {}
+        path_fn = self._geodesic_path_fn(geo, occ)
+
+        for ns, robot in self.robots.items():
+            if robot.state not in ("NAVIGATING", "DISPATCHING"):
+                continue
+            if robot.latest_plan_world and (now - robot.latest_plan_time) <= 25.0:
+                active_paths[ns] = robot.latest_plan_world
+            elif robot.current_goal_world is not None:
+                gx, gy = robot.current_goal_world
+                active_paths[ns] = [
+                    (
+                        robot.world_x + (k / 12.0) * (gx - robot.world_x),
+                        robot.world_y + (k / 12.0) * (gy - robot.world_y),
+                    )
+                    for k in range(13)
+                ]
+
+        self.corridor_mgr.update_reservations(poses, active_paths, now)
+
+        # Interrupt low-priority robots approaching a narrow bottleneck head-on
+        for ns, cid, owner_ns, yield_pose in self.corridor_mgr.detect_head_on_yielders(
+            poses, active_paths
+        ):
+            robot = self.robots.get(ns)
+            if robot is None or robot.yielding_corridor_id == cid:
+                continue
+            self.get_logger().info(
+                f"[CorridorMutex] {ns} yielding narrow segment #{cid} to {owner_ns}"
+            )
+            self._cancel_robot_goal(robot)
+            robot.yielding_corridor_id = cid
+            if yield_pose is not None:
+                yx, yy, yyaw = yield_pose
+                if math.hypot(yx - robot.world_x, yy - robot.world_y) > 0.45:
+                    self._dispatch_yield_pose(robot, yx, yy, yyaw)
+                else:
+                    robot.yield_until_time = now + 2.5
+            else:
+                robot.yield_until_time = now + 2.5
+
+        # Release yield holds once corridor is no longer reserved by another robot
+        for ns, robot in self.robots.items():
+            if robot.yielding_corridor_id is not None:
+                holder = self.corridor_mgr.reservations.get(robot.yielding_corridor_id)
+                if holder is None or holder[0] == ns:
+                    robot.yielding_corridor_id = None
+                    robot.yield_until_time = -1e9
+
+    def _dispatch_yield_pose(
+        self, robot: RobotTracker, yx: float, yy: float, yyaw: float
+    ) -> bool:
+        from types import SimpleNamespace
+
+        yield_cand = SimpleNamespace(
+            x=yx, y=yy, world_x=yx, world_y=yy, yaw_world=yyaw, kind="yield"
+        )
+        return self.dispatch_goal(robot, yield_cand)
 
     # ------------------------------------------------------------------
     # Scheduling helpers
@@ -710,9 +963,14 @@ class MultiRobotCoordinator(Node):
         idle_robots: List[RobotTracker],
         dispatched: set,
         now: float,
+        geo: Optional[GeodesicCache] = None,
     ) -> List:
+        dist_fn = geo.distance if geo is not None else euclidean_distance
+        path_fn = self._geodesic_path_fn(geo, occ)
+        use_mutex = self.corridor_mutex_enable and len(self.robots) >= 2 and bool(self.corridor_mgr.segments)
+
         agents = [self._agent_state(r, occ) for r in self.robots.values()]
-        ownership = assign_ownership(agents, available, self.local_radius)
+        ownership = assign_ownership(agents, available, self.local_radius, distance_fn=dist_fn)
 
         local_by_robot: Dict[str, List[object]] = {}
         for cand, own in zip(available, ownership):
@@ -727,9 +985,27 @@ class MultiRobotCoordinator(Node):
             if robot_comp <= 0:
                 continue
             pool = [c for c in pool if getattr(c, "component_label", -1) in (-1, robot_comp)]
-            tour = build_local_tour(pool, (robot.world_x, robot.world_y), self.tour_params)
+            if not pool:
+                continue
+
+            if use_mutex:
+                safe_pool, conflict = filter_corridor_safe_candidates(
+                    robot.namespace, (robot.world_x, robot.world_y), pool, self.corridor_mgr, path_fn
+                )
+                if safe_pool:
+                    pool = safe_pool
+                elif conflict is not None:
+                    # Leave robot for global pool to check alternate branches before yielding
+                    continue
+
+            tour = build_local_tour(
+                pool, (robot.world_x, robot.world_y), self.tour_params, distance_fn=dist_fn
+            )
             if tour and self.dispatch_tour(robot, tour):
                 dispatched.add(robot.namespace)
+                if use_mutex:
+                    _d, pxy = path_fn((robot.world_x, robot.world_y), (tour[0].world_x, tour[0].world_y))
+                    self.corridor_mgr.reserve_for_robot(robot.namespace, pxy, now)
 
         global_pool = self._build_global_pool(available, ownership, dispatched, now)
         remaining_idle = [r for r in idle_robots if r.namespace not in dispatched]
@@ -740,7 +1016,9 @@ class MultiRobotCoordinator(Node):
             ) or exclude_near_waypoints(raw_pool, self._all_active_waypoints(), 0.8)
             if global_pool:
                 if self.global_roi_enable:
-                    n = self._run_global_auction(remaining_idle, global_pool, occ, dispatched)
+                    n = self._run_global_auction(
+                        remaining_idle, global_pool, occ, dispatched, now, geo
+                    )
                     if n == 0 and self._global_reject_info is not None:
                         pool_n, best_roi = self._global_reject_info
                         self._warn_dispatch_starved(
@@ -839,23 +1117,45 @@ class MultiRobotCoordinator(Node):
         clusters: List[object],
         occ: OccupancyView,
         dispatched: set,
+        now: float = 0.0,
+        geo: Optional[GeodesicCache] = None,
     ) -> int:
+        dist_fn = geo.distance if geo is not None else euclidean_distance
+        path_fn = self._geodesic_path_fn(geo, occ)
+        use_mutex = self.corridor_mutex_enable and len(self.robots) >= 2 and bool(self.corridor_mgr.segments)
+
         remaining_robots = list(idle_robots)
         remaining_clusters = list(clusters)
         count = 0
         best_rejected_roi = -float("inf")
         self._global_reject_info = None
+        blocked_robots: Dict[str, Tuple[int, str]] = {}
+
         while remaining_robots and remaining_clusters:
             best_bid = -float("inf")
             best_match = None
             for robot in remaining_robots:
                 agent = self._agent_state(robot, occ)
-                for cand in remaining_clusters:
+                cands_for_robot = remaining_clusters
+                if use_mutex:
+                    safe_cands, conflict = filter_corridor_safe_candidates(
+                        robot.namespace,
+                        (robot.world_x, robot.world_y),
+                        remaining_clusters,
+                        self.corridor_mgr,
+                        path_fn,
+                    )
+                    if safe_cands:
+                        cands_for_robot = safe_cands
+                    elif conflict is not None:
+                        blocked_robots[robot.namespace] = conflict
+                        continue
+                for cand in cands_for_robot:
                     cand_comp = int(getattr(cand, "component_label", -1))
                     if agent.component_label > 0 and cand_comp > 0 and agent.component_label != cand_comp:
                         continue
-                    bid, roi, dist = global_bid(agent, cand, self.roi_params)
-                    if roi < self.roi_params.min_roi or (
+                    bid, roi, dist = global_bid(agent, cand, self.roi_params, distance_fn=dist_fn)
+                    if not math.isfinite(dist) or roi < self.roi_params.min_roi or (
                         self.roi_params.max_distance > 0.0 and dist > self.roi_params.max_distance
                     ):
                         best_rejected_roi = max(best_rejected_roi, roi)
@@ -869,10 +1169,34 @@ class MultiRobotCoordinator(Node):
             if not self.dispatch_goal(winner, won):
                 remaining_robots.remove(winner)
                 continue
+            if use_mutex:
+                _d, pxy = path_fn((winner.world_x, winner.world_y), (won.world_x, won.world_y))
+                self.corridor_mgr.reserve_for_robot(winner.namespace, pxy, now)
             count += 1
             dispatched.add(winner.namespace)
+            blocked_robots.pop(winner.namespace, None)
             remaining_robots.remove(winner)
             remaining_clusters = self._prune_after_win(remaining_clusters, won, bool(remaining_robots))
+
+        # Any robot whose ONLY reachable candidates cross an occupied bottleneck
+        # stages cleanly at the bottleneck's spacious Yield Point instead of deadlocking.
+        for robot in remaining_robots:
+            conflict = blocked_robots.get(robot.namespace)
+            if conflict is None:
+                continue
+            cid, owner_ns = conflict
+            owner = self.robots.get(owner_ns)
+            blocker_xy = (owner.world_x, owner.world_y) if owner is not None else None
+            yp = self.corridor_mgr.select_yield_point(cid, (robot.world_x, robot.world_y), blocker_xy)
+            robot.yielding_corridor_id = cid
+            if yp is not None and math.hypot(yp[0] - robot.world_x, yp[1] - robot.world_y) > 0.45:
+                if self._dispatch_yield_pose(robot, yp[0], yp[1], yp[2]):
+                    dispatched.add(robot.namespace)
+                    count += 1
+            else:
+                robot.yield_until_time = now + 2.0
+                dispatched.add(robot.namespace)
+
         if count == 0 and clusters and best_rejected_roi > -float("inf"):
             self._global_reject_info = (len(clusters), best_rejected_roi)
         return count
@@ -925,6 +1249,36 @@ class MultiRobotCoordinator(Node):
             self._voxel_prev_keys = None
             self._last_voxel_build_time = -1e9
 
+    @staticmethod
+    def _fast_read_xyz(cloud_msg: PointCloud2) -> np.ndarray:
+        """Zero-copy fast path for float32 XYZ PointCloud2 (12/16/32-byte point_step)."""
+        if not cloud_msg.is_bigendian and cloud_msg.point_step >= 12:
+            offs = {}
+            for f in cloud_msg.fields:
+                if f.datatype == 7 and f.name in ("x", "y", "z"):
+                    offs[f.name] = int(f.offset)
+            if len(offs) == 3:
+                n = int(cloud_msg.width) * int(cloud_msg.height)
+                if n == 0:
+                    return np.empty((0, 3), dtype=np.float64)
+                step = int(cloud_msg.point_step)
+                stride = max(1, n // 30000)
+                if step == 12 and offs["x"] == 0 and offs["y"] == 4 and offs["z"] == 8:
+                    arr = np.frombuffer(cloud_msg.data, dtype="<f4", count=n * 3).reshape(n, 3)
+                    return arr[::stride].astype(np.float64, copy=False)
+                dt = np.dtype(
+                    {
+                        "names": ["x", "y", "z"],
+                        "formats": ["<f4", "<f4", "<f4"],
+                        "offsets": [offs["x"], offs["y"], offs["z"]],
+                        "itemsize": step,
+                    }
+                )
+                rec = np.frombuffer(cloud_msg.data, dtype=dt, count=n)[::stride]
+                return np.column_stack((rec["x"], rec["y"], rec["z"])).astype(np.float64, copy=False)
+        pts = point_cloud2.read_points_numpy(cloud_msg, field_names=("x", "y", "z"), skip_nans=True)
+        return np.asarray(pts, dtype=np.float64).reshape(-1, 3)
+
     def _maybe_update_voxel_index(self, now: float, occ: OccupancyView) -> None:
         if not self.use_3d_gain or self._latest_cloud is None or point_cloud2 is None:
             return
@@ -939,8 +1293,7 @@ class MultiRobotCoordinator(Node):
                 self._cloud_frame_warned = True
             return
         try:
-            pts = point_cloud2.read_points_numpy(self._latest_cloud, field_names=("x", "y", "z"), skip_nans=True)
-            pts = np.asarray(pts, dtype=np.float64).reshape(-1, 3)
+            pts = self._fast_read_xyz(self._latest_cloud)
             new_index = VoxelColumnIndex.build(pts, occ, self.voxel_params)
         except Exception as exc:
             if now - self._voxel_error_log_time > 10.0:

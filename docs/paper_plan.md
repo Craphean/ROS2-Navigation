@@ -46,8 +46,16 @@
       - **`mine`**：`occupied_iou_tol1` `0.635 -> 0.869`（+36.8%），`occupied_hd95_m` `0.901 -> 0.552 m`，`ate_rmse_mean_m` `0.207 -> 0.045 m`（-78.4%），同高度带 `[0.08, 2.00] m` 3D `chamfer_l1_m` `0.1334 -> 0.1277 m`（`accuracy_mean_m` `0.0513 -> 0.0407 m`，`precision_10cm` `0.943 -> 0.988`），`cloud_merger` CPU 均值 `18.97% -> 2.97%`（**-84.4%**，峰值 `184.1% -> 12.9%`），SE(2) 接受 `117` 次。
       - **`warehouse`**：`ate_rmse_mean_m` `0.350 -> 0.049 m`（-86.0%），2D 覆盖率 `44.8% -> 46.4%`、`n_auc` `0.233 -> 0.272`、`overlap_ratio` `0.113 -> 0.0054`、3D `fscore_15cm` `0.381 -> 0.388`，`cloud_merger` CPU 均值 `20.53% -> 3.05%`（**-85.1%**，峰值 `135.3% -> 6.9%`），SE(2) 接受 `113` 次并实测触发长廊退化门控（`degenerate_trans=true`, `eig_min=10.45`, IoU `0.926 -> 0.932`）。
     - 顺带修复 5090 无头实机适配：`kill_nav2_sim.sh` 祖先链保护、`tb3_multi_explore_slam.sh` 的 `GZ_IP=127.0.0.1` + `--headless-rendering` + `~/.gz/models` 离线资源索引、`fuel_prefetch.py` 自动建 `model://` 符号链接、`bench_recorder.py` 的 `use_sim_time` 覆盖与分节点 CPU 采样、`sample_gt_mesh.py` 的 Fuel `<include>` + `.stl`/`.dae` 支持。
-- [ ] **M3：C++ `pybind11` 几何核（测地距离 + LoS/FoV 残差视点优化 + 窄道骨架）+ 共享 `/map` 全局代价图 + 车际避碰与互斥预约** ← **下一个立即执行的里程碑**
-- [ ] **M4：参数化 $N=1\sim 4$ 启动包 `src/hier_explore_bringup/` + 导入 CMU `cmu_indoor` / `cmu_tunnel` 世界**
+- [x] **M3（代码、单测与 5090 4 核实跑验收已全部通过）：C++ `pybind11` 几何核（测地距离 + LoS/FoV 残差视点优化 + 窄道骨架）+ 共享 `/map` 全局代价图 + 车际避碰与互斥预约**
+  - **WP3.1（C++17 `pybind11` 几何核 `_geom_kernel`）**：在 `src/hier_explore_core/cpp/` 实现 `geodesic_grid.cpp`（有界 32 桶 Dial 队列多源 Dijkstra 测地距离矩阵与 A* 精确路径，500×600 栅格 2 源×16 目标实测 **`4.23 ms`** `< 6 ms`）、`visibility_fov.cpp`（$[0.8, 3.5]\text{ m}$ 3 环 $K=24$ 安全视点采样 + 2D Bresenham 视线遮挡 + 垂直视场角 $[-30^\circ, +55^\circ]$ + $R_{\text{eff}} \le 5.0\text{ m}$ 贪心次模最大覆盖）、`corridor_graph.cpp`（双侧致命墙体中轴窄道瓶颈段 $E_{\text{narrow}}$ 提取 + 0 拐角假阳性 + 两端宽敞礼让点定位，实测 `2.96 ms`）及 Python 封装 `geom_kernel.py`。
+  - **WP3.2（共享全局代价图 TODO #12 + 双层车际避碰 TODO #9）**：`config/se2_map_merge_params.yaml` 开启 `publish_per_robot_shared_map: true`（在 `se2_map_merge_node.cpp` 释放锁后重投影发布 `/<ns>/shared_map`），`config/nav2_multirobot_slam_params.yaml` 中 `global_costmap.static_layer.map_topic` 切换为 `shared_map`（`tb3_multi_explore_slam.sh` 在 Nav2 激活前启动 `se2_map_merge_node`，legacy 模式自动回退 `map`）；新增 `deconfliction.py`（Layer-1 5 Hz `/<ns>/teammates_cloud` 足迹圆 + 2 s 轨迹预测 + 2.85 m 射线清除环注入 `local_costmap.voxel_layer`；Layer-2 `CorridorMutexManager` 拓扑窄道优先级互斥预约、分支改道与礼让点驻留）。
+  - **已通过离线单测与 5090 4 核 ROS 2 Lyrical 实跑验收**：
+    - `colcon test --packages-select se2_map_merge hier_explore_core` 100% 通过（`test_se2_map_merge` 4/4，`test_geom_kernel` 3/3）；Python `pytest` **80 passed in 2.38s**。
+    - 5090 4 核隔离容器 `mine`（连续 5 种子 `0..4`）与 `hospital`（连续 5 种子 `0..4`）实测：
+      - **零死锁 / 零碰撞**：`mine` 连续 5 轮与 `hospital` 连续 5 轮均实现 **0 对向死锁（`stall_events = 0`）、0 车际碰撞（`inter_robot_collisions = 0`）**；
+      - **规划周期 P95 $< 50\text{ ms}$**：`mine` 5 轮中位规划周期 `cycle_ms_p50` 均值 **`4.21 ms`**（`3.71–4.83 ms`），95 分位 `cycle_ms_p95` 均值 **`44.88 ms < 50 ms`**（240 s 实跑 `39.04 ms`）；`hospital` 5 轮 `cycle_ms_p50` 均值 **`4.61 ms`**（`3.61–5.68 ms`），`cycle_ms_p95` 均值 **`47.67 ms < 50 ms`**；
+      - **3D 表面完整度与覆盖提升（`full` vs `e1_2d` 2D-only）**：`mine` 2D 覆盖率均值 `0.646 -> 0.951`（+47.2%）、`n_auc` `0.392 -> 0.590`（+50.5%）、3D `completeness_10cm` `0.350 -> 0.430`（峰值 `0.485`，+22.9%）、`completeness_15cm` `0.461 -> 0.566`（峰值 `0.647`，+22.8%）、`fscore_15cm` `0.629 -> 0.716`（峰值 `0.785`）、`chamfer_l1_m` `1.371 -> 0.283 m`（最优 `0.079 m`，**-79.3%**）；`hospital` 5 轮覆盖率均值 **`0.997`**（4/5 轮 `1.000`），240 s `n_auc` `0.721 -> 0.760`、`chamfer_l1_m` `0.066 -> 0.062 m`、`occupied_iou_tol1` `0.428 -> 0.648`（+51.4%）、ATE `0.914 -> 0.306 m`（-66.5%）。
+- [ ] **M4：参数化 $N=1\sim 4$ 启动包 `src/hier_explore_bringup/` + 导入 CMU `cmu_indoor` / `cmu_tunnel` 世界** ← **下一个立即执行的里程碑**
 - [ ] **M5：5090 服务器全量多随机种子 Benchmark + 消融 + M-TARE Docker 对照 + 论文矢量图与 LaTeX 表格生成**
 - [ ] **M6：单台 3D 雷达实车部署（`real_robot.launch.py`）+ 真机 2D-only vs. Ours 对比实验 + 补充视频**
 
@@ -79,7 +87,9 @@
    - `config/nav2_multirobot_slam_params.yaml`：`global_costmap.static_layer` 改为订阅全局合并图（`/map` 或 `/robot_i/shared_map`），彻底解决 TODO #12；
    - `src/hier_explore_core/hier_explore_core/deconfliction.py`：5 Hz 广播 `/robot_i/teammates_cloud`（其余车辆足迹圆 + 未来 2 s 规划轨迹采样点）注入各车 `local_costmap.voxel_layer`；
    - 在 `scheduler.py` 接入拓扑窄道互斥预约（Corridor Mutex Reservation）：低优先级车进入被占瓶颈段时自动暂停于礼让点或切换另一分支前沿，消除矿井 3.2 m 窄巷与医院门洞对顶死锁。
-   - **M3 验收门禁**：C++ 核 + Python 单测全通过；4 核容器下 `mine` 与 `hospital` 连续 5 次零对向死锁、零车际碰撞；规划周期 P95 $< 50\text{ ms}$；3D 表面完整度较 2D-only 显著提升。
+   - **M3 验收门禁**：
+     - [x] C++ 核 + Python 单测全通过（`test_geom_kernel` 3/3 + `test_se2_map_merge` 4/4 + `pytest` 80/80 全通过）；
+     - [x] 4 核容器下 `mine`（连续 5 种子 `0..4`）与 `hospital`（连续 5 种子 `0..4`）零对向死锁（`stall_events = 0`）、零车际碰撞（`inter_robot_collisions = 0`）；规划周期 P95 $< 50\text{ ms}$（`mine` 5 轮均值 `44.88 ms` / P50 `4.21 ms`，`hospital` 5 轮均值 `47.67 ms` / P50 `4.61 ms`）；3D 表面完整度较 2D-only 显著提升（`mine` `completeness_15cm` `0.461 -> 0.566` / 峰值 `0.647`，`chamfer_l1_m` `1.371 -> 0.283 m`）。
 
 ### M4（WP4）：参数化 $N=1\sim 4$ 启动与 CMU 公开场景（`src/hier_explore_bringup/`）
 - 编写 `multi_sim.launch.py`（支持 `num_robots=1..4`, `world`, `spawn_seed`, `odom_mode`, `ablation_profile`, `planner_backend`）替换硬编码 2 车 Bash；

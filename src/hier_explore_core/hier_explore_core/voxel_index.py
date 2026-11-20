@@ -201,24 +201,32 @@ class VoxelColumnIndex:
         index.observed = observed
         flat_lin = np.flatnonzero(observed.reshape(-1))
         # Quantize column centers on a world-anchored grid so keys stay
-        # invariant as the SLAM map bounding box grows.
+        # invariant as the SLAM map bounding box grows. Pack (kx, ky) into
+        # sorted int64 array to avoid allocating 100k+ Python tuples per cycle.
         oy, ox = np.divmod(flat_lin, nx)
         wx = min_x + (ox + 0.5) * res
         wy = min_y + (oy + 0.5) * res
-        index.column_keys = set(
-            zip(
-                (wx // res).astype(np.int64).tolist(),
-                (wy // res).astype(np.int64).tolist(),
-            )
-        )
+        kx = np.floor(wx / res).astype(np.int64)
+        ky = np.floor(wy / res).astype(np.int64)
+        packed = (kx << 32) | (ky & np.int64(0xFFFFFFFF))
+        index.column_keys = np.unique(packed)
         index.total_columns = int(len(index.column_keys))
         return index
 
-    def new_column_count(self, previous_keys: Optional[set]) -> int:
+    def new_column_count(self, previous_keys: Optional[object]) -> int:
         """Number of occupied columns absent from the previous index."""
-        if not previous_keys:
+        if previous_keys is None or len(previous_keys) == 0:  # type: ignore[arg-type]
             return int(len(self.column_keys))
-        return int(len(self.column_keys - previous_keys))
+        if isinstance(self.column_keys, np.ndarray) and isinstance(previous_keys, np.ndarray):
+            if self.column_keys.size == 0:
+                return 0
+            # Both arrays are sorted unique int64 keys -> O(N log M) C-speed search
+            idx = np.searchsorted(previous_keys, self.column_keys)
+            in_bounds = idx < previous_keys.size
+            matched = np.zeros(self.column_keys.size, dtype=bool)
+            matched[in_bounds] = previous_keys[idx[in_bounds]] == self.column_keys[in_bounds]
+            return int(np.count_nonzero(~matched))
+        return int(len(set(self.column_keys) - set(previous_keys)))  # type: ignore[arg-type]
 
     def window_stats(
         self, wx: float, wy: float, radius: float, params: InfoGainParams

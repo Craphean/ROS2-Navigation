@@ -232,6 +232,18 @@ MINE_STATION_POSES=(
   "19.00 0.00 0.00 东端掘进工作面"
 )
 
+# Pick two distinct station indices in [0, N).  When SPAWN_SEED is set (the
+# benchmark runner always sets it) the choice is deterministic per seed, so
+# every method in an A/B matrix sees exactly the same spawn pair.
+pick_two_stations() {
+  local n="$1"
+  if [[ -n "${SPAWN_SEED:-}" ]]; then
+    RANDOM="${SPAWN_SEED}"
+  fi
+  idx1=$(( RANDOM % n ))
+  idx2=$(( (idx1 + 1 + (RANDOM % (n - 1))) % n ))
+}
+
 case "${WORLD:-sandbox}" in
   sandbox|tb3_sandbox)
     WORLD_FILE="${SIM_SHARE}/worlds/tb3_sandbox.sdf.xacro"
@@ -252,13 +264,7 @@ case "${WORLD:-sandbox}" in
     DEFAULT_R2_X="-6.00"; DEFAULT_R2_Y="0.60";  DEFAULT_R2_YAW="0.0"
 
     if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
-      if command -v shuf >/dev/null 2>&1; then
-        mapfile -t indices < <(shuf -i 0-7 -n 2)
-        idx1="${indices[0]}"; idx2="${indices[1]}"
-      else
-        idx1=$(( RANDOM % 8 ))
-        idx2=$(( (idx1 + 1 + (RANDOM % 7)) % 8 ))
-      fi
+      pick_two_stations 8
       read -r r1_x r1_y r1_yaw r1_desc <<< "${HOSPITAL_STATION_POSES[idx1]}"
       read -r r2_x r2_y r2_yaw r2_desc <<< "${HOSPITAL_STATION_POSES[idx2]}"
       DEFAULT_R1_X="${r1_x}"; DEFAULT_R1_Y="${r1_y}"; DEFAULT_R1_YAW="${r1_yaw}"
@@ -276,13 +282,7 @@ case "${WORLD:-sandbox}" in
     DEFAULT_R2_X="0.00"; DEFAULT_R2_Y="0.50";  DEFAULT_R2_YAW="0.0"
 
     if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
-      if command -v shuf >/dev/null 2>&1; then
-        mapfile -t indices < <(shuf -i 0-5 -n 2)
-        idx1="${indices[0]}"; idx2="${indices[1]}"
-      else
-        idx1=$(( RANDOM % 6 ))
-        idx2=$(( (idx1 + 1 + (RANDOM % 5)) % 6 ))
-      fi
+      pick_two_stations 6
       read -r r1_x r1_y r1_yaw r1_desc <<< "${HOUSE_STATION_POSES[idx1]}"
       read -r r2_x r2_y r2_yaw r2_desc <<< "${HOUSE_STATION_POSES[idx2]}"
       DEFAULT_R1_X="${r1_x}"; DEFAULT_R1_Y="${r1_y}"; DEFAULT_R1_YAW="${r1_yaw}"
@@ -300,13 +300,7 @@ case "${WORLD:-sandbox}" in
     DEFAULT_R2_X="-20.50"; DEFAULT_R2_Y="0.70";  DEFAULT_R2_YAW="0.00"
 
     if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
-      if command -v shuf >/dev/null 2>&1; then
-        mapfile -t indices < <(shuf -i 0-8 -n 2)
-        idx1="${indices[0]}"; idx2="${indices[1]}"
-      else
-        idx1=$(( RANDOM % 9 ))
-        idx2=$(( (idx1 + 1 + (RANDOM % 8)) % 9 ))
-      fi
+      pick_two_stations 9
       read -r r1_x r1_y r1_yaw r1_desc <<< "${MINE_STATION_POSES[idx1]}"
       read -r r2_x r2_y r2_yaw r2_desc <<< "${MINE_STATION_POSES[idx2]}"
       DEFAULT_R1_X="${r1_x}"; DEFAULT_R1_Y="${r1_y}"; DEFAULT_R1_YAW="${r1_yaw}"
@@ -327,14 +321,7 @@ case "${WORLD:-sandbox}" in
 
     if [[ "${RANDOM_SPAWN,,}" =~ ^(true|1|yes)$ ]]; then
       # Sample two distinct station indices (0..9) without replacement
-      if command -v shuf >/dev/null 2>&1; then
-        mapfile -t indices < <(shuf -i 0-9 -n 2)
-        idx1="${indices[0]}"
-        idx2="${indices[1]}"
-      else
-        idx1=$(( RANDOM % 10 ))
-        idx2=$(( (idx1 + 1 + (RANDOM % 9)) % 10 ))
-      fi
+      pick_two_stations 10
 
       read -r r1_x r1_y r1_yaw r1_desc <<< "${WAREHOUSE_STATION_POSES[idx1]}"
       read -r r2_x r2_y r2_yaw r2_desc <<< "${WAREHOUSE_STATION_POSES[idx2]}"
@@ -421,6 +408,24 @@ SE2_MERGE_PARAMS="${SE2_MERGE_PARAMS:-${ROOT_DIR}/config/se2_map_merge_params.ya
 SE2_MERGE_ARGS="${SE2_MERGE_ARGS:-}"
 MAP_MERGE_PARAMS="${MAP_MERGE_PARAMS:-${ROOT_DIR}/src/m-explore-ros2/map_merge/config/params.yaml}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-${ROOT_DIR}/src/m-explore-ros2/map_merge/launch/map_merge.rviz}"
+
+# Map merger selection must be known before Nav2 starts: with the C++ merger
+# each global_costmap.static_layer plans on /<ns>/shared_map (TODO #12).
+HAS_SE2_PKG=0
+if ros2 pkg prefix se2_map_merge >/dev/null 2>&1; then
+  HAS_SE2_PKG=1
+fi
+USE_SE2_ACTIVE=0
+if [[ "${USE_SE2_MERGE,,}" =~ ^(true|1|yes)$ && "${HAS_SE2_PKG}" -eq 1 ]]; then
+  USE_SE2_ACTIVE=1
+elif grep -q "map_topic: shared_map" "${PARAMS_FILE}" 2>/dev/null; then
+  # Legacy multirobot_map_merge does not publish shared_map: plan on the
+  # robot's own SLAM map, exactly as before M3.
+  LEGACY_PARAMS_FILE="/tmp/tb3_nav2_legacy_params.yaml"
+  sed 's/map_topic: shared_map/map_topic: map/' "${PARAMS_FILE}" >"${LEGACY_PARAMS_FILE}"
+  PARAMS_FILE="${LEGACY_PARAMS_FILE}"
+  echo "[tb3_multi_explore_slam] legacy merger: global_costmap static_layer -> own SLAM map (${PARAMS_FILE})"
+fi
 
 echo "[tb3_multi_explore_slam] world=${WORLD_FILE} headless=${HEADLESS} use_rviz=${USE_RVIZ} mode=${EXPLORATION_MODE} use_gt_odom=${USE_GT_ODOM} se2_merge=${USE_SE2_MERGE} cpp_cloud=${USE_CPP_CLOUD_MERGER}"
 echo "[tb3_multi_explore_slam] robot1 spawn=(${ROBOT1_X}, ${ROBOT1_Y}, ${ROBOT1_YAW}) | robot2 spawn=(${ROBOT2_X}, ${ROBOT2_Y}, ${ROBOT2_YAW})"
@@ -735,6 +740,22 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# 3a. C++ se2_map_merge_node must run before Nav2 activates: it publishes
+# /<ns>/shared_map, which each global_costmap.static_layer waits for.
+if [[ "${USE_SE2_ACTIVE}" -eq 1 ]]; then
+  echo "[tb3_multi_explore_slam] Starting C++ se2_map_merge_node (online SE(2) + degeneracy gate) -> /map ..."
+  ros2 run se2_map_merge se2_map_merge_node --ros-args \
+    --params-file "${SE2_MERGE_PARAMS}" \
+    -p use_sim_time:=true \
+    -p robot_namespaces:="['robot1', 'robot2']" \
+    -p robot1_init_pose:="[${MAP_INIT_R1_X}, ${MAP_INIT_R1_Y}, ${MAP_INIT_R1_YAW}]" \
+    -p robot2_init_pose:="[${MAP_INIT_R2_X}, ${MAP_INIT_R2_Y}, ${MAP_INIT_R2_YAW}]" \
+    ${SE2_MERGE_ARGS} \
+    >"${MERGE_LOG}" 2>&1 &
+  MERGE_PID=$!
+  echo "[tb3_multi_explore_slam] se2_map_merge_node PID=${MERGE_PID} log=${MERGE_LOG}"
+fi
+
 echo "[tb3_multi_explore_slam] Waiting for /robot1 and /robot2 SLAM & Nav2 stacks to become active..."
 for i in $(seq 1 240); do
   if ! kill -0 "${GZ_PID}" 2>/dev/null; then
@@ -759,6 +780,10 @@ for i in $(seq 1 240); do
   fi
   if [[ -n "${EKF2_PID}" ]] && ! kill -0 "${EKF2_PID}" 2>/dev/null; then
     echo "[tb3_multi_explore_slam] robot2 EKF exited early — see ${EKF2_LOG}" >&2
+    exit 1
+  fi
+  if [[ -n "${MERGE_PID}" ]] && ! kill -0 "${MERGE_PID}" 2>/dev/null; then
+    echo "[tb3_multi_explore_slam] se2_map_merge_node exited early — see ${MERGE_LOG}" >&2
     exit 1
   fi
 
@@ -786,25 +811,8 @@ for i in $(seq 1 240); do
   sleep 1
 done
 
-# 3. Start map merge node (C++ se2_map_merge_node by default, legacy fallback)
-HAS_SE2_PKG=0
-if ros2 pkg prefix se2_map_merge >/dev/null 2>&1; then
-  HAS_SE2_PKG=1
-fi
-
-if [[ "${USE_SE2_MERGE,,}" =~ ^(true|1|yes)$ && "${HAS_SE2_PKG}" -eq 1 ]]; then
-  echo "[tb3_multi_explore_slam] Starting C++ se2_map_merge_node (online SE(2) + degeneracy gate) -> /map ..."
-  ros2 run se2_map_merge se2_map_merge_node --ros-args \
-    --params-file "${SE2_MERGE_PARAMS}" \
-    -p use_sim_time:=true \
-    -p robot_namespaces:="['robot1', 'robot2']" \
-    -p robot1_init_pose:="[${MAP_INIT_R1_X}, ${MAP_INIT_R1_Y}, ${MAP_INIT_R1_YAW}]" \
-    -p robot2_init_pose:="[${MAP_INIT_R2_X}, ${MAP_INIT_R2_Y}, ${MAP_INIT_R2_YAW}]" \
-    ${SE2_MERGE_ARGS} \
-    >"${MERGE_LOG}" 2>&1 &
-  MERGE_PID=$!
-  echo "[tb3_multi_explore_slam] se2_map_merge_node PID=${MERGE_PID} log=${MERGE_LOG}"
-else
+# 3. Legacy map merger (the C++ se2_map_merge_node was started before Nav2).
+if [[ "${USE_SE2_ACTIVE}" -eq 0 ]]; then
   if [[ "${USE_SE2_MERGE,,}" =~ ^(true|1|yes)$ ]]; then
     echo "[tb3_multi_explore_slam] WARNING: se2_map_merge package not built; falling back to multirobot_map_merge." >&2
     echo "[tb3_multi_explore_slam]   Build with: colcon build --symlink-install --packages-select se2_map_merge" >&2

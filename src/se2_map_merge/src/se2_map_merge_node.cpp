@@ -424,17 +424,26 @@ private:
     const auto stamp = this->now();
     merged_map_pub_->publish(to_ros_grid(merged, world_frame_, stamp));
 
-    // Optional per-robot local-frame reprojected shared map for TODO #12 fallback
+    // Per-robot local-frame reprojected shared map (TODO #12): each robot's
+    // global_costmap.static_layer subscribes /<ns>/shared_map (frame "map").
+    // Snapshot (pose, publisher) under the lock, then reproject WITHOUT holding
+    // it so the 20 Hz world->robotX/map TF broadcaster never stalls.
     if (publish_shared_maps_) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      for (const auto & slot : robots_) {
-        if (!slot.shared_map_pub) {
-          continue;
+      std::vector<std::pair<Pose2D, rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr>> targets;
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        targets.reserve(robots_.size());
+        for (const auto & slot : robots_) {
+          if (slot.shared_map_pub) {
+            targets.emplace_back(slot.pose, slot.shared_map_pub);
+          }
         }
-        const Pose2D inv_pose = inverse_se2(slot.pose);
+      }
+      for (const auto & [pose, pub] : targets) {
+        const Pose2D inv_pose = inverse_se2(pose);
         const auto local_shared = merge_occupancy_grids({{&merged, inv_pose}}, output_resolution_);
         if (!local_shared.empty()) {
-          slot.shared_map_pub->publish(to_ros_grid(local_shared, "map", stamp));
+          pub->publish(to_ros_grid(local_shared, "map", stamp));
         }
       }
     }

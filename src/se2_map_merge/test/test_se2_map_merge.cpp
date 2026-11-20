@@ -1,3 +1,7 @@
+// Tests must assert in every build type (Release defines NDEBUG).
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <chrono>
 #include <cmath>

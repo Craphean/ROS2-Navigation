@@ -15,7 +15,9 @@
     enable_online_alignment: true
     enable_phase_corr: true
     enable_degeneracy_gate: true
-    publish_per_robot_shared_map: false
+    # M3 / TODO #12: publish /<ns>/shared_map (merged map reprojected into each
+    # robot's local "map" frame) for global_costmap.static_layer.
+    publish_per_robot_shared_map: true
 
     # Step-clamped exponential smoothing (prevents OctoMap smearing from TF jumps)
     smoothing_alpha: 0.25

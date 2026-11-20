@@ -7,6 +7,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
+import cv2
 import numpy as np
 
 from .occupancy_view import OccupancyView
@@ -61,6 +62,50 @@ class FrontierCluster:
         return self.world_y
 
 
+def _split_coords_if_large(
+    coords: np.ndarray,
+    res: float,
+    min_size: int = 8,
+    min_spread_m: float = 2.0,
+    recurse_spread_m: float = 2.5,
+) -> List[np.ndarray]:
+    """Fast NumPy-array recursive bisection of elongated frontier clusters."""
+    if len(coords) < min_size * 2:
+        return [coords]
+
+    span0 = int(coords[:, 0].max() - coords[:, 0].min())
+    span1 = int(coords[:, 1].max() - coords[:, 1].min())
+    spread_m = math.hypot(span0, span1) * res
+    if spread_m < min_spread_m:
+        return [coords]
+
+    var0 = float(np.var(coords[:, 0]))
+    var1 = float(np.var(coords[:, 1]))
+    split_dim = 1 if var1 > var0 else 0
+    median_val = float(np.median(coords[:, split_dim]))
+
+    mask1 = coords[:, split_dim] <= median_val
+    part1 = coords[mask1]
+    part2 = coords[~mask1]
+    if len(part1) < min_size or len(part2) < min_size:
+        return [coords]
+
+    results: List[np.ndarray] = []
+    for part in (part1, part2):
+        ps0 = int(part[:, 0].max() - part[:, 0].min())
+        ps1 = int(part[:, 1].max() - part[:, 1].min())
+        p_spread = math.hypot(ps0, ps1) * res
+        if p_spread >= recurse_spread_m and len(part) >= min_size * 2:
+            results.extend(
+                _split_coords_if_large(
+                    part, res, min_size, min_spread_m, recurse_spread_m
+                )
+            )
+        else:
+            results.append(part)
+    return results
+
+
 def split_cluster_if_large(
     cluster_cells: List[Tuple[int, int]],
     res: float,
@@ -71,36 +116,11 @@ def split_cluster_if_large(
     """Recursively bisect elongated frontier clusters along their principal axis."""
     if len(cluster_cells) < min_size * 2:
         return [cluster_cells]
-
-    coords = np.array(cluster_cells)
-    span = np.ptp(coords, axis=0)
-    spread_m = math.hypot(span[0], span[1]) * res
-    if spread_m < min_spread_m:
+    arr = np.asarray(cluster_cells, dtype=np.int32)
+    parts = _split_coords_if_large(arr, res, min_size, min_spread_m, recurse_spread_m)
+    if len(parts) == 1 and len(parts[0]) == len(cluster_cells):
         return [cluster_cells]
-
-    var = np.var(coords, axis=0)
-    split_dim = 1 if var[1] > var[0] else 0
-    median_val = np.median(coords[:, split_dim])
-
-    part1 = [c for c in cluster_cells if c[split_dim] <= median_val]
-    part2 = [c for c in cluster_cells if c[split_dim] > median_val]
-    if len(part1) < min_size or len(part2) < min_size:
-        return [cluster_cells]
-
-    results: List[List[Tuple[int, int]]] = []
-    for part in (part1, part2):
-        p_coords = np.array(part)
-        p_span = np.ptp(p_coords, axis=0)
-        p_spread = math.hypot(p_span[0], p_span[1]) * res
-        if p_spread >= recurse_spread_m and len(part) >= min_size * 2:
-            results.extend(
-                split_cluster_if_large(
-                    part, res, min_size, min_spread_m, recurse_spread_m
-                )
-            )
-        else:
-            results.append(part)
-    return results
+    return [[(int(r), int(c)) for r, c in p] for p in parts]
 
 
 def find_safe_goal(
@@ -110,49 +130,50 @@ def find_safe_goal(
     res: float,
     min_clearance: float = 0.55,
     max_retract_m: float = 1.5,
+    free_labels: Optional[np.ndarray] = None,
 ) -> Optional[Tuple[int, int]]:
-    """Retract a frontier centroid into free space with >= min_clearance."""
+    """Retract a frontier centroid into free space with >= min_clearance (vectorized)."""
     height, width = is_free.shape
     min_clearance_cells = min_clearance / res
     max_retract_cells = int(max_retract_m / res)
 
-    mean_r = sum(c[0] for c in cluster_cells) / len(cluster_cells)
-    mean_c = sum(c[1] for c in cluster_cells) / len(cluster_cells)
+    arr = np.asarray(cluster_cells, dtype=np.int32)
+    mean_r = float(arr[:, 0].mean())
+    mean_c = float(arr[:, 1].mean())
 
-    safe_cells = [
-        (r, c)
-        for (r, c) in cluster_cells
-        if obstacle_dt[r, c] >= min_clearance_cells
-    ]
-    if safe_cells:
-        return min(
-            safe_cells,
-            key=lambda p: (p[0] - mean_r) ** 2 + (p[1] - mean_c) ** 2,
-        )
+    dt_vals = obstacle_dt[arr[:, 0], arr[:, 1]]
+    safe_mask = dt_vals >= min_clearance_cells
+    if safe_mask.any():
+        safe_arr = arr[safe_mask]
+        d2 = (safe_arr[:, 0] - mean_r) ** 2 + (safe_arr[:, 1] - mean_c) ** 2
+        idx = int(np.argmin(d2))
+        return (int(safe_arr[idx, 0]), int(safe_arr[idx, 1]))
 
-    sorted_cluster = sorted(
-        cluster_cells,
-        key=lambda p: (p[0] - mean_r) ** 2 + (p[1] - mean_c) ** 2,
-    )
-    q: deque = deque()
-    visited = set()
-    for r, c in sorted_cluster:
-        q.append((r, c, 0))
-        visited.add((r, c))
+    r_c = int(round(mean_r))
+    c_c = int(round(mean_c))
+    r0 = max(0, r_c - max_retract_cells)
+    r1 = min(height, r_c + max_retract_cells + 1)
+    c0 = max(0, c_c - max_retract_cells)
+    c1 = min(width, c_c + max_retract_cells + 1)
+    if r0 >= r1 or c0 >= c1:
+        return None
 
-    while q:
-        r, c, steps = q.popleft()
-        if steps > max_retract_cells:
-            break
-        if obstacle_dt[r, c] >= min_clearance_cells:
-            return (r, c)
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nr, nc = r + dr, c + dc
-            if 0 <= nr < height and 0 <= nc < width and (nr, nc) not in visited:
-                visited.add((nr, nc))
-                if is_free[nr, nc]:
-                    q.append((nr, nc, steps + 1))
-    return None
+    sub_ok = is_free[r0:r1, c0:c1] & (obstacle_dt[r0:r1, c0:c1] >= min_clearance_cells)
+    if free_labels is not None:
+        comp = int(free_labels[int(arr[0, 0]), int(arr[0, 1])])
+        if comp > 0:
+            sub_ok = sub_ok & (free_labels[r0:r1, c0:c1] == comp)
+    if not sub_ok.any():
+        return None
+
+    rr, cc = np.nonzero(sub_ok)
+    gr = rr + r0
+    gc = cc + c0
+    d2 = (gr - mean_r) ** 2 + (gc - mean_c) ** 2
+    if float(d2.min()) > float((max_retract_cells + 4) ** 2):
+        return None
+    idx = int(np.argmin(d2))
+    return (int(gr[idx]), int(gc[idx]))
 
 
 def frontier_yaw(occ: OccupancyView, safe_r: int, safe_c: int) -> float:
@@ -175,69 +196,56 @@ def frontier_yaw(occ: OccupancyView, safe_r: int, safe_c: int) -> float:
     return math.atan2(uy - wy, ux - wx)
 
 
+_KERNEL_3X3 = np.ones((3, 3), dtype=np.uint8)
+
+
 def extract_frontiers(
     occ: OccupancyView,
     params: FrontierParams,
     blacklisted_goals: Sequence[Tuple[float, float]] = (),
 ) -> List[FrontierCluster]:
     """Vectorized 2D frontier extraction with safe-goal retraction and deduplication."""
-    height, width = occ.height, occ.width
     res = occ.resolution
 
-    unknown_padded = np.pad(
-        occ.is_unknown, 1, mode="constant", constant_values=False
-    )
-    lethal_padded = np.pad(
-        occ.is_lethal, 1, mode="constant", constant_values=False
-    )
+    # An is_free cell has an 8-connected unknown neighbor iff the 3x3 dilation
+    # of is_unknown is non-zero there, and has no 8-connected lethal neighbor
+    # iff its Euclidean obstacle distance transform is >= 1.5 cells (> sqrt(2)).
+    unk_dilated = cv2.dilate(occ.is_unknown.view(np.uint8), _KERNEL_3X3)
+    frontier_mask = occ.is_free & (occ.obstacle_dt >= 1.5) & (unk_dilated != 0)
+    raw_clusters: List[np.ndarray] = []
 
-    has_unknown_neighbor = np.zeros((height, width), dtype=bool)
-    has_lethal_neighbor = np.zeros((height, width), dtype=bool)
-    for dr in (-1, 0, 1):
-        for dc in (-1, 0, 1):
-            if dr == 0 and dc == 0:
-                continue
-            has_unknown_neighbor |= unknown_padded[
-                1 + dr : height + 1 + dr, 1 + dc : width + 1 + dc
-            ]
-            has_lethal_neighbor |= lethal_padded[
-                1 + dr : height + 1 + dr, 1 + dc : width + 1 + dc
-            ]
-
-    frontier_mask = occ.is_free & has_unknown_neighbor & (~has_lethal_neighbor)
-    frontier_coords = np.argwhere(frontier_mask)
-    visited = np.zeros((height, width), dtype=bool)
-    raw_clusters: List[List[Tuple[int, int]]] = []
-
-    for r, c in frontier_coords:
-        if visited[r, c]:
-            continue
-        cluster_cells: List[Tuple[int, int]] = []
-        q = deque([(int(r), int(c))])
-        visited[r, c] = True
-        while q:
-            curr_r, curr_c = q.popleft()
-            cluster_cells.append((curr_r, curr_c))
-            r_start = max(0, curr_r - 1)
-            r_end = min(height, curr_r + 2)
-            c_start = max(0, curr_c - 1)
-            c_end = min(width, curr_c + 2)
-            for nr in range(r_start, r_end):
-                for nc in range(c_start, c_end):
-                    if frontier_mask[nr, nc] and not visited[nr, nc]:
-                        visited[nr, nc] = True
-                        q.append((nr, nc))
-
-        if len(cluster_cells) >= params.min_frontier_size:
-            raw_clusters.extend(
-                split_cluster_if_large(
-                    cluster_cells,
-                    res,
-                    params.min_frontier_size,
-                    params.split_min_spread_m,
-                    params.split_recurse_spread_m,
-                )
+    if frontier_mask.any():
+        n_labels, labels, stats, _centroids = cv2.connectedComponentsWithStats(
+            frontier_mask.view(np.uint8), connectivity=8, ltype=cv2.CV_32S
+        )
+        valid_labels = [
+            lbl
+            for lbl in range(1, n_labels)
+            if int(stats[lbl, cv2.CC_STAT_AREA]) >= params.min_frontier_size
+        ]
+        if valid_labels:
+            rr, cc = np.nonzero(frontier_mask)
+            lbl_vals = labels[rr, cc]
+            order = np.argsort(lbl_vals, kind="mergesort")
+            coords_s = np.column_stack((rr[order], cc[order])).astype(np.int32, copy=False)
+            lbl_s = lbl_vals[order]
+            uniq_lbls, starts, counts = np.unique(
+                lbl_s, return_index=True, return_counts=True
             )
+            for _lbl_id, st, cnt in zip(
+                uniq_lbls.tolist(), starts.tolist(), counts.tolist()
+            ):
+                if cnt < params.min_frontier_size:
+                    continue
+                raw_clusters.extend(
+                    _split_coords_if_large(
+                        coords_s[st : st + cnt],
+                        res,
+                        params.min_frontier_size,
+                        params.split_min_spread_m,
+                        params.split_recurse_spread_m,
+                    )
+                )
 
     clusters: List[FrontierCluster] = []
     for sub_cells in raw_clusters:
@@ -248,6 +256,7 @@ def extract_frontiers(
             res,
             min_clearance=params.min_clearance,
             max_retract_m=params.max_retract_m,
+            free_labels=occ.free_labels,
         )
         if safe_cell is None:
             continue

@@ -1,6 +1,15 @@
 """Lightweight 2.5D-3D hierarchical multi-robot exploration core."""
 
 from .convergence import ConvergenceParams, ConvergenceState, ConvergenceTracker
+from .deconfliction import (
+    CorridorInfo,
+    CorridorMutexManager,
+    CorridorMutexParams,
+    TeammateCloudParams,
+    build_teammate_cloud_points,
+    pack_xyz32_cloud,
+    sample_plan_horizon,
+)
 from .frontier import (
     FrontierCluster,
     FrontierParams,
@@ -9,6 +18,13 @@ from .frontier import (
     frontier_yaw,
     score_frontiers,
     split_cluster_if_large,
+)
+from .geom_kernel import (
+    GeodesicCache,
+    extract_corridor_bottlenecks_cpp,
+    has_cpp_kernel,
+    has_line_of_sight_cpp,
+    optimize_residual_viewpoints_cpp,
 )
 from .geometry import (
     MAX_ROBOT_SPEED_MPS,
@@ -33,6 +49,7 @@ from .scheduler import (
     calculate_legacy_utility,
     euclidean_distance,
     exclude_near_waypoints,
+    filter_corridor_safe_candidates,
     global_bid,
     nearest_neighbor_order,
     open_path_2opt,
@@ -75,11 +92,24 @@ __all__ = [
     "assign_ownership",
     "global_bid",
     "exclude_near_waypoints",
+    "filter_corridor_safe_candidates",
     "calculate_legacy_utility",
     "ConvergenceParams",
     "ConvergenceState",
     "ConvergenceTracker",
     "RobotTracker",
+    "GeodesicCache",
+    "has_cpp_kernel",
+    "has_line_of_sight_cpp",
+    "optimize_residual_viewpoints_cpp",
+    "extract_corridor_bottlenecks_cpp",
+    "TeammateCloudParams",
+    "CorridorMutexParams",
+    "CorridorInfo",
+    "CorridorMutexManager",
+    "build_teammate_cloud_points",
+    "pack_xyz32_cloud",
+    "sample_plan_horizon",
     "wrap_angle",
     "se2_apply",
     "se2_inverse",

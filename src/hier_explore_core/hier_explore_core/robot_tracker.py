@@ -33,6 +33,11 @@ class RobotTracker:
         self.goal_pub = None
         self.plan_pub = None
         self.plan_sub = None
+        self.teammates_pub = None
+        self.latest_plan_world: List[Tuple[float, float]] = []
+        self.latest_plan_time: float = -1e9
+        self.yielding_corridor_id: Optional[int] = None
+        self.yield_until_time: float = -1e9
 
         # Out-of-bounds self recovery
         self.backup_active: bool = False

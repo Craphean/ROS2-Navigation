@@ -290,7 +290,24 @@ local_costmap:
         z_voxels: 40
         max_obstacle_height: 2.0
         mark_threshold: 0
-        observation_sources: scan points
+        observation_sources: scan points teammates
+        # M3 layer-1 deconfliction: coordinator publishes /<ns>/teammates_cloud at
+        # 5 Hz (teammate footprint + 2 s of planned path, z=0.17 m) plus a 24-pt
+        # clearing ring at r=2.85 m so vacated teammate cells are raytrace-cleared
+        # every update (no ghost trails).  Points beyond 2.5 m never mark.
+        teammates:
+          topic: teammates_cloud
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          min_obstacle_height: 0.05
+          max_obstacle_height: 1.5
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.15
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          observation_persistence: 0.4
+          expected_update_rate: 0.0
         points:
           topic: points
           data_type: "PointCloud2"
@@ -384,6 +401,10 @@ global_costmap:
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
+        # M3 / TODO #12: plan on the SE(2)-fused team map reprojected into this
+        # robot's local map frame (published by se2_map_merge_node).  With
+        # USE_SE2_MERGE=false the launcher rewrites this back to `map`.
+        map_topic: shared_map
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 8.0

@@ -141,3 +141,28 @@ multi_robot_coordinator:
     # of re-auctioning the same frontier and logging "Action server not ready!"
     # at the coordination rate.
     nav_outage_warn_period: 15.0
+
+    # --- M3: C++17 geometric kernel (_geom_kernel, pybind11) ---
+    # Bounded multi-source Dijkstra on the merged map replaces Euclidean
+    # distance in auction / tour costs (falls back to Euclidean if unbuilt).
+    use_geodesic_distance: true
+    geodesic_min_clearance: 0.22
+    geodesic_max_dist: 40.0
+    # LoS (2D Bresenham) + vertical FoV + submodular set-cover residual NBV.
+    use_los_fov_optimizer: true
+    residual_viewpoint_r_min: 0.8
+    residual_viewpoint_r_max: 3.5
+    residual_viewpoint_samples: 24
+    lidar_sensor_z: 0.25
+    lidar_vfov_min_deg: -30.0
+    lidar_vfov_max_deg: 55.0
+    residual_max_eff_range: 5.0
+
+    # --- M3: two-layer multi-robot deconfliction ---
+    # Layer 1: /<ns>/teammates_cloud (5 Hz) -> local_costmap.voxel_layer.
+    teammate_deconfliction_enable: true
+    teammate_cloud_rate_hz: 5.0
+    # Layer 2: corridor mutex reservation on doorway / corridor bottlenecks.
+    corridor_mutex_enable: true
+    corridor_narrow_margin: 0.35
+    corridor_robot_radius: 0.22

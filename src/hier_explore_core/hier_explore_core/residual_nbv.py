@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import cv2
 import numpy as np
 
+from .geom_kernel import has_cpp_kernel, optimize_residual_viewpoints_cpp
 from .occupancy_view import FREE, UNKNOWN, OccupancyView
 from .voxel_index import VoxelColumnIndex
 
@@ -30,6 +31,15 @@ class ResidualParams:
     score_scale: float = 10.0
     blacklist_radius: float = 1.0
     coverage_hole_enable: bool = False
+    # Pillar 3: C++ 2D Bresenham LoS + 3D vertical FoV + submodular viewpoint optimization
+    use_los_fov_optimizer: bool = True
+    viewpoint_r_min: float = 0.8
+    viewpoint_r_max: float = 3.5
+    viewpoint_samples: int = 24
+    sensor_z: float = 0.25
+    vfov_min_deg: float = -30.0
+    vfov_max_deg: float = 55.0
+    max_eff_range: float = 5.0
 
 
 @dataclass
@@ -138,39 +148,112 @@ def detect_residuals(
     if not mask.any():
         return [], 0.0
 
-    n_labels, _labels, stats, centroids = cv2.connectedComponentsWithStats(
+    n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
         mask.astype(np.uint8), connectivity=8
     )
     del n_labels
 
-    raw_candidates: List[ResidualCandidate] = []
-    raw_gain = 0.0
     blacklist = list(blacklist)
     attempts = attempts or {}
 
+    # Identify qualifying clusters (size, blacklist, max attempts)
+    cluster_meta: Dict[int, Tuple[float, float, int, float, float]] = {}
+    raw_gain = 0.0
     for label in range(1, stats.shape[0]):
         cell_count = int(stats[label, cv2.CC_STAT_AREA])
         if cell_count < params.min_cluster_cells:
             continue
-
         cx = index.origin_x + (centroids[label][0] + 0.5) * res
         cy = index.origin_y + (centroids[label][1] + 0.5) * res
-
         if _is_blacklisted(cx, cy, blacklist, params.blacklist_radius):
             continue
         key = _attempt_key(cx, cy)
         if attempts.get(key, 0) >= max_attempts:
             continue
+        area = cell_count * res * res
+        score = params.score_scale * area
+        cluster_meta[label] = (cx, cy, cell_count, area, score)
 
+    if not cluster_meta:
+        return [], 0.0
+
+    # Preferred Pillar 3 path: C++ 2D Bresenham LoS + 3D vertical FoV + submodular set cover
+    if params.use_los_fov_optimizer and has_cpp_kernel():
+        qual_mask = np.isin(labels, list(cluster_meta.keys()))
+        ry, rx = np.nonzero(qual_mask)
+        if len(ry) > 0:
+            # Cap very large clusters to <= 600 sampled columns so LoS raycasting stays < 2 ms
+            if len(ry) > 600:
+                stride = int(math.ceil(len(ry) / 600.0))
+                ry = ry[::stride]
+                rx = rx[::stride]
+            cxs = index.origin_x + (rx.astype(np.float64) + 0.5) * res
+            cys = index.origin_y + (ry.astype(np.float64) + 0.5) * res
+            zmins = index.zmin[ry, rx].astype(np.float64)
+            zmaxs = index.zmax[ry, rx].astype(np.float64)
+            bad_z = (~np.isfinite(zmins)) | (~np.isfinite(zmaxs)) | (zmaxs < zmins)
+            zmins = np.where(bad_z, 0.25, zmins)
+            zmaxs = np.where(bad_z, 1.50, zmaxs)
+            cols_xyzz = np.column_stack((cxs, cys, zmins, zmaxs))
+            cids = labels[ry, rx].astype(np.int32)
+
+            cpp_views = optimize_residual_viewpoints_cpp(
+                view,
+                cols_xyzz,
+                cids,
+                r_min=params.viewpoint_r_min,
+                r_max=params.viewpoint_r_max,
+                num_samples=params.viewpoint_samples,
+                min_clearance=params.min_clearance,
+                sensor_z=params.sensor_z,
+                vfov_min_deg=params.vfov_min_deg,
+                vfov_max_deg=params.vfov_max_deg,
+                max_eff_range=params.max_eff_range,
+                max_viewpoints=params.max_candidates,
+                dedupe_radius=params.dedupe_radius,
+            )
+
+            selected: List[ResidualCandidate] = []
+            for vp in cpp_views:
+                vx, vy = float(vp["x"]), float(vp["y"])
+                if _is_blacklisted(vx, vy, blacklist, params.blacklist_radius):
+                    continue
+                cid = int(vp["cluster_id"])
+                cx, cy, cell_count, area, base_score = cluster_meta[cid]
+                cov_ratio = max(0.25, min(1.5, float(vp.get("coverage_ratio", 1.0))))
+                score = base_score * cov_ratio
+                component = view.component_at_world(vx, vy)
+                selected.append(
+                    ResidualCandidate(
+                        x=vx,
+                        y=vy,
+                        yaw=float(vp["yaw"]),
+                        score=score,
+                        cluster_cells=cell_count,
+                        area=area,
+                        component_label=component,
+                        cluster_x=cx,
+                        cluster_y=cy,
+                        total_gain=score,
+                        size=cell_count,
+                    )
+                )
+            if selected:
+                raw_gain = sum(m[4] for m in cluster_meta.values())
+                return selected, raw_gain
+
+    # Fallback path (or ablation when use_los_fov_optimizer=False)
+    raw_candidates: List[ResidualCandidate] = []
+    for _label, (cx, cy, cell_count, area, score) in cluster_meta.items():
         view_xy = _find_viewpoint(
             view, cx, cy, params.viewpoint_search_radius, params.min_clearance
         )
         if view_xy is None:
             continue
         vx, vy = view_xy
+        if _is_blacklisted(vx, vy, blacklist, params.blacklist_radius):
+            continue
         yaw = math.atan2(cy - vy, cx - vx)
-        area = cell_count * res * res
-        score = params.score_scale * area
         component = view.component_at_world(vx, vy)
 
         raw_gain += score
@@ -194,17 +277,17 @@ def detect_residuals(
         return [], raw_gain
 
     raw_candidates.sort(key=lambda c: (-c.score, c.x, c.y))
-    selected: List[ResidualCandidate] = []
+    selected_fb: List[ResidualCandidate] = []
     for cand in raw_candidates:
-        if len(selected) >= params.max_candidates:
+        if len(selected_fb) >= params.max_candidates:
             break
         if any(
             math.hypot(cand.x - s.x, cand.y - s.y) < params.dedupe_radius
-            for s in selected
+            for s in selected_fb
         ):
             continue
-        selected.append(cand)
-    return selected, raw_gain
+        selected_fb.append(cand)
+    return selected_fb, raw_gain
 
 
 def _odd_kernel(size_cells: float) -> int:

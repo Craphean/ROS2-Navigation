@@ -209,6 +209,12 @@ def build_local_tour(
     dist_matrix: Optional[np.ndarray] = None
     start_dists: Optional[np.ndarray] = None
     if distance_fn is not euclidean_distance:
+        geo_obj = getattr(distance_fn, "__self__", None)
+        if geo_obj is not None and hasattr(geo_obj, "precompute_pairwise") and len(selected) > 1:
+            geo_obj.precompute_pairwise(
+                [(sx, sy)] + [(float(c.x), float(c.y)) for c in selected],
+                max_dist_m=max(params.max_tour_length * 1.5, 12.0),
+            )
         n = len(selected)
         start_dists = np.array(
             [distance_fn(sx, sy, float(c.x), float(c.y)) for c in selected],
@@ -309,6 +315,44 @@ def exclude_near_waypoints(
         for c in candidates
         if all(math.hypot(c.x - wx, c.y - wy) >= radius for wx, wy in waypoints)
     ]
+
+
+def filter_corridor_safe_candidates(
+    robot_ns: str,
+    robot_xy: Tuple[float, float],
+    candidates: Sequence,
+    corridor_mgr,
+    path_fn: Callable[[Tuple[float, float], Tuple[float, float]], Tuple[float, np.ndarray]],
+) -> Tuple[List, Optional[Tuple[int, str]]]:
+    """Partition candidates by topological corridor-mutex conflicts.
+
+    Returns ``(safe_candidates, first_conflict)``. When ``safe_candidates`` is
+    non-empty, the robot switches cleanly to an alternate branch avoiding any
+    narrow bottleneck reserved by a higher-priority teammate. When all
+    candidates require crossing an occupied bottleneck, ``safe_candidates`` is
+    empty and ``first_conflict = (corridor_id, owner_ns)`` signals the
+    coordinator to stage the robot at a spacious Yield Point.
+    """
+    reservations = getattr(corridor_mgr, "reservations", None)
+    if corridor_mgr is None or not reservations:
+        return list(candidates), None
+    if not any(holder[0] != robot_ns for holder in reservations.values()):
+        return list(candidates), None
+
+    safe: List = []
+    first_conflict: Optional[Tuple[int, str]] = None
+    rx, ry = float(robot_xy[0]), float(robot_xy[1])
+    for cand in candidates:
+        cx, cy = float(cand.x), float(cand.y)
+        dist_m, path_xy = path_fn((rx, ry), (cx, cy))
+        if not math.isfinite(dist_m) or len(path_xy) == 0:
+            continue
+        conflict = corridor_mgr.blocking_corridor_for_path(robot_ns, path_xy)
+        if conflict is None:
+            safe.append(cand)
+        elif first_conflict is None:
+            first_conflict = conflict
+    return safe, first_conflict
 
 
 def calculate_legacy_utility(
