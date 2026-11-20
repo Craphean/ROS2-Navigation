@@ -240,10 +240,10 @@ ros2 topic pub --once /explore/resume std_msgs/msg/Bool "{data: true}"
 
 在原有 2D SLAM / frontier / Nav2 之上，双车链路额外增加一条并行的 3D 建图层：
 
-- 每台车在 `base_scan` 上增加一颗 32 线（-30°..+55°）、720 点、5 Hz 的 `gpu_lidar`，桥接为 `/robotX/points`
-- `/robotX/points` 同时作为 Nav2 局部 `voxel_layer` 和全局 `obstacle_layer` 的 `PointCloud2` 观测源，因此桌面、床面、柜顶等悬空结构会投影进 2D 代价地图
-- `scripts/merge_pointclouds.py` 用 TF 把两车点云从 `robotX/base_scan` 变换到 `world`，体素降采样后发布 `/points_merged`
-- `octomap_server` 订阅 `/points_merged`，输出 `/octomap_binary`、`/octomap_full`、`/octomap_point_cloud_centers` 和 `/projected_map`
+- 每台车在 `base_scan` 上增加一颗 **16 线（-30°..+55°）、360 水平点、5 Hz** 的 `gpu_lidar`（详见 `config/gz_waffle_3d_lidar.sdf.xacro`），桥接为 `/robotX/points`
+- `/robotX/points` 作为 Nav2 **局部 `voxel_layer`**（仅 `marking: true`，清障由 2D `scan` 承担）的 `PointCloud2` 观测源，使桌面、床面等悬空结构在局部避障可见；全局 `obstacle_layer` 保持仅订阅 2D `scan` 以避免 4 核 CPU 下的 `planner_server` 阻塞
+- `scripts/merge_pointclouds.py`（M2 将替换为 C++ `cloud_merger_node`）用 TF 把各车点云从 `robotX/base_scan` 变换到 `world`，体素降采样后发布 `/points_merged`
+- `octomap_server` 订阅 `/points_merged`，以 0.10 m 分辨率输出 `/octomap_binary`、`/octomap_full`、`/octomap_point_cloud_centers` 和 `/projected_map`
 
 2D SLAM、`/robotX/scan` 与 Nav2 规划逻辑不变；`multi_robot_coordinator.py` 现在还会消费 `/octomap_point_cloud_centers`，把占据体素结构计入前沿评分，并在 2D 前沿闭合后做残差补盲与收敛判定（见下节）。3D 图不再只是被动展示/存档。
 
