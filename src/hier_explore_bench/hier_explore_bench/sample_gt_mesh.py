@@ -324,8 +324,48 @@ def load_stl_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
     return verts, faces
 
 
+def _dae_node_transform(node_elem: ET.Element) -> np.ndarray:
+    """Compose 4x4 transform from COLLADA <node> children (<matrix>, <translate>, <rotate>, <scale>)."""
+    T = np.eye(4, dtype=np.float64)
+    for child in node_elem:
+        _, tag = _strip_ns(child.tag)
+        if not child.text:
+            continue
+        vals = np.fromstring(child.text, sep=" ", dtype=np.float64)
+        if tag == "matrix" and vals.size == 16:
+            T = T @ vals.reshape(4, 4)
+        elif tag == "translate" and vals.size >= 3:
+            M = np.eye(4, dtype=np.float64)
+            M[:3, 3] = vals[:3]
+            T = T @ M
+        elif tag == "scale" and vals.size >= 3:
+            M = np.eye(4, dtype=np.float64)
+            M[0, 0], M[1, 1], M[2, 2] = vals[0], vals[1], vals[2]
+            T = T @ M
+        elif tag == "rotate" and vals.size >= 4:
+            ax = vals[:3]
+            n = float(np.linalg.norm(ax))
+            if n > 1e-12:
+                ux, uy, uz = ax / n
+                ang = math.radians(float(vals[3]))
+                c, s = math.cos(ang), math.sin(ang)
+                C = 1.0 - c
+                R = np.array(
+                    [
+                        [c + ux * ux * C, ux * uy * C - uz * s, ux * uz * C + uy * s],
+                        [uy * ux * C + uz * s, c + uy * uy * C, uy * uz * C - ux * s],
+                        [uz * ux * C - uy * s, uz * uy * C + ux * s, c + uz * uz * C],
+                    ],
+                    dtype=np.float64,
+                )
+                M = np.eye(4, dtype=np.float64)
+                M[:3, :3] = R
+                T = T @ M
+    return T
+
+
 def load_dae_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
-    """Lightweight Collada (.dae) mesh loader supporting triangles and polylists."""
+    """Lightweight Collada (.dae) mesh loader supporting triangles, polylists, and visual-scene node transforms."""
     try:
         root = ET.parse(path).getroot()
     except Exception:
@@ -343,16 +383,24 @@ def load_dae_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
         elif local == "up_axis" and elem.text:
             up_axis = elem.text.strip().upper()
 
-    all_verts: List[np.ndarray] = []
-    all_faces: List[np.ndarray] = []
-    vert_offset = 0
+    geom_by_id: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
+    geom_order: List[str] = []
 
-    for geom in root.iter():
-        if _strip_ns(geom.tag)[1] != "mesh":
+    for geom_el in root.iter():
+        if _strip_ns(geom_el.tag)[1] != "geometry":
             continue
+        gid = geom_el.attrib.get("id", f"__anon_{len(geom_order)}")
+        mesh_el = None
+        for ch in geom_el:
+            if _strip_ns(ch.tag)[1] == "mesh":
+                mesh_el = ch
+                break
+        if mesh_el is None:
+            continue
+
         sources: Dict[str, np.ndarray] = {}
         vertices_map: Dict[str, str] = {}
-        for child in geom:
+        for child in mesh_el:
             _, tag = _strip_ns(child.tag)
             if tag == "source":
                 sid = child.attrib.get("id", "")
@@ -367,7 +415,10 @@ def load_dae_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
                     if _strip_ns(inp.tag)[1] == "input" and inp.attrib.get("semantic") == "POSITION":
                         vertices_map[vid] = inp.attrib.get("source", "").lstrip("#")
 
-        for prim in geom:
+        g_verts: List[np.ndarray] = []
+        g_faces: List[np.ndarray] = []
+        g_voff = 0
+        for prim in mesh_el:
             _, tag = _strip_ns(prim.tag)
             if tag not in ("triangles", "polylist", "polygons"):
                 continue
@@ -394,16 +445,16 @@ def load_dae_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
             verts = sources[pos_id]
             p_vals = np.fromstring(p_elem.text, sep=" ", dtype=np.int64)
             v_indices = p_vals[v_off::stride]
-            faces_local: List[List[int]] = []
             if tag == "triangles":
                 n_tri = len(v_indices) // 3
                 if n_tri > 0:
-                    tri = v_indices[: n_tri * 3].reshape(-1, 3) + vert_offset
-                    all_verts.append(verts)
-                    all_faces.append(tri)
-                    vert_offset += len(verts)
+                    tri = v_indices[: n_tri * 3].reshape(-1, 3) + g_voff
+                    g_verts.append(verts)
+                    g_faces.append(tri)
+                    g_voff += len(verts)
             elif vcount_elem is not None and vcount_elem.text:
                 vcounts = np.fromstring(vcount_elem.text, sep=" ", dtype=np.int64)
+                faces_local: List[List[int]] = []
                 cursor = 0
                 for vc in vcounts:
                     vc_i = int(vc)
@@ -411,16 +462,53 @@ def load_dae_mesh(path: Path) -> Tuple[np.ndarray, np.ndarray]:
                         poly = v_indices[cursor : cursor + vc_i]
                         for k in range(1, vc_i - 1):
                             faces_local.append(
-                                [int(poly[0]) + vert_offset, int(poly[k]) + vert_offset, int(poly[k + 1]) + vert_offset]
+                                [int(poly[0]) + g_voff, int(poly[k]) + g_voff, int(poly[k + 1]) + g_voff]
                             )
                     cursor += vc_i
                 if faces_local:
-                    all_verts.append(verts)
-                    all_faces.append(np.asarray(faces_local, dtype=np.int64))
-                    vert_offset += len(verts)
+                    g_verts.append(verts)
+                    g_faces.append(np.asarray(faces_local, dtype=np.int64))
+                    g_voff += len(verts)
 
-    if not all_verts or not all_faces:
+        if g_verts and g_faces:
+            geom_by_id[gid] = (np.vstack(g_verts), np.vstack(g_faces))
+            geom_order.append(gid)
+
+    if not geom_by_id:
         return np.empty((0, 3), dtype=np.float64), np.empty((0, 3), dtype=np.int64)
+
+    all_verts: List[np.ndarray] = []
+    all_faces: List[np.ndarray] = []
+    vert_offset = 0
+
+    def _walk_scene_node(node_el: ET.Element, T_parent: np.ndarray) -> None:
+        nonlocal vert_offset
+        T_cur = T_parent @ _dae_node_transform(node_el)
+        for ch in node_el:
+            _, ctag = _strip_ns(ch.tag)
+            if ctag == "instance_geometry":
+                ref = ch.attrib.get("url", "").lstrip("#")
+                if ref in geom_by_id:
+                    gv, gf = geom_by_id[ref]
+                    vt = gv @ T_cur[:3, :3].T + T_cur[:3, 3]
+                    all_verts.append(vt)
+                    all_faces.append(gf + vert_offset)
+                    vert_offset += len(vt)
+            elif ctag == "node":
+                _walk_scene_node(ch, T_cur)
+
+    for el in root.iter():
+        if _strip_ns(el.tag)[1] == "visual_scene":
+            for ch in el:
+                if _strip_ns(ch.tag)[1] == "node":
+                    _walk_scene_node(ch, np.eye(4, dtype=np.float64))
+
+    if not all_verts:
+        for gid in geom_order:
+            gv, gf = geom_by_id[gid]
+            all_verts.append(gv)
+            all_faces.append(gf + vert_offset)
+            vert_offset += len(gv)
 
     V = np.vstack(all_verts) * unit_scale
     if up_axis == "Y_UP":
@@ -712,9 +800,19 @@ def _resolve_mesh_uri(uri: str, base_dir: Path) -> Optional[Path]:
         p = Path(uri[7:])
         return p if p.is_file() else None
     if uri.startswith("model://"):
-        # model://<model_name>/<rel_path> -> check relative to included model's base_dir
         rest = uri[len("model://") :]
         parts = rest.split("/", 1)
+        search_dirs: List[Path] = [base_dir / "models", base_dir]
+        for env_var in ("GZ_SIM_RESOURCE_PATH", "IGN_GAZEBO_RESOURCE_PATH"):
+            raw = os.environ.get(env_var, "")
+            for item in raw.split(":"):
+                if item.strip():
+                    search_dirs.append(Path(item.strip()))
+        search_dirs.extend([Path.home() / ".gz" / "models", Path("/root/.gz/models")])
+        for sd in search_dirs:
+            cand = sd / rest
+            if cand.is_file():
+                return cand
         if len(parts) == 2:
             cand = base_dir / parts[1]
             if cand.is_file():

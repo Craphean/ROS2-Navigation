@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<!--
+  CMU Autonomous Exploration Development Environment — Indoor benchmark world
+  wrapped for Gazebo Harmonic/Ionic/Jetty (gz-sim) + ROS 2 Lyrical.
+
+  Original mesh source:
+    https://github.com/HongbiaoZ/autonomous_exploration_development_environment
+    (src/vehicle_simulator/mesh/indoor/meshes/indoor.dae)
+
+  Fetch meshes once before launching:
+    python3 scripts/fetch_cmu_worlds.py
+
+  Origin (0, 0, 0) lies inside the main western entrance corridor; world spans
+  approx. x in [-2, 128] m, y in [-29, 70] m, z in [0, 3.8] m.
+-->
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="headless" default="true"/>
+
+  <world name="cmu_indoor">
+    <scene>
+      <grid>false</grid>
+      <shadows>false</shadows>
+      <ambient>0.48 0.48 0.48 1</ambient>
+      <background>0.12 0.14 0.16 1</background>
+    </scene>
+
+    <physics name="5ms" type="ode">
+      <max_step_size>0.005</max_step_size>
+      <real_time_update_rate>200.0</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <xacro:unless value="$(arg headless)">
+      <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    </xacro:unless>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <light name="cmu_indoor_sun" type="directional">
+      <cast_shadows>0</cast_shadows>
+      <pose>50 20 15 0 0 0</pose>
+      <diffuse>0.85 0.85 0.85 1</diffuse>
+      <specular>0.12 0.12 0.12 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.005</linear>
+        <quadratic>0.0005</quadratic>
+      </attenuation>
+      <direction>-0.25 0.15 -0.95</direction>
+    </light>
+
+    <!-- Flat safety ground plane just below mesh floor for stable diff-drive wheel contact -->
+    <model name="cmu_indoor_ground">
+      <static>true</static>
+      <pose>60 20 -0.005 0 0 0</pose>
+      <link name="link">
+        <collision name="floor_c">
+          <geometry><plane><normal>0 0 1</normal><size>220 180</size></plane></geometry>
+          <surface>
+            <friction><ode><mu>100</mu><mu2>50</mu2></ode></friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- Official CMU AEDE indoor building mesh -->
+    <model name="cmu_indoor_structure">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <mesh>
+              <uri>model://cmu_indoor/meshes/indoor.dae</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction><ode><mu>100</mu><mu2>50</mu2></ode></friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>model://cmu_indoor/meshes/indoor.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

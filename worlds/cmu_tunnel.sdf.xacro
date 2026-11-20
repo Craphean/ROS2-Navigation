@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<!--
+  CMU Autonomous Exploration Development Environment — Subterranean Tunnel
+  benchmark world wrapped for Gazebo Harmonic/Ionic/Jetty (gz-sim) + ROS 2 Lyrical.
+
+  Original mesh source:
+    https://github.com/HongbiaoZ/autonomous_exploration_development_environment
+    (src/vehicle_simulator/mesh/tunnel/meshes/tunnel.dae)
+
+  Fetch meshes once before launching:
+    python3 scripts/fetch_cmu_worlds.py
+
+  Preserves the exact CMU model pose (-22.0, 92.5, 0) so origin (0, 0, 0) sits
+  inside the primary subterranean tunnel portal for apples-to-apples M-TARE runs.
+-->
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="headless" default="true"/>
+
+  <world name="cmu_tunnel">
+    <scene>
+      <grid>false</grid>
+      <shadows>false</shadows>
+      <ambient>0.38 0.37 0.35 1</ambient>
+      <background>0.03 0.03 0.04 1</background>
+    </scene>
+
+    <physics name="5ms" type="ode">
+      <max_step_size>0.005</max_step_size>
+      <real_time_update_rate>200.0</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <xacro:unless value="$(arg headless)">
+      <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    </xacro:unless>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <light name="cmu_tunnel_fill" type="directional">
+      <cast_shadows>0</cast_shadows>
+      <pose>80 -80 20 0 0 0</pose>
+      <diffuse>0.82 0.80 0.75 1</diffuse>
+      <specular>0.08 0.08 0.08 1</specular>
+      <attenuation>
+        <range>1500</range>
+        <constant>0.9</constant>
+        <linear>0.004</linear>
+        <quadratic>0.0002</quadratic>
+      </attenuation>
+      <direction>-0.18 0.12 -0.97</direction>
+    </light>
+
+    <!-- Flat safety ground plane at z=0 for stable diff-drive wheel contact -->
+    <model name="cmu_tunnel_ground">
+      <static>true</static>
+      <pose>100 -70 -0.005 0 0 0</pose>
+      <link name="link">
+        <collision name="floor_c">
+          <geometry><plane><normal>0 0 1</normal><size>600 600</size></plane></geometry>
+          <surface>
+            <friction><ode><mu>100</mu><mu2>50</mu2></ode></friction>
+          </surface>
+        </collision>
+      </link>
+    </model>
+
+    <!-- Official CMU AEDE subterranean tunnel mesh with original CMU offset (-22.0, 92.5, 0) -->
+    <model name="cmu_tunnel_structure">
+      <static>true</static>
+      <pose>-22.0 92.5 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <mesh>
+              <uri>model://cmu_tunnel/meshes/tunnel.dae</uri>
+            </mesh>
+          </geometry>
+          <surface>
+            <friction><ode><mu>100</mu><mu2>50</mu2></ode></friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>model://cmu_tunnel/meshes/tunnel.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

@@ -55,8 +55,19 @@
       - **零死锁 / 零碰撞**：`mine` 连续 5 轮与 `hospital` 连续 5 轮均实现 **0 对向死锁（`stall_events = 0`）、0 车际碰撞（`inter_robot_collisions = 0`）**；
       - **规划周期 P95 $< 50\text{ ms}$**：`mine` 5 轮中位规划周期 `cycle_ms_p50` 均值 **`4.21 ms`**（`3.71–4.83 ms`），95 分位 `cycle_ms_p95` 均值 **`44.88 ms < 50 ms`**（240 s 实跑 `39.04 ms`）；`hospital` 5 轮 `cycle_ms_p50` 均值 **`4.61 ms`**（`3.61–5.68 ms`），`cycle_ms_p95` 均值 **`47.67 ms < 50 ms`**；
       - **3D 表面完整度与覆盖提升（`full` vs `e1_2d` 2D-only）**：`mine` 2D 覆盖率均值 `0.646 -> 0.951`（+47.2%）、`n_auc` `0.392 -> 0.590`（+50.5%）、3D `completeness_10cm` `0.350 -> 0.430`（峰值 `0.485`，+22.9%）、`completeness_15cm` `0.461 -> 0.566`（峰值 `0.647`，+22.8%）、`fscore_15cm` `0.629 -> 0.716`（峰值 `0.785`）、`chamfer_l1_m` `1.371 -> 0.283 m`（最优 `0.079 m`，**-79.3%**）；`hospital` 5 轮覆盖率均值 **`0.997`**（4/5 轮 `1.000`），240 s `n_auc` `0.721 -> 0.760`、`chamfer_l1_m` `0.066 -> 0.062 m`、`occupied_iou_tol1` `0.428 -> 0.648`（+51.4%）、ATE `0.914 -> 0.306 m`（-66.5%）。
-- [ ] **M4：参数化 $N=1\sim 4$ 启动包 `src/hier_explore_bringup/` + 导入 CMU `cmu_indoor` / `cmu_tunnel` 世界** ← **下一个立即执行的里程碑**
-- [ ] **M5：5090 服务器全量多随机种子 Benchmark + 消融 + M-TARE Docker 对照 + 论文矢量图与 LaTeX 表格生成**
+- [x] **M4（代码、单测与 5090 4 核实跑验收已全部通过）：参数化 $N=1\sim 4$ 启动包 `src/hier_explore_bringup/` + 导入 CMU `cmu_indoor` / `cmu_tunnel` 世界**
+  - **WP4.1（参数化 ROS 2 启动包 `src/hier_explore_bringup/`）**：新增标准 `ament_cmake` + `ament_cmake_python` 包，实现 `launch/multi_sim.launch.py`（支持 `num_robots=1..4`、`world`、`spawn_seed`、`odom_mode=ekf|gt`、`ablation_profile=legacy|e1_2d|e2_3dgain|e3_hier|e4_geodesic|e5_deconflict|full|no_se2|no_degen_gate`、`planner_backend=auto|coordinator|legacy|off`、`enable_cameras=false` 节能默认开关、按车错峰启动）；扩充 `config/nav2_multirobot_slam_params.yaml` 支持 `robot1..robot4` `slam_toolbox` 参数块，并在 `run_benchmark.py` 中接入 `--num-robots`、`--odom-mode`、`--launcher launch|bash`。
+  - **WP4.2（CMU AEDE 官方网格导入与全 6 场景真值档案）**：从 CMU `HongbiaoZ/autonomous_exploration_development_environment` 下载官方 `indoor.dae`（211,832 三角面）与 `tunnel.dae`（13,880 三角面，保留原偏移 `(-22.0, 92.5, 0)`），新增 [scripts/fetch_cmu_worlds.py](file:///home/liangqingcai/ros/ROS2-Navigation/scripts/fetch_cmu_worlds.py)、[worlds/cmu_indoor.sdf.xacro](file:///home/liangqingcai/ros/ROS2-Navigation/worlds/cmu_indoor.sdf.xacro)、[worlds/cmu_tunnel.sdf.xacro](file:///home/liangqingcai/ros/ROS2-Navigation/worlds/cmu_tunnel.sdf.xacro) 与 [scripts/generate_all_gt_maps.py](file:///home/liangqingcai/ros/ROS2-Navigation/scripts/generate_all_gt_maps.py)；增强 `sample_gt_mesh.py` 的 COLLADA `<visual_scene>` 节点变换解析与 `model://` 搜索路径，上调 `octomap_params.yaml` 的 `sensor_model.max_range` 至 `500.0 m`，生成全部 6 场景 `maps/gt/<world>/` 真值档案（零边界泄漏：`house` $76.13\text{ m}^2$、`hospital` $150.44\text{ m}^2$、`mine` $280.09\text{ m}^2$、`warehouse` $1370.35\text{ m}^2$、`cmu_indoor` $2667.21\text{ m}^2$、`cmu_tunnel` $13559.88\text{ m}^2$）与经 `gt_2d.npz` 净空校验的 4 车默认编队及 9–10 基站随机出生池；顺带将 `/<ns>/teammates_cloud` 改为在 `base_footprint` 坐标系发布，消除大场景远距局部代价图射线原点越界警告。
+  - **已通过离线单测与 5090 4 核 ROS 2 Lyrical 实跑验收**：
+    - `colcon build --symlink-install` 全 7 包零错通过；`colcon test` 全 4 包 **68/68 通过（0 失败）**；Python `pytest` **115 passed in 2.54s**（含全部 6 场景 `gt_2d.npz` 4 车无重叠净空校验与 $N=1\sim 4$ 确定性采样测试）。
+    - 5090 4 核隔离容器 `ros2 launch hier_explore_bringup multi_sim.launch.py` 6 组 120 s 实跑全通：
+      - **`mine` ($N=1$, `full`, `ekf`)**：探索 `121.3 m²`（`43.3%`），行程 `21.6 m`，ATE `0.016 m`，`CycP50/P95 = 1.84 / 32.88 ms`，`0` 碰撞；
+      - **`mine` ($N=3$, `full`, `ekf`)**：3 车全活跃（`23.3 / 18.6 / 17.8 m`），探索 `143.2 m²`（`51.1%`，`Comp15 = 0.364`），渐进 DAG SE(2) 接受 `107` 次，`0` 碰撞；
+      - **`mine` ($N=4$, `full`, `ekf`)**：4 车在 4 核容器内全部平稳驱动（`18.7 / 19.8 / 22.0 / 19.0 m`，总行程 `79.5 m`），探索 `146.2 m²`（`Comp15 = 0.380`, `IoU2D = 0.626`），渐进 DAG SE(2) 接受 `167` 次，`0` 碰撞；
+      - **`cmu_indoor` ($N=2$, `full`, `ekf`)**：双车正常探索 CMU 官方建筑（`24.5 / 37.0 m`），120 s 建图 `292.0 m²`，ATE `0.198 m`，`CycP50/P95 = 3.83 / 31.93 ms`，SE(2) 接受 `55` 次，`0` 碰撞；
+      - **`cmu_tunnel` ($N=2$, `full`, `ekf`)**：双车驶入 CMU 官方地下隧道（`16.6 / 24.6 m`），120 s 建图 `161.4 m²`，ATE `0.291 m`，`CycP50/P95 = 2.84 / 42.11 ms`，SE(2) 接受 `51` 次，`0` 碰撞；
+      - **`house` ($N=2$, `legacy`, `gt`)**：双车覆盖率 `100.0%`，ATE `0.000 m`，`IoU2D = 0.771`，`0` 碰撞。
+- [ ] **M5：5090 服务器全量多随机种子 Benchmark + 消融 + M-TARE Docker 对照 + 论文矢量图与 LaTeX 表格生成** ← **下一个立即执行的里程碑**
 - [ ] **M6：单台 3D 雷达实车部署（`real_robot.launch.py`）+ 真机 2D-only vs. Ours 对比实验 + 补充视频**
 
 ---
@@ -92,8 +103,8 @@
      - [x] 4 核容器下 `mine`（连续 5 种子 `0..4`）与 `hospital`（连续 5 种子 `0..4`）零对向死锁（`stall_events = 0`）、零车际碰撞（`inter_robot_collisions = 0`）；规划周期 P95 $< 50\text{ ms}$（`mine` 5 轮均值 `44.88 ms` / P50 `4.21 ms`，`hospital` 5 轮均值 `47.67 ms` / P50 `4.61 ms`）；3D 表面完整度较 2D-only 显著提升（`mine` `completeness_15cm` `0.461 -> 0.566` / 峰值 `0.647`，`chamfer_l1_m` `1.371 -> 0.283 m`）。
 
 ### M4（WP4）：参数化 $N=1\sim 4$ 启动与 CMU 公开场景（`src/hier_explore_bringup/`）
-- 编写 `multi_sim.launch.py`（支持 `num_robots=1..4`, `world`, `spawn_seed`, `odom_mode`, `ablation_profile`, `planner_backend`）替换硬编码 2 车 Bash；
-- 从 CMU Autonomous Exploration Development Environment 导入 `cmu_indoor` 与 `cmu_tunnel` 网格封装为 Gazebo SDF，并生成 6 场景全部 `maps/gt/<world>/` 真值档案与 4 车无重叠出生点池。
+- [x] 编写 `multi_sim.launch.py`（支持 `num_robots=1..4`, `world`, `spawn_seed`, `odom_mode`, `ablation_profile`, `planner_backend`）替换硬编码 2 车 Bash，并在 5090 4 核容器实测通过 $N=1,2,3,4$ 与 `legacy+gt` 模式；
+- [x] 从 CMU Autonomous Exploration Development Environment 导入 `cmu_indoor` 与 `cmu_tunnel` 网格封装为 Gazebo SDF，并生成 6 场景全部 `maps/gt/<world>/` 真值档案与经净空校验的 4 车无重叠出生点池（`cmu_indoor` / `cmu_tunnel` 实跑均通过，0 碰撞、`CycP95 < 50 ms`）。
 
 ### M5（WP5）：5090 服务器全量实验与论文图表输出
 - 跑完主对比表（Table I / Fig. 3：5 方法 × 6 场景 × 5 种子，含 M-TARE Docker 在 `--cpus=4 --memory=8g` 下同图对比）、7 组消融（Table II）、噪声里程计配准专项对比（Fig. 2）、$N=1\sim 4$ 扩展性加速比与带宽（Fig. 4）、16/32 线与体素分辨率敏感性附表，使用 `plot_paper_figs.py` 自动产出矢量图与 LaTeX 表格。

@@ -703,12 +703,15 @@ class MultiRobotCoordinator(Node):
         for ns, robot in self.robots.items():
             if robot.teammates_pub is None:
                 continue
-            tf_w2l = self._world_to_local_transform(robot)
+            # Emit in ego's base_footprint frame so Nav2 VoxelLayer's raytrace
+            # sensor origin stays centered inside the rolling local_costmap
+            # regardless of how far the robot travels from the map origin.
+            tf_w2b = se2_inverse((robot.world_x, robot.world_y, robot.world_yaw))
             pts = build_teammate_cloud_points(
-                ns, poses_world, plans_world, tf_w2l, self.teammate_cloud_params
+                ns, poses_world, plans_world, tf_w2b, self.teammate_cloud_params
             )
             if len(pts) > 0:
-                robot.teammates_pub.publish(pack_xyz32_cloud(pts, "map", stamp_msg))
+                robot.teammates_pub.publish(pack_xyz32_cloud(pts, "base_footprint", stamp_msg))
 
     # ------------------------------------------------------------------
     # Main coordination cycle
