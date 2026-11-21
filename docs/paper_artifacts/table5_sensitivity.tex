@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\caption{LiDAR beam count and OctoMap voxel resolution sensitivity on Mine (3 seeds, 4-core).}
+\label{tab:sensitivity}
+\footnotesize
+\begin{tabular}{lcccccc}
+\toprule
+Configuration & Area ($\text{m}^2$) & 3D Comp.$_{15}$ (\%) & CD-$L_1$ (m) & CPU (\%) & RAM (MB) & P95 (ms) \\
+\midrule
+16-beam / 0.05 m & $231.7 \pm 51.8$ & $50.1 \pm 11.9$ & $0.773 \pm 0.823$ & $\mathbf{213.8 \pm 4.1}$ & $\mathbf{2296 \pm 12}$ & $\mathbf{30.4 \pm 6.9}$ \\
+16-beam / 0.10 m (Default) & $214.5 \pm 60.8$ & $46.9 \pm 11.8$ & $0.886 \pm 0.724$ & $261.5 \pm 6.3$ & $2306 \pm 26$ & $55.3 \pm 9.2$ \\
+16-beam / 0.15 m & $235.3 \pm 42.8$ & $50.8 \pm 7.9$ & $0.586 \pm 0.552$ & $230.0 \pm 32.9$ & $2318 \pm 31$ & $37.6 \pm 26.0$ \\
+32-beam / 0.10 m & $245.4 \pm 44.0$ & $\mathbf{65.8 \pm 13.7}$ & $\mathbf{0.403 \pm 0.337}$ & $235.7 \pm 37.7$ & $2333 \pm 18$ & $45.5 \pm 29.8$ \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -2,6 +2,8 @@
 <sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
     <xacro:arg name="namespace" default=""/>
     <xacro:arg name="use_gt_odom" default="false"/>
+    <xacro:arg name="lidar_v_samples" default="16"/>
+    <xacro:arg name="lidar_h_samples" default="360"/>
 
     <model name="turtlebot3_waffle"> 
       <pose>0.0 0.0 0.0 0.0 0.0 0.0</pose>
@@ -184,13 +186,13 @@
           <ray>
             <scan>
               <horizontal>
-                <samples>360</samples>
+                <samples>$(arg lidar_h_samples)</samples>
                 <resolution>1.0</resolution>
                 <min_angle>-3.14159</min_angle>
                 <max_angle>3.14159</max_angle>
               </horizontal>
               <vertical>
-                <samples>16</samples>
+                <samples>$(arg lidar_v_samples)</samples>
                 <resolution>1.0</resolution>
                 <min_angle>-0.5236</min_angle>
                 <max_angle>0.9599</max_angle>

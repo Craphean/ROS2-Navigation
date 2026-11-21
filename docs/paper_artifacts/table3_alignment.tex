@@ -1,0 +1,23 @@
+\begin{table*}[t]
+\centering
+\caption{Online SE(2) map alignment and degeneracy gate study under noisy EKF odometry (5 seeds).}
+\label{tab:alignment}
+\footnotesize
+\begin{tabular}{lcccccc}
+\toprule
+World / Variant & Occ. IoU & ATE (m) & CD-$L_1$ (m) & Prec.$_{10}$ (\%) & Cloud CPU (\%) & SE(2) Acc. \\
+\midrule
+mine / Legacy Merge + PyCloud & $0.694 \pm 0.099$ & $0.262 \pm 0.120$ & $\mathbf{0.560 \pm 0.643}$ & $94.9 \pm 4.8$ & $20.3 \pm 3.2$ & $0.0 \pm 0.0$ \\
+mine / No SE(2) Align & $0.734 \pm 0.077$ & $0.314 \pm 0.036$ & $0.613 \pm 0.592$ & $98.2 \pm 1.4$ & $\mathbf{2.6 \pm 0.3}$ & $0.0 \pm 0.0$ \\
+mine / SE(2) w/o Degen. Gate & $0.666 \pm 0.019$ & $0.296 \pm 0.048$ & $0.593 \pm 0.515$ & $97.9 \pm 1.2$ & $2.6 \pm 0.2$ & $28.6 \pm 40.9$ \\
+mine / Lite-HMRE (Ours) & $0.687 \pm 0.084$ & $\mathbf{0.215 \pm 0.069}$ & $0.621 \pm 0.631$ & $97.2 \pm 1.9$ & $3.3 \pm 0.3$ & $47.4 \pm 30.3$ \\
+mine / GT-Odom (Oracle) & $\mathbf{0.760 \pm 0.061}$ & -- & $0.767 \pm 0.528$ & $\mathbf{99.9 \pm 0.0}$ & $2.9 \pm 0.3$ & $32.8 \pm 32.6$ \\
+\midrule
+warehouse / Legacy Merge + PyCloud & $\mathbf{0.473 \pm 0.113}$ & $0.311 \pm 0.262$ & $1.929 \pm 2.195$ & $57.0 \pm 5.7$ & $21.4 \pm 1.2$ & $0.0 \pm 0.0$ \\
+warehouse / No SE(2) Align & $0.425 \pm 0.093$ & $\mathbf{0.177 \pm 0.044}$ & $2.201 \pm 2.145$ & $56.5 \pm 3.2$ & $\mathbf{3.0 \pm 0.0}$ & $0.0 \pm 0.0$ \\
+warehouse / SE(2) w/o Degen. Gate & $0.441 \pm 0.037$ & $0.257 \pm 0.058$ & $\mathbf{1.874 \pm 0.609}$ & $56.6 \pm 8.6$ & $3.9 \pm 1.7$ & $20.2 \pm 36.0$ \\
+warehouse / Lite-HMRE (Ours) & $0.405 \pm 0.132$ & $0.312 \pm 0.074$ & $2.417 \pm 1.981$ & $55.7 \pm 8.4$ & $3.4 \pm 0.2$ & $19.8 \pm 41.0$ \\
+warehouse / GT-Odom (Oracle) & $0.432 \pm 0.078$ & -- & $2.882 \pm 2.108$ & $\mathbf{63.8 \pm 4.5}$ & $3.2 \pm 0.2$ & $21.4 \pm 38.1$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

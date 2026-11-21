@@ -147,6 +147,8 @@ def run_single_trial(
     dry_run: bool = False,
     odom_mode: str = "ekf",
     launcher: str = "launch",
+    lidar_v_samples: int = 16,
+    voxel_resolution: float = 0.10,
 ) -> Dict[str, object]:
     """Launch headless simulation + bench_recorder, clean up, and evaluate."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -165,6 +167,8 @@ def run_single_trial(
             f"spawn_seed:={seed}",
             f"odom_mode:={odom_mode}",
             f"ablation_profile:={profile}",
+            f"lidar_v_samples:={lidar_v_samples}",
+            f"voxel_resolution:={voxel_resolution:.3f}",
             "headless:=true",
             "use_rviz:=false",
             "enable_cameras:=false",
@@ -265,6 +269,8 @@ def main() -> None:
     ap.add_argument("--robots", nargs="+", default=["robot1", "robot2"])
     ap.add_argument("--odom-mode", choices=["ekf", "gt"], default="ekf")
     ap.add_argument("--launcher", choices=["launch", "bash"], default="launch")
+    ap.add_argument("--lidar-v-samples", type=int, default=16)
+    ap.add_argument("--voxel-resolution", type=float, default=0.10)
     ap.add_argument("--max-sim-sec", type=float, default=240.0)
     ap.add_argument("--gt-root", default=str(REPO_ROOT / "maps" / "gt"))
     ap.add_argument(
@@ -302,6 +308,8 @@ def main() -> None:
                     dry_run=args.dry_run,
                     odom_mode=args.odom_mode,
                     launcher=args.launcher,
+                    lidar_v_samples=args.lidar_v_samples,
+                    voxel_resolution=args.voxel_resolution,
                 )
                 profile_runs.append(rep)
                 all_reports.append(rep)

@@ -88,6 +88,8 @@ def _build_launch_actions(context, *args, **kwargs):
     use_composition = LaunchConfiguration("use_composition").perform(context)
     robot_stagger_sec = float(LaunchConfiguration("robot_stagger_sec").perform(context))
     explorer_delay_arg = LaunchConfiguration("explorer_start_delay_sec").perform(context).strip().lower()
+    lidar_v_samples = LaunchConfiguration("lidar_v_samples").perform(context).strip()
+    voxel_resolution = float(LaunchConfiguration("voxel_resolution").perform(context))
 
     resolved = resolve_profile(
         ablation_profile=ablation_profile,
@@ -225,7 +227,11 @@ def _build_launch_actions(context, *args, **kwargs):
         robot_sdf = _expand_xacro(
             robot_sdf_xacro,
             tmp_dir / f"{ns}.sdf",
-            {"namespace": ns, "use_gt_odom": "true" if use_gt_odom else "false"},
+            {
+                "namespace": ns,
+                "use_gt_odom": "true" if use_gt_odom else "false",
+                "lidar_v_samples": lidar_v_samples,
+            },
         )
         start_t = 3.0 + idx * robot_stagger_sec
         spawn_z = 0.02 + 0.01 * idx
@@ -418,7 +424,10 @@ def _build_launch_actions(context, *args, **kwargs):
             executable="octomap_server_node",
             name="octomap_server",
             output="screen",
-            parameters=[str(octomap_params), {"use_sim_time": True}],
+            parameters=[
+                str(octomap_params),
+                {"use_sim_time": True, "resolution": voxel_resolution},
+            ],
             remappings=[("cloud_in", "/points_merged")],
         )
     )
@@ -427,6 +436,7 @@ def _build_launch_actions(context, *args, **kwargs):
         coord_dyn: Dict[str, object] = {
             "use_sim_time": True,
             "robot_namespaces": namespaces,
+            "voxel_index_resolution": voxel_resolution,
         }
         for ns, sp in zip(namespaces, spawns):
             coord_dyn[f"{ns}_init_pose"] = sp.as_list()
@@ -509,6 +519,16 @@ def generate_launch_description() -> LaunchDescription:
                 "explorer_start_delay_sec",
                 default_value="auto",
                 description="Delay before starting cloud merger, octomap, and explorer ('auto' or seconds).",
+            ),
+            DeclareLaunchArgument(
+                "lidar_v_samples",
+                default_value="16",
+                description="3D LiDAR vertical beam count (16 or 32 for sensitivity study).",
+            ),
+            DeclareLaunchArgument(
+                "voxel_resolution",
+                default_value="0.10",
+                description="OctoMap & 2.5D VoxelColumnIndex resolution in meters (0.05|0.10|0.15).",
             ),
             OpaqueFunction(function=_build_launch_actions),
         ]

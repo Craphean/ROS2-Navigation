@@ -1,0 +1,21 @@
+\begin{table*}[t]
+\centering
+\caption{Multi-robot scalability ($N=1\dots 4$) on Mine and CMU Indoor under 4-core edge compute.}
+\label{tab:scalability}
+\footnotesize
+\begin{tabular}{lccccccc}
+\toprule
+World / Team Size & Area ($\text{m}^2$) & 3D Comp.$_{15}$ (\%) & Load CV & Comms (KB/s) & CPU (\%) & RAM (MB) & P95 (ms) \\
+\midrule
+mine / $N=1$ & $161.6 \pm 12.6$ & $33.9 \pm 4.1$ & $0.000 \pm 0.000$ & $385.6 \pm 53.9$ & $129.5 \pm 19.3$ & $1345 \pm 9$ & $\mathbf{8.7 \pm 2.5}$ \\
+mine / $N=2$ & $238.2 \pm 54.0$ & $51.8 \pm 10.9$ & $0.207 \pm 0.113$ & $725.5 \pm 113.1$ & $261.2 \pm 5.1$ & $2317 \pm 24$ & $67.3 \pm 22.4$ \\
+mine / $N=3$ & $267.3 \pm 49.4$ & $67.7 \pm 11.9$ & $0.258 \pm 0.112$ & $897.7 \pm 146.8$ & $305.7 \pm 16.5$ & $3448 \pm 23$ & $102.8 \pm 55.5$ \\
+mine / $N=4$ & $\mathbf{280.1 \pm 11.1}$ & $\mathbf{69.7 \pm 6.0}$ & $0.319 \pm 0.083$ & $1029.3 \pm 101.9$ & $344.1 \pm 4.1$ & $4744 \pm 32$ & $237.0 \pm 123.3$ \\
+\midrule
+cmu\_indoor / $N=1$ & $280.0 \pm 170.4$ & $4.3 \pm 1.6$ & $0.000 \pm 0.000$ & $637.8 \pm 379.0$ & $164.3 \pm 20.7$ & $1774 \pm 69$ & $\mathbf{36.5 \pm 25.3}$ \\
+cmu\_indoor / $N=2$ & $443.0 \pm 94.0$ & $8.5 \pm 1.7$ & $0.050 \pm 0.062$ & $2732.7 \pm 783.6$ & $291.3 \pm 3.6$ & $2949 \pm 80$ & $133.3 \pm 39.0$ \\
+cmu\_indoor / $N=3$ & $659.7 \pm 141.5$ & $13.2 \pm 1.4$ & $0.171 \pm 0.113$ & $5212.4 \pm 2939.8$ & $311.9 \pm 13.3$ & $4211 \pm 334$ & $182.8 \pm 112.7$ \\
+cmu\_indoor / $N=4$ & $\mathbf{828.7 \pm 229.3}$ & $\mathbf{16.3 \pm 3.7}$ & $0.233 \pm 0.134$ & $6783.4 \pm 2852.5$ & $325.4 \pm 11.8$ & $5669 \pm 376$ & $208.3 \pm 82.7$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -17,7 +17,14 @@ from hier_explore_bench.eval_metrics import (
     evaluate_trajectory_accuracy,
 )
 from hier_explore_bench.pcd_io import read_pcd, write_pcd
-from hier_explore_bench.plot_paper_figs import format_latex_table, plot_coverage_curves
+from hier_explore_bench.plot_paper_figs import (
+    format_latex_table,
+    plot_ablation_and_sensitivity,
+    plot_alignment_study,
+    plot_coverage_curves,
+    plot_multiworld_coverage_grid,
+    plot_scalability_curves,
+)
 from hier_explore_bench.sample_gt_mesh import sample_world_ground_truth
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -143,5 +150,76 @@ def test_ieee_plot_and_latex_table(tmp_path: Path):
     assert (tmp_path / "fig_cov.png").is_file()
 
     agg_ours = aggregate_runs([{"ce": 2.4}, {"ce": 2.6}], ["ce"])
-    tex = format_latex_table([("Ours", agg_ours)], [("ce", r"CE ($\text{m}^2/\text{m}$)", ".2f")])
+    agg_base = aggregate_runs([{"ce": 1.6}, {"ce": 1.8}], ["ce"])
+    tex = format_latex_table(
+        [("Ours", agg_ours), ("Base", agg_base)],
+        [("ce", r"CE ($\text{m}^2/\text{m}$)", ".2f")],
+        best_modes={"ce": "max"},
+        sig_markers={("Ours", "ce"): "**"},
+    )
     assert r"\toprule" in tex and "Ours" in tex and "2.50" in tex
+    assert r"\mathbf{2.50 \pm" in tex and "^{**}" in tex
+
+
+def test_ieee_multiworld_alignment_scalability_and_ablation_plots(tmp_path: Path):
+    c1 = (np.array([0.0, 60.0, 120.0]), np.array([10.0, 80.0, 140.0]))
+    c2 = (np.array([0.0, 60.0, 120.0]), np.array([10.0, 60.0, 105.0]))
+    worlds_data = [
+        ("house", "House", 120.0, {"full": [c1], "e1_2d": [c2]}),
+        ("mine", "Mine", 120.0, {"full": [c1], "mtare": [c2]}),
+    ]
+    p3 = plot_multiworld_coverage_grid(worlds_data, tmp_path / "fig3")
+    assert p3.is_file() and (tmp_path / "fig3.png").is_file()
+
+    def _agg(val: float):
+        return {"mean": val, "std": 0.05 * abs(val), "median": val, "n": 3}
+
+    align = {
+        "mine": {
+            v: {
+                "occupied_iou_tol1": _agg(0.7 + 0.05 * i),
+                "ate_rmse_mean_m": _agg(0.25 - 0.04 * i),
+                "chamfer_l1_m": _agg(0.30 - 0.03 * i),
+                "cloud_merger_cpu_mean_pct": _agg(40.0 - 7.0 * i),
+            }
+            for i, v in enumerate(("legacy_merge", "no_se2", "no_degen_gate", "full", "gt_odom"))
+        },
+        "warehouse": {
+            v: {
+                "occupied_iou_tol1": _agg(0.65 + 0.06 * i),
+                "ate_rmse_mean_m": _agg(0.30 - 0.05 * i),
+                "chamfer_l1_m": _agg(0.32 - 0.03 * i),
+                "cloud_merger_cpu_mean_pct": _agg(45.0 - 8.0 * i),
+            }
+            for i, v in enumerate(("legacy_merge", "no_se2", "no_degen_gate", "full", "gt_odom"))
+        },
+    }
+    p2 = plot_alignment_study(align, tmp_path / "fig2")
+    assert p2.is_file() and (tmp_path / "fig2.png").is_file()
+
+    scale = {
+        w: {
+            n: {
+                "final_area_m2": _agg(80.0 * n),
+                "comms_avg_kbps": _agg(50.0 * n),
+                "ram_peak_mb": _agg(900.0 + 250.0 * n),
+                "cycle_ms_p95": _agg(12.0 + 4.0 * n),
+                "load_balance_cv": _agg(0.12),
+            }
+            for n in (1, 2, 3, 4)
+        }
+        for w in ("mine", "cmu_indoor")
+    }
+    p4 = plot_scalability_curves(scale, tmp_path / "fig4")
+    assert p4.is_file() and (tmp_path / "fig4.png").is_file()
+
+    ablation = {
+        w: {k: {"completeness_15cm": _agg(0.4 + 0.05 * i)} for i, k in enumerate(("legacy", "e1_2d", "e2_3dgain", "e3_hier", "e4_geodesic", "e5_deconflict", "full"))}
+        for w in ("mine", "hospital")
+    }
+    sens = {
+        k: {"completeness_15cm": _agg(0.65 + 0.03 * i), "cpu_mean_pct": _agg(220.0 + 15.0 * i)}
+        for i, k in enumerate(("16beam_005", "16beam_010", "16beam_015", "32beam_010"))
+    }
+    p5 = plot_ablation_and_sensitivity(ablation, sens, tmp_path / "fig5")
+    assert p5.is_file() and (tmp_path / "fig5.png").is_file()

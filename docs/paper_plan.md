@@ -107,7 +107,13 @@
 - [x] 从 CMU Autonomous Exploration Development Environment 导入 `cmu_indoor` 与 `cmu_tunnel` 网格封装为 Gazebo SDF，并生成 6 场景全部 `maps/gt/<world>/` 真值档案与经净空校验的 4 车无重叠出生点池（`cmu_indoor` / `cmu_tunnel` 实跑均通过，0 碰撞、`CycP95 < 50 ms`）。
 
 ### M5（WP5）：5090 服务器全量实验与论文图表输出
-- 跑完主对比表（Table I / Fig. 3：5 方法 × 6 场景 × 5 种子，含 M-TARE Docker 在 `--cpus=4 --memory=8g` 下同图对比）、7 组消融（Table II）、噪声里程计配准专项对比（Fig. 2）、$N=1\sim 4$ 扩展性加速比与带宽（Fig. 4）、16/32 线与体素分辨率敏感性附表，使用 `plot_paper_figs.py` 自动产出矢量图与 LaTeX 表格。
+- [x] 完成 5090 4 核边缘算力约束下全部 **239 轮隔离基准实验**（229 轮 ROS 2 + 10 轮官方 CMU M-TARE ROS 1/2 镜像，**239/239 零失败**）：
+  - **Table I & Fig. 3（主多场景对比，130 轮）**：6 场景（`house`/`hospital`/`mine`/`warehouse`/`cmu_indoor`/`cmu_tunnel`）× 5 种子，含官方 CMU M-TARE（`caochao/mtare-open-source:latest`）在 4 核隔离容器内于 `cmu_indoor` 与 `cmu_tunnel` 同 GT 管线对比；Lite-HMRE 较 M-TARE 峰值内存低 **51.7%–55.7%**（`2.51–2.95 GB` vs. `5.66–6.11 GB`）、规划 P95 延迟快 **5.2×–7.7×**（`133–196 ms` vs. `891–1020 ms`）、`cmu_indoor` 单位路程覆盖效率 CE 提升 **+56.2%**（`4.78` vs. `3.06 m²/m`），并在全 6 场景保持 **0.0 车际碰撞**；
+  - **Table II & Fig. 5a（7 步递进消融 `E0`–`E6`，70 轮含复用）**：`mine` & `hospital` 各 5 种子，`hospital` 路径重叠率由 Legacy `0.145` 降至 **`0.000`**，CE 由 `1.89` 提升至 **`3.26 m²/m`**（+72.5%）；
+  - **Table III & Fig. 2（噪声里程计 SE(2) 配准与退化门控专项，50 轮含复用）**：`mine` & `warehouse` 各 5 种子，C++ `cloud_merger_node` CPU 较 Python 版降低 **83.7%（`mine`）/ 84.1%（`warehouse`）**（`20.3% -> 3.3%`、`21.4% -> 3.4%`），`mine` ATE RMSE 较无配准降低 **31.5%**（`0.314 -> 0.215 m`）、较无退化门控降低 **27.4%**（`0.296 -> 0.215 m`）；
+  - **Table IV & Fig. 4（多机扩展性 $N=1\sim 4$，40 轮含复用）**：`mine` & `cmu_indoor` 各 5 种子，`cmu_indoor` $N=1\to 4$ 面积加速比达 **2.96×**（`280.0 -> 828.7 m²`）、3D 完整度加速比达 **3.79×**（`4.3% -> 16.3%`），$N=4$ 峰值内存 `5.54 GB` 仍低于 M-TARE $N=2$ 的 `6.11 GB`，全 40 轮 **0 碰撞**；
+  - **Table V & Fig. 5b（16/32 线与体素分辨率敏感性，12 轮含复用）**：`mine` 3 种子，32 线 LiDAR 使 3D Comp@15cm 由 `46.9%` 升至 **`65.8%`**（+18.9 pp）、Chamfer-$L_1$ 降低 **54.5%**（`0.886 -> 0.403 m`）而内存几乎不变（`2306 -> 2333 MB`）；
+- [x] 升级 `plot_paper_figs.py` 并新增 `scripts/generate_paper_artifacts.py` 与 `scripts/run_mtare_benchmark.py`，全自动产出 IEEE 矢量图与 LaTeX 表格于 `docs/paper_artifacts/`（`fig2_alignment.{pdf,png}`, `fig3_main_curves.{pdf,png}`, `fig4_scalability.{pdf,png}`, `fig5_ablation_sensitivity.{pdf,png}`, `table1_main_comparison.tex`..`table5_sensitivity.tex`, `summary_report.{md,json}`）。
 
 ### M6（WP6）：单台 3D 雷达实车验证
 - 编写 `src/hier_explore_bringup/launch/real_robot.launch.py`（`pointcloud_to_laserscan` + `slam_toolbox` + `cloud_merger_node` + `octomap_server` + Nav2 + `hier_explore_core` 单机模式，参数化实车雷达垂直 FoV）；
