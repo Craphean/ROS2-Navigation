@@ -42,12 +42,23 @@ def _build_inner_script(
     gt_2d_cont: str,
     out_cont: str,
     max_sim_sec: int,
+    max_speed: float = 0.5,
 ) -> str:
     s0 = spawns[0]
     s1 = spawns[1]
     return f"""set -e
 ROOT=/home/docker-user/mtare
 mkdir -p "{out_cont}"
+
+# Generate velocity-matched system_matched.launch (exact {max_speed:.2f} m/s matching TB3 vx_max)
+python3 - << 'PYPATCH'
+from pathlib import Path
+src = Path("/home/docker-user/mtare/autonomous_exploration_development_environment/src/vehicle_simulator/launch/system.launch").read_text()
+old = '<arg name="goalY" value="$(arg vehicleY)"/>'
+new = old + '\\n    <arg name="maxSpeed" value="{max_speed:.2f}"/>\\n    <arg name="autonomySpeed" value="{max_speed:.2f}"/>'
+assert old in src, "Expected goalY arg in system.launch"
+Path("/tmp/system_matched.launch").write_text(src.replace(old, new, 1))
+PYPATCH
 
 # Background process CPU/RAM monitor (1 Hz inside this 4-core isolated container)
 python3 - << 'PYMON' >"{out_cont}/proc_mon.log" 2>&1 &
@@ -129,12 +140,13 @@ launch_robot() {{
     (
       source /opt/ros/noetic/setup.bash
       source "$ROOT/autonomous_exploration_development_environment/devel/setup.bash"
-      roslaunch --wait vehicle_simulator system.launch world_name:={scenario} robot_id:=${{RID}} rviz:=false gazebo_gui:=false vis_tools:=false vehicleX:=${{X}} vehicleY:=${{Y}} vehicleYaw:=${{YAW}} >/tmp/sim_${{RID}}.log 2>&1
+      roslaunch --wait /tmp/system_matched.launch world_name:={scenario} robot_id:=${{RID}} rviz:=false gazebo_gui:=false vis_tools:=false vehicleX:=${{X}} vehicleY:=${{Y}} vehicleYaw:=${{YAW}} >/tmp/sim_${{RID}}.log 2>&1
     ) &
     sleep 6
     (
       source /opt/ros/noetic/setup.bash
       source "$ROOT/tare_system/devel/setup.bash"
+      rosparam set /sensor_coverage_planner/tare_planner_node/kRobotSpeed {max_speed:.2f} || true
       roslaunch --wait tare_planner explore_{scenario}.launch robot_id:=${{RID}} robot_num:=2 test_id:={test_id} rviz:=false >/tmp/tare_${{RID}}.log 2>&1
     ) &
     wait
@@ -283,7 +295,9 @@ def _merge_mtare_run(run_dir: Path, max_sim_sec: int) -> bool:
     return True
 
 
-def run_one(slot: int, world: str, seed: int, max_sim_sec: int, out_root: Path, base_cpu: int) -> Tuple[str, bool, str]:
+def run_one(
+    slot: int, world: str, seed: int, max_sim_sec: int, out_root: Path, base_cpu: int, max_speed: float = 0.5
+) -> Tuple[str, bool, str]:
     scenario, test_id = WORLD_TO_MTARE_SCENARIO[world]
     run_dir = out_root / world / f"seed_{seed}"
     mp = run_dir / "metrics.json"
@@ -306,7 +320,7 @@ def run_one(slot: int, world: str, seed: int, max_sim_sec: int, out_root: Path, 
     for p in (Path(f"/dev/shm/liangqingcai_mtare_tmp_{tag}"), Path(f"/dev/shm/liangqingcai_mtare_shm_{tag}")):
         shutil.rmtree(p, ignore_errors=True)
 
-    script = _build_inner_script(scenario, test_id, spawns, gt_2d_cont, out_cont, max_sim_sec)
+    script = _build_inner_script(scenario, test_id, spawns, gt_2d_cont, out_cont, max_sim_sec, max_speed=max_speed)
     env = os.environ.copy()
     env.update({"EDGE_CPUS": cpus, "MTARE_RUN_TAG": tag})
 
@@ -364,6 +378,7 @@ def main() -> None:
     ap.add_argument("--worlds", nargs="+", default=["cmu_indoor", "cmu_tunnel"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
     ap.add_argument("--max-sim-sec", type=int, default=180)
+    ap.add_argument("--max-speed", type=float, default=0.5, help="Max linear speed (m/s) matched to TB3 (0.5 m/s).")
     ap.add_argument("--base-cpu", type=int, default=80)
     ap.add_argument("--out-dir", default=str(REPO_ROOT / "benchmark_results" / "m5_paper" / "mtare"))
     ap.add_argument("--merge-only", default="", help="Internal: merge robot_0/robot_1 artifacts in one run dir.")
@@ -375,12 +390,15 @@ def main() -> None:
 
     out_root = Path(args.out_dir)
     jobs = [(w, s) for w in args.worlds for s in args.seeds]
-    print(f"[mtare_bench] Launching {len(jobs)} 4-core M-TARE runs starting at CPU {args.base_cpu}...", flush=True)
+    print(
+        f"[mtare_bench] Launching {len(jobs)} 4-core M-TARE runs (max_speed={args.max_speed:.2f} m/s) starting at CPU {args.base_cpu}...",
+        flush=True,
+    )
 
     ok_cnt = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(jobs)) as ex:
         futs = [
-            ex.submit(run_one, idx, w, s, args.max_sim_sec, out_root, args.base_cpu)
+            ex.submit(run_one, idx, w, s, args.max_sim_sec, out_root, args.base_cpu, args.max_speed)
             for idx, (w, s) in enumerate(jobs)
         ]
         for f in concurrent.futures.as_completed(futs):

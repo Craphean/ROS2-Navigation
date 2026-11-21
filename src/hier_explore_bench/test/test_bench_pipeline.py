@@ -22,6 +22,7 @@ from hier_explore_bench.plot_paper_figs import (
     plot_ablation_and_sensitivity,
     plot_alignment_study,
     plot_coverage_curves,
+    plot_edge_pareto,
     plot_multiworld_coverage_grid,
     plot_scalability_curves,
 )
@@ -223,3 +224,17 @@ def test_ieee_multiworld_alignment_scalability_and_ablation_plots(tmp_path: Path
     }
     p5 = plot_ablation_and_sensitivity(ablation, sens, tmp_path / "fig5")
     assert p5.is_file() and (tmp_path / "fig5.png").is_file()
+
+    main_agg = {
+        w: {
+            m: {
+                "ram_peak_mb": _agg(2800.0 if m != "mtare" else 6000.0),
+                "cycle_ms_p95": _agg(120.0 if m != "mtare" else 900.0),
+                "coverage_efficiency_m2_per_m": _agg(5.0 if m == "full" else 3.2),
+            }
+            for m in ("legacy", "e1_2d", "e3_hier", "mtare", "full")
+        }
+        for w in ("house", "hospital", "mine", "cmu_indoor", "cmu_tunnel")
+    }
+    p3b = plot_edge_pareto(main_agg, tmp_path / "fig3b")
+    assert p3b.is_file() and (tmp_path / "fig3b.png").is_file()

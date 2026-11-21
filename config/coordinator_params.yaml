@@ -12,13 +12,13 @@ multi_robot_coordinator:
     # Minimum number of frontier cells to form a valid cluster
     min_frontier_size: 5
     # Utility weights: Utility = gain_scale * size - potential_scale * dist - orientation_scale * angle
-    gain_scale: 1.0
-    potential_scale: 2.0
+    gain_scale: 2.0
+    potential_scale: 1.8
     orientation_scale: 0.5
     # Minimum distance (meters) between two robots' targets to avoid conflict
     exclusion_radius: 1.5
     # Maximum time (seconds) allowed for a single navigation goal before cancelling
-    goal_timeout: 90.0
+    goal_timeout: 35.0
     # Number of failures before an unreachable frontier is permanently blacklisted
     blacklist_retry_limit: 2
     # Radius around a blacklisted point to ignore (meters)
@@ -48,7 +48,7 @@ multi_robot_coordinator:
     voxel_max_points: 400000
     voxel_update_period: 2.0
     gain_3d_window_radius: 1.5
-    gain_3d_scale: 40.0
+    gain_3d_scale: 6.0
     gain_3d_density_weight: 0.30
     gain_3d_unknown_weight: 0.35
     gain_3d_floating_weight: 0.15
@@ -64,11 +64,11 @@ multi_robot_coordinator:
 
     # --- Local / Global hierarchical scheduling ---
     local_scheduling_enable: true
-    local_radius: 6.0
-    local_max_waypoints: 6
-    local_min_spacing: 1.2
-    local_max_tour_length: 10.0
-    local_tour_score_dist_weight: 1.0
+    local_radius: 8.0
+    local_max_waypoints: 3
+    local_min_spacing: 2.5
+    local_max_tour_length: 12.0
+    local_tour_score_dist_weight: 1.5
     local_release_unselected: false
     local_release_cooldown: 5.0
     local_release_score_penalty: 0.7
@@ -81,14 +81,16 @@ multi_robot_coordinator:
     global_max_candidates: 8
 
     # --- Tour dispatch / supervision ---
-    use_through_poses: true
+    # Receding-horizon open-TSP dispatch via NavigateToPose prevents driving
+    # blindly through stale waypoints already cleared by the 12 m 3D LiDAR.
+    use_through_poses: false
     through_poses_fail_limit: 2
     action_wait_sec: 2.0
     tf_wait_sec: 0.1
     tour_timeout_per_waypoint: 25.0
-    tour_stall_window: 12.0
-    tour_stall_min_translation: 0.10
-    tour_stall_min_progress: 0.20
+    tour_stall_window: 10.0
+    tour_stall_min_translation: 0.28
+    tour_stall_min_progress: 0.25
     tour_rewrite_on_invalidation: true
     tour_max_rewrites: 2
 

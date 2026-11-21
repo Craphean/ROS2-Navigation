@@ -7,17 +7,17 @@
 \toprule
 World / Variant & Occ. IoU & ATE (m) & CD-$L_1$ (m) & Prec.$_{10}$ (\%) & Cloud CPU (\%) & SE(2) Acc. \\
 \midrule
-mine / Legacy Merge + PyCloud & $0.694 \pm 0.099$ & $0.262 \pm 0.120$ & $\mathbf{0.560 \pm 0.643}$ & $94.9 \pm 4.8$ & $20.3 \pm 3.2$ & $0.0 \pm 0.0$ \\
-mine / No SE(2) Align & $0.734 \pm 0.077$ & $0.314 \pm 0.036$ & $0.613 \pm 0.592$ & $98.2 \pm 1.4$ & $\mathbf{2.6 \pm 0.3}$ & $0.0 \pm 0.0$ \\
-mine / SE(2) w/o Degen. Gate & $0.666 \pm 0.019$ & $0.296 \pm 0.048$ & $0.593 \pm 0.515$ & $97.9 \pm 1.2$ & $2.6 \pm 0.2$ & $28.6 \pm 40.9$ \\
-mine / Lite-HMRE (Ours) & $0.687 \pm 0.084$ & $\mathbf{0.215 \pm 0.069}$ & $0.621 \pm 0.631$ & $97.2 \pm 1.9$ & $3.3 \pm 0.3$ & $47.4 \pm 30.3$ \\
-mine / GT-Odom (Oracle) & $\mathbf{0.760 \pm 0.061}$ & -- & $0.767 \pm 0.528$ & $\mathbf{99.9 \pm 0.0}$ & $2.9 \pm 0.3$ & $32.8 \pm 32.6$ \\
+mine / Legacy Merge + PyCloud & $\mathbf{0.839 \pm 0.045}$ & $\mathbf{0.046 \pm 0.012}$ & $\mathbf{0.171 \pm 0.141}$ & $97.7 \pm 1.8$ & $20.9 \pm 2.3$ & $0.0 \pm 0.0$ \\
+mine / No SE(2) Align & $0.813 \pm 0.046$ & $0.051 \pm 0.009$ & $0.226 \pm 0.174$ & $96.6 \pm 2.6$ & $3.3 \pm 0.0$ & $0.0 \pm 0.0$ \\
+mine / SE(2) w/o Degen. Gate & $0.695 \pm 0.175$ & $0.078 \pm 0.049$ & $0.221 \pm 0.141$ & $94.0 \pm 6.2$ & $3.3 \pm 0.0$ & $27.0 \pm 39.9$ \\
+mine / Lite-HMRE (Ours) & $0.811 \pm 0.085$ & $0.046 \pm 0.015$ & $0.207 \pm 0.123$ & $97.5 \pm 2.4$ & $\mathbf{3.0 \pm 0.3}$ & $22.0 \pm 35.3$ \\
+mine / GT-Odom (Oracle) & $0.816 \pm 0.100$ & -- & $0.173 \pm 0.139$ & $\mathbf{98.0 \pm 2.1}$ & $3.3 \pm 0.3$ & $8.4 \pm 11.2$ \\
 \midrule
-warehouse / Legacy Merge + PyCloud & $\mathbf{0.473 \pm 0.113}$ & $0.311 \pm 0.262$ & $1.929 \pm 2.195$ & $57.0 \pm 5.7$ & $21.4 \pm 1.2$ & $0.0 \pm 0.0$ \\
-warehouse / No SE(2) Align & $0.425 \pm 0.093$ & $\mathbf{0.177 \pm 0.044}$ & $2.201 \pm 2.145$ & $56.5 \pm 3.2$ & $\mathbf{3.0 \pm 0.0}$ & $0.0 \pm 0.0$ \\
-warehouse / SE(2) w/o Degen. Gate & $0.441 \pm 0.037$ & $0.257 \pm 0.058$ & $\mathbf{1.874 \pm 0.609}$ & $56.6 \pm 8.6$ & $3.9 \pm 1.7$ & $20.2 \pm 36.0$ \\
-warehouse / Lite-HMRE (Ours) & $0.405 \pm 0.132$ & $0.312 \pm 0.074$ & $2.417 \pm 1.981$ & $55.7 \pm 8.4$ & $3.4 \pm 0.2$ & $19.8 \pm 41.0$ \\
-warehouse / GT-Odom (Oracle) & $0.432 \pm 0.078$ & -- & $2.882 \pm 2.108$ & $\mathbf{63.8 \pm 4.5}$ & $3.2 \pm 0.2$ & $21.4 \pm 38.1$ \\
+warehouse / Legacy Merge + PyCloud & $\mathbf{0.491 \pm 0.087}$ & $0.072 \pm 0.025$ & $1.821 \pm 0.771$ & $61.7 \pm 10.8$ & $22.5 \pm 1.0$ & $0.0 \pm 0.0$ \\
+warehouse / No SE(2) Align & $0.415 \pm 0.076$ & $0.068 \pm 0.018$ & $\mathbf{1.602 \pm 0.527}$ & $49.9 \pm 7.0$ & $3.7 \pm 0.5$ & $0.0 \pm 0.0$ \\
+warehouse / SE(2) w/o Degen. Gate & $0.426 \pm 0.104$ & $0.061 \pm 0.019$ & $1.747 \pm 0.793$ & $\mathbf{62.2 \pm 9.6}$ & $\mathbf{3.5 \pm 0.1}$ & $4.4 \pm 9.8$ \\
+warehouse / Lite-HMRE (Ours) & $0.458 \pm 0.100$ & $\mathbf{0.052 \pm 0.017}$ & $1.914 \pm 2.146$ & $56.6 \pm 7.0$ & $3.5 \pm 0.1$ & $11.2 \pm 25.0$ \\
+warehouse / GT-Odom (Oracle) & $0.463 \pm 0.127$ & -- & $2.438 \pm 1.912$ & $57.6 \pm 11.8$ & $3.5 \pm 0.2$ & $12.6 \pm 23.0$ \\
 \bottomrule
 \end{tabular}
 \end{table*}

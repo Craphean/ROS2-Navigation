@@ -134,6 +134,10 @@ public:
     this->declare_parameter<double>("min_trans_eigenvalue", 12.0);
     this->declare_parameter<double>("max_trans_cond_number", 25.0);
     this->declare_parameter<double>("max_correspondence_dist_m", 0.80);
+    this->declare_parameter<int>("min_overlap_points", 150);
+    this->declare_parameter<double>("min_inlier_ratio", 0.55);
+    this->declare_parameter<double>("max_rmse_m", 0.12);
+    this->declare_parameter<double>("iou_tolerance", 0.002);
 
     world_frame_ = this->get_parameter("world_frame").as_string();
     merged_map_topic_ = this->get_parameter("merged_map_topic").as_string();
@@ -152,6 +156,11 @@ public:
     align_params_.max_trans_cond_number = this->get_parameter("max_trans_cond_number").as_double();
     align_params_.max_correspondence_dist_m =
       this->get_parameter("max_correspondence_dist_m").as_double();
+    align_params_.min_overlap_points =
+      static_cast<int>(this->get_parameter("min_overlap_points").as_int());
+    align_params_.min_inlier_ratio = this->get_parameter("min_inlier_ratio").as_double();
+    align_params_.max_rmse_m = this->get_parameter("max_rmse_m").as_double();
+    align_params_.iou_tolerance = this->get_parameter("iou_tolerance").as_double();
 
     auto raw_ns = this->get_parameter("robot_namespaces").as_string_array();
     if (raw_ns.empty()) {

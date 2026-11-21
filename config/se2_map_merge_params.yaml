@@ -24,7 +24,11 @@
     max_step_xy_m: 0.05
     max_step_yaw_rad: 0.0174532925
 
-    # Zhang & Singh translational Hessian degeneracy thresholds
+    # Zhang & Singh translational Hessian degeneracy thresholds & overlap quality gates
     min_trans_eigenvalue: 12.0
     max_trans_cond_number: 25.0
     max_correspondence_dist_m: 0.80
+    min_overlap_points: 150
+    min_inlier_ratio: 0.55
+    max_rmse_m: 0.12
+    iou_tolerance: 0.002

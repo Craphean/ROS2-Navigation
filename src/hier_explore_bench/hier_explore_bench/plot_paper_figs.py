@@ -27,7 +27,7 @@ PALETTE = [
 # Consistent method styling across all paper figures
 METHOD_STYLES: Dict[str, Dict[str, object]] = {
     "full": {"label": "Lite-HMRE (Ours)", "color": "#0072B2", "ls": "-", "marker": "o", "lw": 1.8, "zorder": 5},
-    "mtare": {"label": "CMU M-TARE* (2.0 m/s)", "color": "#D55E00", "ls": "--", "marker": "s", "lw": 1.5, "zorder": 4},
+    "mtare": {"label": "CMU M-TARE (0.5 m/s, GT)", "color": "#D55E00", "ls": "--", "marker": "s", "lw": 1.5, "zorder": 4},
     "e3_hier": {"label": "Hier-Greedy (E3)", "color": "#009E73", "ls": "-.", "marker": "^", "lw": 1.4, "zorder": 3},
     "e1_2d": {"label": "2D-Frontier (E1)", "color": "#E69F00", "ls": ":", "marker": "D", "lw": 1.4, "zorder": 2},
     "legacy": {"label": "Legacy explore_lite (E0)", "color": "#CC79A7", "ls": (0, (3, 1, 1, 1)), "marker": "v", "lw": 1.3, "zorder": 1},
@@ -284,6 +284,22 @@ def plot_alignment_study(
         ax.set_xticklabels([wlabel for _, wlabel in worlds])
         ax.set_ylabel(ylabel)
         ax.set_ylim(bottom=0.0)
+        if mkey == "ate_rmse_mean_m":
+            gt_idx = list(variants).index("gt_odom") if "gt_odom" in variants else -1
+            if gt_idx >= 0:
+                gt_off = (gt_idx - (n_var - 1) / 2.0) * width
+                y_top = ax.get_ylim()[1]
+                for wi in range(len(worlds)):
+                    ax.text(
+                        wi + gt_off,
+                        y_top * 0.04,
+                        "0\n(GT)",
+                        ha="center",
+                        va="bottom",
+                        fontsize=5.5,
+                        color="#007A59",
+                        fontweight="bold",
+                    )
         ax.grid(True, axis="y", linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
 
     handles, labels = axes[0].get_legend_handles_labels()
@@ -370,8 +386,9 @@ def plot_scalability_curves(
     ax.set_xlabel("Number of Robots ($N$)")
     ax.set_ylabel("Comms Bandwidth (KB/s)")
     ax2.set_ylabel("Peak RAM (GB)", color="#444444")
-    ax.set_ylim(0.0, max_comms * 1.38)
-    ax2.set_ylim(0.0, max_ram * 1.38)
+    ax.set_ylim(0.0, max_comms * 1.48)
+    ax2.set_ylim(0.0, max(max_ram * 1.48, 7.6))
+    ax2.axhline(5.80, color="#D55E00", linestyle=":", linewidth=1.0, alpha=0.85, label="M-TARE (N=2) RAM")
     ax.set_title("(b) Bandwidth & Memory", fontweight="bold")
     ax.grid(True, linestyle="--", linewidth=0.35, alpha=0.45)
     h1, l1 = ax.get_legend_handles_labels()
@@ -415,6 +432,103 @@ def plot_scalability_curves(
     return _save_fig(fig, out_stem)
 
 
+def plot_edge_pareto(
+    main_agg: Dict[str, Dict[str, Dict[str, Dict[str, float]]]],
+    out_stem: Path,
+    pareto_worlds: Sequence[Tuple[str, str]] = (("cmu_indoor", "CMU Indoor"), ("cmu_tunnel", "CMU Tunnel")),
+    methods: Sequence[str] = ("full", "e3_hier", "e1_2d", "mtare"),
+) -> Path:
+    """Plot Fig. 3b: Edge Compute Efficiency Pareto (RAM vs P95 Latency & CE vs RAM)."""
+    configure_ieee_style()
+    fig, axes = plt.subplots(1, 2, figsize=(7.16, 2.55), dpi=300)
+
+    # Panel (a): Peak RAM (GB) vs Planning P95 Latency (ms) with 4 GB Edge Feasibility Zone
+    ax = axes[0]
+    ax.axvspan(0.0, 4.0, color="#E8F5E9", alpha=0.65, zorder=0)
+    ax.axvline(4.0, color="#2E7D32", linestyle="--", linewidth=0.9, zorder=1)
+    ax.text(2.75, 1085.0, "4 GB Edge SBC Zone", ha="center", va="top", fontsize=6.5, color="#1B5E20", fontweight="bold")
+
+    w_markers = {"cmu_indoor": "o", "cmu_tunnel": "s"}
+    plotted_methods = set()
+    for wkey, wlabel in pareto_worlds:
+        for idx, mkey in enumerate(methods):
+            agg = main_agg.get(wkey, {}).get(mkey)
+            if not agg:
+                continue
+            ram_gb = float(agg.get("ram_peak_mb", {}).get("mean", float("nan"))) / 1024.0
+            ram_sd = float(agg.get("ram_peak_mb", {}).get("std", 0.0)) / 1024.0
+            p95 = float(agg.get("cycle_ms_p95", {}).get("mean", float("nan")))
+            p95_sd = float(agg.get("cycle_ms_p95", {}).get("std", 0.0))
+            if not (math.isfinite(ram_gb) and math.isfinite(p95)):
+                continue
+            st = get_method_style(mkey, idx)
+            lbl = str(st["label"]) if mkey not in plotted_methods else None
+            plotted_methods.add(mkey)
+            ax.errorbar(
+                ram_gb,
+                p95,
+                xerr=ram_sd,
+                yerr=p95_sd,
+                fmt=w_markers.get(wkey, "o"),
+                markersize=6.5 if mkey == "full" else 5.5,
+                color=str(st["color"]),
+                markeredgecolor="#222222",
+                markeredgewidth=0.6,
+                capsize=2.0,
+                elinewidth=0.8,
+                label=lbl,
+                zorder=4 if mkey == "full" else 3,
+            )
+    ax.set_xlabel("Peak System RAM (GB) ↓")
+    ax.set_ylabel("Planning Cycle P95 Latency (ms) ↓")
+    ax.set_xlim(1.5, 6.7)
+    ax.set_ylim(0.0, 1150.0)
+    ax.set_title("(a) Edge Memory vs. Latency (○ Indoor, □ Tunnel)", fontweight="bold")
+    ax.grid(True, linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
+    ax.legend(frameon=True, loc="center right", fontsize=6.0, framealpha=0.95)
+
+    # Panel (b): Coverage Efficiency (CE, m^2/m) across worlds comparing Lite-HMRE vs Baselines
+    ax = axes[1]
+    ce_worlds = [("house", "House"), ("hospital", "Hosp."), ("mine", "Mine"), ("cmu_indoor", "Indoor"), ("cmu_tunnel", "Tunnel")]
+    ce_methods = ("legacy", "e1_2d", "mtare", "full")
+    xs = np.arange(len(ce_worlds))
+    n_m = len(ce_methods)
+    bw = 0.78 / n_m
+    for m_idx, mkey in enumerate(ce_methods):
+        st = get_method_style(mkey, m_idx)
+        vals, errs = [], []
+        for wkey, _ in ce_worlds:
+            stat = main_agg.get(wkey, {}).get(mkey, {}).get("coverage_efficiency_m2_per_m", {})
+            m = float(stat.get("mean", float("nan")))
+            s = float(stat.get("std", 0.0))
+            vals.append(0.0 if not math.isfinite(m) else m)
+            errs.append(0.0 if not math.isfinite(s) else s)
+        off = (m_idx - (n_m - 1) / 2.0) * bw
+        ax.bar(
+            xs + off,
+            vals,
+            width=bw * 0.92,
+            yerr=errs,
+            capsize=1.8,
+            error_kw={"elinewidth": 0.65},
+            color=str(st["color"]),
+            edgecolor="#222222",
+            linewidth=0.4,
+            label=str(st["label"]),
+            zorder=3,
+        )
+    ax.set_xticks(xs)
+    ax.set_xticklabels([wl for _, wl in ce_worlds])
+    ax.set_ylabel("Coverage Efficiency CE (m²/m) ↑")
+    ax.set_ylim(bottom=0.0)
+    ax.set_title("(b) Speed-Normalized Spatial Efficiency", fontweight="bold")
+    ax.grid(True, axis="y", linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
+    ax.legend(frameon=True, loc="upper left", fontsize=5.8, ncol=1, framealpha=0.94)
+
+    fig.tight_layout()
+    return _save_fig(fig, out_stem)
+
+
 def plot_ablation_and_sensitivity(
     ablation_agg: Dict[str, Dict[str, Dict[str, Dict[str, float]]]],
     sensitivity_agg: Dict[str, Dict[str, Dict[str, float]]],
@@ -429,20 +543,21 @@ def plot_ablation_and_sensitivity(
         ("full", "E6"),
     ),
     sensitivity_order: Sequence[Tuple[str, str]] = (
-        ("16beam_005", "16B / 0.05m"),
-        ("16beam_010", "16B / 0.10m"),
-        ("16beam_015", "16B / 0.15m"),
-        ("32beam_010", "32B / 0.10m"),
+        ("16beam_005", "16B\n0.05m"),
+        ("16beam_010", "16B\n0.10m"),
+        ("16beam_015", "16B\n0.15m"),
+        ("32beam_010", "32B\n0.10m"),
     ),
 ) -> Path:
-    """Plot Fig. 5: 7-Step Component Ablation (E0-E6) & Sensor/Voxel Sensitivity."""
+    """Plot Fig. 5: 3-panel Ablation (3D Comp + CE/Overlap) & Sensor/Voxel Sensitivity."""
     configure_ieee_style()
-    fig, axes = plt.subplots(1, 2, figsize=(7.16, 2.55), dpi=300)
+    fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.45), dpi=300)
 
-    # Panel (a): 7-step ablation on mine & hospital (3D Completeness @ 15 cm)
-    ax = axes[0]
     xs = np.arange(len(ablation_order))
-    w = 0.36
+    w = 0.38
+
+    # Panel (a): 7-step ablation 3D Completeness @ 15 cm
+    ax = axes[0]
     for idx, (wkey, wlabel, col) in enumerate((("mine", "Mine", "#0072B2"), ("hospital", "Hospital", "#D55E00"))):
         means, stds = [], []
         for mkey, _ in ablation_order:
@@ -456,25 +571,55 @@ def plot_ablation_and_sensitivity(
             means,
             width=w * 0.92,
             yerr=stds,
-            capsize=2.0,
-            error_kw={"elinewidth": 0.7},
+            capsize=1.6,
+            error_kw={"elinewidth": 0.6},
             color=col,
             edgecolor="#222222",
-            linewidth=0.4,
+            linewidth=0.35,
             label=wlabel,
             zorder=3,
         )
     ax.set_xticks(xs)
-    ax.set_xticklabels([short for _, short in ablation_order])
-    ax.set_xlabel("Incremental Ablation Configuration")
-    ax.set_ylabel("3D Completeness @ 15 cm (%)")
+    ax.set_xticklabels([short for _, short in ablation_order], fontsize=6.5)
+    ax.set_xlabel("Ablation Step")
+    ax.set_ylabel("3D Comp. @ 15 cm (%) ↑")
     ax.set_ylim(0.0, 108.0)
-    ax.set_title("(a) 7-Step Ablation Progression (E0–E6)", fontweight="bold")
+    ax.set_title("(a) Ablation: 3D Quality", fontweight="bold")
     ax.grid(True, axis="y", linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
-    ax.legend(frameon=True, loc="upper center", ncol=2, fontsize=6.8)
+    ax.legend(frameon=True, loc="upper center", ncol=2, fontsize=6.2)
 
-    # Panel (b): Sensor & voxel resolution sensitivity on Mine
+    # Panel (b): 7-step ablation Coverage Efficiency CE (bars) & Path Overlap (dashed line)
     ax = axes[1]
+    ax_ov = ax.twinx()
+    ax_ov.spines["top"].set_visible(False)
+    for idx, (wkey, wlabel, col, mk) in enumerate((("mine", "Mine", "#0072B2", "o"), ("hospital", "Hospital", "#D55E00", "s"))):
+        ce_m = [
+            float(ablation_agg.get(wkey, {}).get(mkey, {}).get("coverage_efficiency_m2_per_m", {}).get("mean", 0.0))
+            for mkey, _ in ablation_order
+        ]
+        ov_m = [
+            float(ablation_agg.get(wkey, {}).get(mkey, {}).get("overlap_ratio", {}).get("mean", 0.0)) * 100.0
+            for mkey, _ in ablation_order
+        ]
+        ce_m = [0.0 if not math.isfinite(v) else v for v in ce_m]
+        ov_m = [0.0 if not math.isfinite(v) else v for v in ov_m]
+        ax.plot(xs, ce_m, color=col, marker=mk, linewidth=1.3, markersize=4.0, label=f"{wlabel} CE", zorder=4)
+        ax_ov.plot(xs, ov_m, color=col, marker=mk, linestyle="--", linewidth=1.0, markersize=3.5, alpha=0.75, label=f"{wlabel} Ovlp", zorder=3)
+    ax.set_xticks(xs)
+    ax.set_xticklabels([short for _, short in ablation_order], fontsize=6.5)
+    ax.set_xlabel("Ablation Step")
+    ax.set_ylabel("Coverage Eff. CE (m²/m) ↑")
+    ax_ov.set_ylabel("Path Overlap (%) ↓", color="#444444")
+    ax.set_ylim(0.0, 4.15)
+    ax_ov.set_ylim(0.0, 29.5)
+    ax.set_title("(b) Ablation: CE & Overlap", fontweight="bold")
+    ax.grid(True, linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax_ov.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, frameon=True, loc="upper right", fontsize=5.2, ncol=2, framealpha=0.94)
+
+    # Panel (c): Sensor & voxel resolution sensitivity on Mine
+    ax = axes[2]
     ax2 = ax.twinx()
     ax2.spines["top"].set_visible(False)
     sxs = np.arange(len(sensitivity_order))
@@ -492,43 +637,43 @@ def plot_ablation_and_sensitivity(
         cpu_s.append(0.0 if not math.isfinite(ps) else ps)
 
     b1 = ax.bar(
-        sxs - 0.18,
+        sxs - 0.19,
         comp_m,
-        width=0.34,
+        width=0.36,
         yerr=comp_s,
-        capsize=2.0,
-        error_kw={"elinewidth": 0.7},
+        capsize=1.8,
+        error_kw={"elinewidth": 0.65},
         color="#0072B2",
         edgecolor="#222222",
-        linewidth=0.4,
-        label="3D Comp. @15cm (%)",
+        linewidth=0.35,
+        label="3D Comp.",
         zorder=3,
     )
     b2 = ax2.bar(
-        sxs + 0.18,
+        sxs + 0.19,
         cpu_m,
-        width=0.34,
+        width=0.36,
         yerr=cpu_s,
-        capsize=2.0,
-        error_kw={"elinewidth": 0.7},
+        capsize=1.8,
+        error_kw={"elinewidth": 0.65},
         color="#E69F00",
         edgecolor="#222222",
-        linewidth=0.4,
-        label="Mean CPU Load (%)",
+        linewidth=0.35,
+        label="CPU %",
         zorder=3,
     )
     ax.set_xticks(sxs)
-    ax.set_xticklabels([lbl for _, lbl in sensitivity_order], fontsize=6.8)
-    ax.set_xlabel("LiDAR Beams / OctoMap Voxel Size (Mine)")
-    ax.set_ylabel("3D Completeness @ 15 cm (%)", color="#0072B2")
-    ax2.set_ylabel("Mean CPU Load (% of 400%)", color="#B87400")
+    ax.set_xticklabels([lbl for _, lbl in sensitivity_order], fontsize=6.2)
+    ax.set_xlabel("LiDAR / Voxel (Mine)")
+    ax.set_ylabel("3D Comp. (%) ↑", color="#0072B2")
+    ax2.set_ylabel("CPU (% / 400%) ↓", color="#B87400")
     ax.set_ylim(0.0, 108.0)
-    ax2.set_ylim(0.0, 340.0)
-    ax.set_title("(b) Sensor & Voxel Sensitivity", fontweight="bold")
+    ax2.set_ylim(0.0, 350.0)
+    ax.set_title("(c) Sensor & Voxel Trade-off", fontweight="bold")
     ax.grid(True, axis="y", linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
-    ax.legend([b1, b2], ["3D Comp. @15cm (%)", "Mean CPU (%)"], frameon=True, loc="upper left", ncol=2, fontsize=6.2)
+    ax.legend([b1, b2], ["3D Comp. (%)", "CPU (%)"], frameon=True, loc="upper left", ncol=2, fontsize=5.8)
 
-    fig.tight_layout()
+    fig.tight_layout(w_pad=1.3)
     return _save_fig(fig, out_stem)
 
 

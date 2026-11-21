@@ -21,6 +21,7 @@ from hier_explore_bench.plot_paper_figs import (
     format_latex_table,
     plot_ablation_and_sensitivity,
     plot_alignment_study,
+    plot_edge_pareto,
     plot_multiworld_coverage_grid,
     plot_scalability_curves,
 )
@@ -64,7 +65,7 @@ ALL_METRICS = (
 WORLDS_META: Sequence[Tuple[str, str, float]] = (
     ("house", "House (150 s)", 150.0),
     ("hospital", "Hospital (180 s)", 180.0),
-    ("mine", "Mine (180 s)", 180.0),
+    ("mine", "Mine (210 s)", 210.0),
     ("warehouse", "Warehouse (180 s)", 180.0),
     ("cmu_indoor", "CMU Indoor (180 s)", 180.0),
     ("cmu_tunnel", "CMU Tunnel (180 s)", 180.0),
@@ -224,6 +225,8 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
 
     if any(curves for _, _, _, curves in worlds_plot_data):
         plot_multiworld_coverage_grid(worlds_plot_data, out_dir / "fig3_main_curves")
+    if main_agg:
+        plot_edge_pareto(main_agg, out_dir / "fig3b_edge_pareto")
 
     if table1_rows:
         t1_tex = format_latex_table(
@@ -238,10 +241,10 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
                 ("cycle_ms_p95", r"P95 (ms)", ".1f"),
             ],
             caption=(
-                "Main multi-world exploration benchmark under 4-core edge compute (Mean $\\pm$ Std across 5 seeds; "
-                "$^*$ $p<0.05$, $^{**}$ $p<0.01$ vs. 2D-Frontier by Welch's $t$-test. "
-                "CMU M-TARE runs its official ROS 1/2 AEDE stack at 2.0 m/s with GT pose; "
-                "all ROS 2 methods run on 0.5 m/s TurtleBot3 with noisy wheel+IMU EKF odometry)."
+                "Main multi-world exploration benchmark under 4-core edge compute at matched 0.5 m/s max speed "
+                "(Mean $\\pm$ Std across 5 seeds; $^*$ $p<0.05$, $^{**}$ $p<0.01$ vs. 2D-Frontier by Welch's $t$-test. "
+                "CMU M-TARE runs its official ROS 1/2 AEDE stack capped to 0.5 m/s with GT pose; "
+                "all ROS 2 methods run with noisy wheel+IMU EKF odometry)."
             ),
             label="tab:main_results",
             best_modes={

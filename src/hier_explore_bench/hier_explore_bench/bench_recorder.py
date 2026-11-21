@@ -219,6 +219,8 @@ def run_ros_recorder(
             self.est_trajs: Dict[str, List[List[float]]] = {ns: [] for ns in robots}
             self.gt_trajs: Dict[str, List[List[float]]] = {ns: [] for ns in robots}
             self.latest_gt: Dict[str, Optional[Tuple[float, float]]] = {ns: None for ns in robots}
+            self.init_poses: Dict[str, Tuple[float, float]] = {}
+            self.first_map_sim: Optional[float] = None
             self.min_inter_robot_dist = float("inf")
             self.inter_robot_collisions = 0
             self._in_collision = False
@@ -338,6 +340,26 @@ def run_ros_recorder(
                 if self.latest_map is None:
                     if time.monotonic() - self.wall_start > 180.0:
                         self.done = True
+                    return
+                if self.first_map_sim is None:
+                    self.first_map_sim = now
+                # Wait until exploration actually starts (coordinator cycle published OR
+                # any robot moves >= 0.08 m from its initial pose), with a 35 s fallback,
+                # so staggered Nav2/SE(2) startup never penalizes active exploration time.
+                moved = False
+                for ns in self.robots:
+                    for frame in (f"{ns}/base_footprint", f"{ns}/base_link"):
+                        try:
+                            t = self.tf_buffer.lookup_transform("world", frame, Time())
+                            px, py = float(t.transform.translation.x), float(t.transform.translation.y)
+                            if ns not in self.init_poses:
+                                self.init_poses[ns] = (px, py)
+                            elif math.hypot(px - self.init_poses[ns][0], py - self.init_poses[ns][1]) >= 0.08:
+                                moved = True
+                            break
+                        except Exception:
+                            continue
+                if not (self.cycle_ms_samples or moved or (now - self.first_map_sim) >= 35.0):
                     return
                 self.t0_sim = now
                 self.last_sample_sim = now

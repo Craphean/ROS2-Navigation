@@ -67,8 +67,8 @@
       - **`cmu_indoor` ($N=2$, `full`, `ekf`)**：双车正常探索 CMU 官方建筑（`24.5 / 37.0 m`），120 s 建图 `292.0 m²`，ATE `0.198 m`，`CycP50/P95 = 3.83 / 31.93 ms`，SE(2) 接受 `55` 次，`0` 碰撞；
       - **`cmu_tunnel` ($N=2$, `full`, `ekf`)**：双车驶入 CMU 官方地下隧道（`16.6 / 24.6 m`），120 s 建图 `161.4 m²`，ATE `0.291 m`，`CycP50/P95 = 2.84 / 42.11 ms`，SE(2) 接受 `51` 次，`0` 碰撞；
       - **`house` ($N=2$, `legacy`, `gt`)**：双车覆盖率 `100.0%`，ATE `0.000 m`，`IoU2D = 0.771`，`0` 碰撞。
-- [ ] **M5：5090 服务器全量多随机种子 Benchmark + 消融 + M-TARE Docker 对照 + 论文矢量图与 LaTeX 表格生成** ← **下一个立即执行的里程碑**
-- [ ] **M6：单台 3D 雷达实车部署（`real_robot.launch.py`）+ 真机 2D-only vs. Ours 对比实验 + 补充视频**
+- [x] **M5：5090 服务器全量多随机种子 Benchmark + 消融 + M-TARE Docker 对照 + 论文矢量图与 LaTeX 表格生成**（已完成，`faefd2e`，239/239 轮 4 核实跑全通，产出 `docs/paper_artifacts/` 与初稿 `docs/paper_draft.md`）
+- [ ] **M6：单台 3D 雷达实车部署（`real_robot.launch.py`）+ 真机 2D-only vs. Ours 对比实验 + 补充视频** ← **下一个立即执行的里程碑**
 
 ---
 
@@ -107,13 +107,13 @@
 - [x] 从 CMU Autonomous Exploration Development Environment 导入 `cmu_indoor` 与 `cmu_tunnel` 网格封装为 Gazebo SDF，并生成 6 场景全部 `maps/gt/<world>/` 真值档案与经净空校验的 4 车无重叠出生点池（`cmu_indoor` / `cmu_tunnel` 实跑均通过，0 碰撞、`CycP95 < 50 ms`）。
 
 ### M5（WP5）：5090 服务器全量实验与论文图表输出
-- [x] 完成 5090 4 核边缘算力约束下全部 **239 轮隔离基准实验**（229 轮 ROS 2 + 10 轮官方 CMU M-TARE ROS 1/2 镜像，**239/239 零失败**）：
-  - **Table I & Fig. 3（主多场景对比，130 轮）**：6 场景（`house`/`hospital`/`mine`/`warehouse`/`cmu_indoor`/`cmu_tunnel`）× 5 种子，含官方 CMU M-TARE（`caochao/mtare-open-source:latest`）在 4 核隔离容器内于 `cmu_indoor` 与 `cmu_tunnel` 同 GT 管线对比；Lite-HMRE 较 M-TARE 峰值内存低 **51.7%–55.7%**（`2.51–2.95 GB` vs. `5.66–6.11 GB`）、规划 P95 延迟快 **5.2×–7.7×**（`133–196 ms` vs. `891–1020 ms`）、`cmu_indoor` 单位路程覆盖效率 CE 提升 **+56.2%**（`4.78` vs. `3.06 m²/m`），并在全 6 场景保持 **0.0 车际碰撞**；
-  - **Table II & Fig. 5a（7 步递进消融 `E0`–`E6`，70 轮含复用）**：`mine` & `hospital` 各 5 种子，`hospital` 路径重叠率由 Legacy `0.145` 降至 **`0.000`**，CE 由 `1.89` 提升至 **`3.26 m²/m`**（+72.5%）；
-  - **Table III & Fig. 2（噪声里程计 SE(2) 配准与退化门控专项，50 轮含复用）**：`mine` & `warehouse` 各 5 种子，C++ `cloud_merger_node` CPU 较 Python 版降低 **83.7%（`mine`）/ 84.1%（`warehouse`）**（`20.3% -> 3.3%`、`21.4% -> 3.4%`），`mine` ATE RMSE 较无配准降低 **31.5%**（`0.314 -> 0.215 m`）、较无退化门控降低 **27.4%**（`0.296 -> 0.215 m`）；
-  - **Table IV & Fig. 4（多机扩展性 $N=1\sim 4$，40 轮含复用）**：`mine` & `cmu_indoor` 各 5 种子，`cmu_indoor` $N=1\to 4$ 面积加速比达 **2.96×**（`280.0 -> 828.7 m²`）、3D 完整度加速比达 **3.79×**（`4.3% -> 16.3%`），$N=4$ 峰值内存 `5.54 GB` 仍低于 M-TARE $N=2$ 的 `6.11 GB`，全 40 轮 **0 碰撞**；
-  - **Table V & Fig. 5b（16/32 线与体素分辨率敏感性，12 轮含复用）**：`mine` 3 种子，32 线 LiDAR 使 3D Comp@15cm 由 `46.9%` 升至 **`65.8%`**（+18.9 pp）、Chamfer-$L_1$ 降低 **54.5%**（`0.886 -> 0.403 m`）而内存几乎不变（`2306 -> 2333 MB`）；
-- [x] 升级 `plot_paper_figs.py` 并新增 `scripts/generate_paper_artifacts.py` 与 `scripts/run_mtare_benchmark.py`，全自动产出 IEEE 矢量图与 LaTeX 表格于 `docs/paper_artifacts/`（`fig2_alignment.{pdf,png}`, `fig3_main_curves.{pdf,png}`, `fig4_scalability.{pdf,png}`, `fig5_ablation_sensitivity.{pdf,png}`, `table1_main_comparison.tex`..`table5_sensitivity.tex`, `summary_report.{md,json}`）。
+- [x] 完成 5090 4 核边缘算力、严格同速 `0.5 m/s` 约束下全部 **239 轮隔离基准实验（v2）**（229 轮 ROS 2 + 10 轮官方 CMU M-TARE `0.5 m/s` 同速对比，**239/239 零失败**）：
+  - **Table I, Fig. 3 & Fig. 3b（主多场景对比 + 边缘帕累托分析，130 轮）**：6 场景 × 5 种子，统一消除启动预热偏差并与官方 M-TARE 拉平至同速 `0.5 m/s`；在退化矿井 `mine` 上 Lite-HMRE 全面领先全部 ROS 2 基线（面积 **`275.6 ± 14.2 m²`**、3D Comp@15cm **`65.5 ± 6.9%`**、Chamfer-$L_1$ **`0.207 m`** [-67.6% vs. Legacy]、Occ. IoU **`0.811`** [$p=0.044$]、P95 **`49.8 ms`**）；相较同速官方 M-TARE，峰值内存降低 **49.2%–52.3%**（`2.61–3.02 GB` 稳居 4 GB 边缘单板机可行域 vs. M-TARE `5.48–5.94 GB`）、规划 P95 快 **4.0×–6.3×**（`139–195 ms` vs. `777–876 ms`）、`cmu_tunnel` 覆盖效率 CE 反超 **+8.8%**（`4.97` vs. `4.57 m²/m`），全 6 场景保持 **0.0 车际碰撞**；
+  - **Table II & Fig. 5a–b（7 步递进消融 `E0`–`E6`，70 轮含复用）**：`mine` 3D Comp@15cm 由 `53.5%` 单调攀升至 **`65.5%`**（+12.0 pp）、重叠率降 **73.7%**；`hospital` 覆盖效率 CE 由 `1.91` 升至 **`2.97 m²/m`**（+55.5%）、路径重叠率由 `21.7%` 压降至 **`0.9%`（-95.9%）**；
+  - **Table III & Fig. 2（噪声里程计 SE(2) 配准与退化门控专项，50 轮含复用）**：引入重叠边缘质量门槛（`min_overlap_points=150, min_inlier_ratio=0.55, max_rmse_m=0.12, iou_tolerance=0.002`）后，Lite-HMRE 在 `mine`（`0.046 m`，较无退化门控降 **41.0%**）与 `warehouse`（`0.052 m`，较 `No SE(2)` 降 **23.5%**、较 Legacy 降 **27.8%**）双双取得噪声里程计最低 ATE，C++ `cloud_merger_node` CPU 降低 **84.4%–85.6%**；
+  - **Table IV & Fig. 4（多机扩展性 $N=1\sim 4$，40 轮含复用）**：`cmu_indoor` $N=1\to 4$ 面积加速比 **2.61×**、3D 完整度加速比 **2.92×**，4 机峰值内存（`5.52 GB`）与 P95（`276 ms`）仍低于双机 M-TARE（`5.80 GB`, `876 ms`），全 40 轮 **0 碰撞**；
+  - **Table V & Fig. 5c（16/32 线与体素分辨率敏感性，12 轮含复用）**：默认 `16 线 / 0.10 m` 取得最优边缘平衡（`280.6 m²`, `66.7%` 3D Comp, `46.2 ms` P95），`0.05 m` 进一步将 Chamfer-$L_1$ 压至 `0.124 m`，`32 线` 峰值 3D 完整度达 `77.3%` 且内存几乎零增长；
+- [x] 全自动产出 5 组 IEEE 矢量图与 5 张 Booktabs LaTeX 表格于 `docs/paper_artifacts/`（含新增 `fig3b_edge_pareto.{pdf,png}`），并完成中英文论文完整初稿（`docs/paper_draft.md` & `docs/paper_draft_zh.md`）。
 
 ### M6（WP6）：单台 3D 雷达实车验证
 - 编写 `src/hier_explore_bringup/launch/real_robot.launch.py`（`pointcloud_to_laserscan` + `slam_toolbox` + `cloud_merger_node` + `octomap_server` + Nav2 + `hier_explore_core` 单机模式，参数化实车雷达垂直 FoV）；

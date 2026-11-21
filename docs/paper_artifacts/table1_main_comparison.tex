@@ -1,43 +1,43 @@
 \begin{table*}[t]
 \centering
-\caption{Main multi-world exploration benchmark under 4-core edge compute (Mean $\pm$ Std across 5 seeds; $^*$ $p<0.05$, $^{**}$ $p<0.01$ vs. 2D-Frontier by Welch's $t$-test. CMU M-TARE runs its official ROS 1/2 AEDE stack at 2.0 m/s with GT pose; all ROS 2 methods run on 0.5 m/s TurtleBot3 with noisy wheel+IMU EKF odometry).}
+\caption{Main multi-world exploration benchmark under 4-core edge compute at matched 0.5 m/s max speed (Mean $\pm$ Std across 5 seeds; $^*$ $p<0.05$, $^{**}$ $p<0.01$ vs. 2D-Frontier by Welch's $t$-test. CMU M-TARE runs its official ROS 1/2 AEDE stack capped to 0.5 m/s with GT pose; all ROS 2 methods run with noisy wheel+IMU EKF odometry).}
 \label{tab:main_results}
 \footnotesize
 \begin{tabular}{lccccccc}
 \toprule
 World / Method & Area ($\text{m}^2$) & 3D Comp.$_{15}$ (\%) & CD-$L_1$ (m) & Occ. IoU & CE ($\text{m}^2/\text{m}$) & CPU (\%) & P95 (ms) \\
 \midrule
-house / Legacy (E0) & $86.2 \pm 0.6$ & $77.7 \pm 3.6$ & $\mathbf{0.058 \pm 0.004}$ & $\mathbf{0.800 \pm 0.010}$ & $1.47 \pm 0.24$ & $262.3 \pm 20.4$ & -- \\
-house / 2D-Frontier (E1) & $86.0 \pm 0.7$ & $76.2 \pm 3.2$ & $0.062 \pm 0.006$ & $0.720 \pm 0.061$ & $1.48 \pm 0.26$ & $241.7 \pm 6.5$ & $\mathbf{8.0 \pm 1.9}$ \\
-house / +Hier (E3) & $86.0 \pm 0.5$ & $77.5 \pm 3.4$ & $0.061 \pm 0.007$ & $0.718 \pm 0.055$ & $1.78 \pm 0.40$ & $\mathbf{240.7 \pm 4.5}$ & $8.6 \pm 1.6$ \\
-house / Lite-HMRE (Ours) & $\mathbf{86.3 \pm 0.4}$ & $\mathbf{78.4 \pm 0.9}$ & $0.060 \pm 0.004$ & $0.726 \pm 0.090$ & $\mathbf{2.01 \pm 0.39}$ & $270.0 \pm 13.3$ & $23.9 \pm 6.9$ \\
+house / Legacy (E0) & $86.0 \pm 0.5$ & $75.6 \pm 2.1$ & $0.059 \pm 0.004$ & $\mathbf{0.809 \pm 0.015}$ & $1.57 \pm 0.27$ & $279.0 \pm 2.9$ & -- \\
+house / 2D-Frontier (E1) & $86.0 \pm 0.5$ & $\mathbf{77.7 \pm 6.0}$ & $0.059 \pm 0.003$ & $0.753 \pm 0.048$ & $1.68 \pm 0.47$ & $286.5 \pm 6.1$ & $15.0 \pm 2.3$ \\
+house / +Hier (E3) & $86.0 \pm 1.4$ & $76.7 \pm 2.8$ & $\mathbf{0.057 \pm 0.004}$ & $0.752 \pm 0.072$ & $2.09 \pm 0.58$ & $\mathbf{250.7 \pm 30.3}$ & $\mathbf{12.5 \pm 3.0}$ \\
+house / Lite-HMRE (Ours) & $\mathbf{86.5 \pm 0.3}$ & $76.0 \pm 5.4$ & $0.061 \pm 0.006$ & $0.730 \pm 0.034$ & $\mathbf{2.40 \pm 0.70}$ & $269.5 \pm 17.2$ & $24.6 \pm 7.9$ \\
 \midrule
-hospital / Legacy (E0) & $\mathbf{170.1 \pm 1.5}$ & $\mathbf{78.8 \pm 2.1}$ & $\mathbf{0.063 \pm 0.011}$ & $\mathbf{0.742 \pm 0.059}$ & $1.89 \pm 0.19$ & $\mathbf{234.3 \pm 3.0}$ & -- \\
-hospital / 2D-Frontier (E1) & $159.1 \pm 21.8$ & $70.9 \pm 9.9$ & $0.115 \pm 0.091$ & $0.665 \pm 0.096$ & $3.23 \pm 0.90$ & $239.3 \pm 7.0$ & $\mathbf{16.3 \pm 4.4}$ \\
-hospital / +Hier (E3) & $167.1 \pm 4.9$ & $72.3 \pm 5.5$ & $0.078 \pm 0.018$ & $0.625 \pm 0.177$ & $2.75 \pm 0.89$ & $268.4 \pm 20.7$ & $17.2 \pm 7.4$ \\
-hospital / Lite-HMRE (Ours) & $156.6 \pm 33.4$ & $70.6 \pm 16.4$ & $0.141 \pm 0.169$ & $0.654 \pm 0.130$ & $\mathbf{3.26 \pm 0.76}$ & $283.1 \pm 4.2$ & $41.2 \pm 6.3$ \\
+hospital / Legacy (E0) & $169.9 \pm 0.5$ & $77.1 \pm 2.5$ & $\mathbf{0.058 \pm 0.004}$ & $\mathbf{0.763 \pm 0.049}$ & $1.91 \pm 0.28$ & $280.6 \pm 2.4$ & -- \\
+hospital / 2D-Frontier (E1) & $\mathbf{170.9 \pm 0.8}$ & $\mathbf{79.9 \pm 2.5}$ & $0.062 \pm 0.007$ & $0.740 \pm 0.050$ & $1.93 \pm 0.14$ & $292.4 \pm 4.3$ & $\mathbf{13.1 \pm 1.8}$ \\
+hospital / +Hier (E3) & $170.2 \pm 1.8$ & $77.9 \pm 4.2$ & $0.071 \pm 0.024$ & $0.662 \pm 0.222$ & $2.28 \pm 0.47$ & $\mathbf{273.0 \pm 23.3}$ & $21.8 \pm 15.0$ \\
+hospital / Lite-HMRE (Ours) & $150.4 \pm 35.5$ & $66.5 \pm 16.0$ & $0.171 \pm 0.196$ & $0.637 \pm 0.171$ & $\mathbf{2.97 \pm 0.40}$ & $277.1 \pm 17.9$ & $48.5 \pm 16.9$ \\
 \midrule
-mine / Legacy (E0) & $\mathbf{260.2 \pm 43.4}$ & $53.9 \pm 9.1$ & $\mathbf{0.444 \pm 0.512}$ & $\mathbf{0.729 \pm 0.157}$ & $3.04 \pm 0.83$ & $\mathbf{186.9 \pm 5.1}$ & -- \\
-mine / 2D-Frontier (E1) & $249.8 \pm 50.9$ & $\mathbf{57.8 \pm 10.3}$ & $0.501 \pm 0.523$ & $0.697 \pm 0.157$ & $2.91 \pm 0.31$ & $206.8 \pm 6.9$ & $\mathbf{10.0 \pm 9.3}$ \\
-mine / +Hier (E3) & $191.2 \pm 52.2$ & $42.1 \pm 10.1$ & $1.550 \pm 1.067$ & $0.631 \pm 0.031$ & $\mathbf{3.25 \pm 0.54}$ & $234.7 \pm 27.3$ & $31.1 \pm 15.4$ \\
-mine / Lite-HMRE (Ours) & $238.2 \pm 54.0$ & $51.8 \pm 10.9$ & $0.621 \pm 0.631$ & $0.687 \pm 0.084$ & $3.08 \pm 0.54$ & $261.2 \pm 5.1$ & $67.3 \pm 22.4$ \\
+mine / Legacy (E0) & $245.1 \pm 42.9$ & $53.5 \pm 12.0$ & $0.638 \pm 0.575$ & $0.653 \pm 0.117$ & $2.18 \pm 0.49$ & $\mathbf{231.5 \pm 22.2}$ & -- \\
+mine / 2D-Frontier (E1) & $253.4 \pm 41.4$ & $56.4 \pm 11.6$ & $0.460 \pm 0.463$ & $0.761 \pm 0.123$ & $\mathbf{2.97 \pm 0.80}$ & $269.4 \pm 10.7$ & $\mathbf{41.2 \pm 31.6}$ \\
+mine / +Hier (E3) & $253.3 \pm 40.6$ & $60.2 \pm 9.1$ & $0.438 \pm 0.425$ & $0.766 \pm 0.054$ & $2.52 \pm 0.45$ & $267.6 \pm 14.2$ & $50.8 \pm 25.2$ \\
+mine / Lite-HMRE (Ours) & $\mathbf{275.6 \pm 14.2}$ & $\mathbf{65.5 \pm 6.9}$ & $\mathbf{0.207 \pm 0.123}$ & $\mathbf{0.811 \pm 0.085}$ & $2.40 \pm 0.17$ & $238.5 \pm 26.3$ & $49.8 \pm 18.0$ \\
 \midrule
-warehouse / Legacy (E0) & $637.7 \pm 176.6$ & $26.4 \pm 8.9$ & $2.115 \pm 1.138$ & $\mathbf{0.418 \pm 0.090}$ & $7.24 \pm 1.43$ & $\mathbf{255.2 \pm 7.4}$ & -- \\
-warehouse / 2D-Frontier (E1) & $\mathbf{752.9 \pm 156.9}$ & $\mathbf{30.1 \pm 8.7}$ & $\mathbf{1.425 \pm 0.774}$ & $0.414 \pm 0.062$ & $\mathbf{9.69 \pm 1.12}$ & $281.2 \pm 17.8$ & $\mathbf{122.0 \pm 84.9}$ \\
-warehouse / +Hier (E3) & $616.8 \pm 144.9$ & $28.6 \pm 5.8$ & $2.559 \pm 1.829$ & $0.392 \pm 0.089$ & $7.04 \pm 1.88$ & $288.4 \pm 18.9$ & $122.0 \pm 62.9$ \\
-warehouse / Lite-HMRE (Ours) & $652.2 \pm 207.5$ & $30.0 \pm 8.1$ & $2.417 \pm 1.981$ & $0.405 \pm 0.132$ & $7.18 \pm 2.53$ & $309.9 \pm 3.7$ & $204.1 \pm 102.7$ \\
+warehouse / Legacy (E0) & $684.2 \pm 152.4$ & $34.3 \pm 7.3$ & $\mathbf{1.508 \pm 1.258}$ & $\mathbf{0.473 \pm 0.080}$ & $6.17 \pm 1.28$ & $\mathbf{299.9 \pm 1.8}$ & -- \\
+warehouse / 2D-Frontier (E1) & $\mathbf{738.4 \pm 112.8}$ & $\mathbf{35.6 \pm 8.2}$ & $1.617 \pm 0.760$ & $0.445 \pm 0.094$ & $\mathbf{8.94 \pm 0.67}$ & $306.9 \pm 18.9$ & $\mathbf{149.4 \pm 43.7}$ \\
+warehouse / +Hier (E3) & $598.4 \pm 151.4$ & $25.6 \pm 7.2$ & $2.928 \pm 1.814$ & $0.345 \pm 0.071$ & $7.67 \pm 2.69$ & $309.9 \pm 15.6$ & $157.3 \pm 88.3$ \\
+warehouse / Lite-HMRE (Ours) & $698.2 \pm 220.9$ & $31.3 \pm 11.4$ & $1.914 \pm 2.146$ & $0.458 \pm 0.100$ & $8.27 \pm 2.07$ & $317.8 \pm 5.7$ & $176.6 \pm 50.2$ \\
 \midrule
-cmu\_indoor / Legacy (E0) & $546.6 \pm 141.4$ & $9.8 \pm 2.0$ & $14.013 \pm 4.207$ & $0.155 \pm 0.018$ & $\mathbf{6.04 \pm 1.87}$ & $\mathbf{264.5 \pm 4.2}$ & -- \\
-cmu\_indoor / 2D-Frontier (E1) & $500.0 \pm 98.6$ & $9.1 \pm 1.2$ & $14.584 \pm 3.849$ & $0.138 \pm 0.016$ & $5.79 \pm 1.36$ & $287.2 \pm 5.7$ & $\mathbf{86.4 \pm 21.8}$ \\
-cmu\_indoor / +Hier (E3) & $509.5 \pm 120.6$ & $9.9 \pm 2.6$ & $13.790 \pm 2.388$ & $0.141 \pm 0.019$ & $5.48 \pm 1.23$ & $290.9 \pm 3.7$ & $113.3 \pm 41.8$ \\
-cmu\_indoor / CMU M-TARE & $\mathbf{1807.1 \pm 209.8}$ & $\mathbf{36.7 \pm 4.0}$ & $\mathbf{2.002 \pm 1.720}$ & $\mathbf{0.583 \pm 0.047}$ & $3.06 \pm 0.39$ & $319.9 \pm 1.2$ & $1020.1 \pm 16.3$ \\
-cmu\_indoor / Lite-HMRE (Ours) & $443.0 \pm 94.0$ & $8.5 \pm 1.7$ & $14.064 \pm 3.282$ & $0.123 \pm 0.023$ & $4.78 \pm 1.53$ & $291.3 \pm 3.6$ & $133.3 \pm 39.0$ \\
+cmu\_indoor / Legacy (E0) & $539.8 \pm 152.3$ & $9.5 \pm 2.7$ & $13.891 \pm 5.051$ & $0.165 \pm 0.043$ & $\mathbf{5.90 \pm 1.72}$ & $\mathbf{261.9 \pm 1.4}$ & -- \\
+cmu\_indoor / 2D-Frontier (E1) & $551.1 \pm 87.9$ & $10.2 \pm 0.8$ & $13.304 \pm 2.490$ & $0.152 \pm 0.012$ & $5.49 \pm 0.72$ & $293.1 \pm 7.3$ & $\mathbf{77.1 \pm 27.9}$ \\
+cmu\_indoor / +Hier (E3) & $578.6 \pm 64.5$ & $11.3 \pm 0.8$ & $13.194 \pm 3.082$ & $0.161 \pm 0.016$ & $5.76 \pm 0.88$ & $297.3 \pm 6.4$ & $107.4 \pm 32.6$ \\
+cmu\_indoor / CMU M-TARE & $\mathbf{951.7 \pm 191.3}$ & $\mathbf{20.3 \pm 3.5}$ & $\mathbf{7.729 \pm 4.052}$ & $\mathbf{0.383 \pm 0.053}$ & $5.74 \pm 1.08$ & $307.4 \pm 8.4$ & $875.7 \pm 36.3$ \\
+cmu\_indoor / Lite-HMRE (Ours) & $553.9 \pm 174.1$ & $10.8 \pm 1.9$ & $13.635 \pm 4.104$ & $0.152 \pm 0.045$ & $5.31 \pm 1.52$ & $298.1 \pm 8.7$ & $139.3 \pm 41.8$ \\
 \midrule
-cmu\_tunnel / Legacy (E0) & $500.0 \pm 156.9$ & $2.8 \pm 0.7$ & $53.962 \pm 6.775$ & $0.044 \pm 0.011$ & $\mathbf{5.76 \pm 2.00}$ & $\mathbf{202.6 \pm 9.6}$ & -- \\
-cmu\_tunnel / 2D-Frontier (E1) & $391.6 \pm 89.9$ & $2.5 \pm 0.5$ & $54.541 \pm 9.013$ & $0.034 \pm 0.007$ & $5.28 \pm 1.79$ & $242.2 \pm 24.7$ & $\mathbf{161.4 \pm 125.3}$ \\
-cmu\_tunnel / +Hier (E3) & $488.4 \pm 158.5$ & $2.7 \pm 0.6$ & $52.911 \pm 8.770$ & $0.044 \pm 0.014$ & $5.34 \pm 1.82$ & $291.6 \pm 44.2$ & $239.8 \pm 131.8$ \\
-cmu\_tunnel / CMU M-TARE & $\mathbf{2752.1 \pm 690.3}$ & $\mathbf{13.7 \pm 2.6}$ & $\mathbf{15.830 \pm 11.161}$ & $\mathbf{0.319 \pm 0.048}$ & $4.27 \pm 1.07$ & $314.3 \pm 1.4$ & $890.5 \pm 102.5$ \\
-cmu\_tunnel / Lite-HMRE (Ours) & $424.2 \pm 108.3$ & $2.8 \pm 0.7$ & $53.120 \pm 9.501$ & $0.039 \pm 0.012$ & $4.79 \pm 1.34$ & $302.1 \pm 17.1$ & $195.5 \pm 139.9$ \\
+cmu\_tunnel / Legacy (E0) & $443.8 \pm 106.4$ & $2.5 \pm 0.4$ & $54.023 \pm 6.213$ & $0.041 \pm 0.011$ & $4.87 \pm 1.47$ & $\mathbf{253.2 \pm 6.0}$ & -- \\
+cmu\_tunnel / 2D-Frontier (E1) & $466.2 \pm 164.2$ & $2.9 \pm 0.9$ & $52.659 \pm 9.939$ & $0.044 \pm 0.016$ & $4.78 \pm 1.53$ & $306.5 \pm 21.9$ & $181.9 \pm 103.0$ \\
+cmu\_tunnel / +Hier (E3) & $459.6 \pm 110.5$ & $2.9 \pm 0.6$ & $54.219 \pm 7.945$ & $0.038 \pm 0.012$ & $\mathbf{5.06 \pm 1.42}$ & $265.9 \pm 24.1$ & $\mathbf{84.9 \pm 85.1}$ \\
+cmu\_tunnel / CMU M-TARE & $\mathbf{776.0 \pm 225.3}$ & $\mathbf{4.2 \pm 1.1}$ & $\mathbf{39.068 \pm 9.561}$ & $\mathbf{0.120 \pm 0.029}$ & $4.57 \pm 1.27$ & $301.1 \pm 5.6$ & $776.5 \pm 145.2$ \\
+cmu\_tunnel / Lite-HMRE (Ours) & $470.7 \pm 131.1$ & $3.2 \pm 0.8$ & $55.522 \pm 6.601$ & $0.044 \pm 0.014$ & $4.97 \pm 1.39$ & $291.3 \pm 43.3$ & $194.5 \pm 114.4$ \\
 \bottomrule
 \end{tabular}
 \end{table*}
