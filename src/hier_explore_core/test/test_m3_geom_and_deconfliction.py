@@ -361,3 +361,79 @@ def test_robot_inside_bottleneck_keeps_reservation():
     assert inside
     for cid in inside:
         assert res[cid] == "robot2"
+
+
+@needs_cpp
+def test_short_doorway_exemption_and_abba_deadlock_guard():
+    # A 1.0 m wide thin wall opening (half-width 0.50 m >= 0.22+0.14=0.36 m, length ~0.25 m)
+    # should be exempted when min_segment_length_m=0.75 so hospital doorways do not deadlock.
+    occ = OccupancyView.from_numpy(_two_rooms_with_door(1.0), 0.0, 0.0, RES)
+    mgr = CorridorMutexManager(CorridorMutexParams(narrow_margin_m=0.20, min_segment_length_m=0.75))
+    mgr.update_map(occ)
+    door_segs = [
+        s for s in mgr.segments.values()
+        if math.hypot(s.centroid_x - 5.0, s.centroid_y - 3.0) < 0.8
+    ]
+    assert not door_segs, f"short 1.0 m doorway should be exempted, got {door_segs}"
+
+    # AB-BA mutual yield guard: when owner_ns is itself in yielding_robots, do not yield back.
+    occ_tight, mgr_tight = _door_manager(0.6)
+    geo = GeodesicCache(occ_tight, min_clearance_m=0.2)
+    poses = {"robot1": (4.0, 3.0, 0.0), "robot2": (6.5, 3.0, math.pi)}
+    _d1, p1 = geo.shortest_path((4.0, 3.0), (8.5, 3.0))
+    _d2, p2 = geo.shortest_path((6.5, 3.0), (1.5, 3.0))
+    paths = {"robot1": [tuple(p) for p in p1], "robot2": [tuple(p) for p in p2]}
+    mgr_tight.update_reservations(poses, paths, now=10.0)
+    y_normal = mgr_tight.detect_head_on_yielders(poses, paths, yielding_robots=set())
+    assert len(y_normal) == 1 and y_normal[0][0] == "robot2"
+    y_mutual = mgr_tight.detect_head_on_yielders(poses, paths, yielding_robots={"robot1"})
+    assert y_mutual == [], "must never yield to a teammate already in yielding state"
+
+
+@needs_cpp
+def test_large_grid_astar_scratch_speed():
+    import time
+
+    grid = np.zeros((800, 800), dtype=np.int8)
+    grid[0, :] = grid[-1, :] = grid[:, 0] = grid[:, -1] = 100
+    occ = OccupancyView.from_numpy(grid, 0.0, 0.0, RES)
+    geo = GeodesicCache(occ, min_clearance_m=0.2, max_dist_m=30.0)
+    geo.shortest_path((2.0, 2.0), (10.0, 10.0))
+    t0 = time.perf_counter()
+    for i in range(20):
+        d, path = geo.shortest_path((2.0 + 0.1 * i, 2.0), (12.0, 8.0 + 0.1 * i))
+        assert math.isfinite(d) and len(path) > 5
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    assert elapsed_ms < 250.0, f"20 A* calls on 800x800 grid took {elapsed_ms:.1f} ms"
+
+
+def test_visit_cooldown_and_ping_pong_blacklist():
+    from hier_explore_core.supervisor import FailureBookkeeper
+
+    bk = FailureBookkeeper(visit_blacklist_limit=2, visit_cooldown_sec=35.0, visit_radius=1.2)
+    # 1st visit/handoff at Goal A puts it on cooldown (blocks immediate A<->B ping-pong)
+    msg1 = bk.record_visit((20.8, 6.8), now=100.0)
+    assert msg1 is None
+    assert bk.is_visit_cooled_down(20.9, 6.9, now=110.0)
+    assert not bk.is_frontier_blacklisted(20.8, 6.8)
+    # After cooldown expires, a 2nd visit to the persistent occluded pocket permanently blacklists it
+    assert not bk.is_visit_cooled_down(20.9, 6.9, now=140.0)
+    msg2 = bk.record_visit((20.85, 6.85), now=141.0)
+    assert msg2 is not None and "permanently blacklisted" in msg2
+    assert bk.is_frontier_blacklisted(20.8, 6.8)
+
+
+def test_global_bid_voronoi_wing_partitioning():
+    from types import SimpleNamespace
+    from hier_explore_core.scheduler import AgentState, RoiParams, global_bid
+
+    r1 = AgentState("robot1", 0.0, 0.0, 0.0, idle=False)
+    r2 = AgentState("robot2", 30.0, 0.0, 0.0, idle=True)
+    # Candidate A is inside r1's west wing (5 m from r1, 25 m from r2) with high gain
+    # Candidate B is in r2's east wing (10 m from r2, 40 m from r1) with moderate gain
+    cand_west = SimpleNamespace(x=5.0, y=0.0, world_x=5.0, world_y=0.0, total_gain=12.0)
+    cand_east = SimpleNamespace(x=40.0, y=0.0, world_x=40.0, world_y=0.0, total_gain=5.0)
+    params = RoiParams()
+    bid_west, _, _ = global_bid(r2, cand_west, params, other_agents=[r1, r2])
+    bid_east, _, _ = global_bid(r2, cand_east, params, other_agents=[r1, r2])
+    assert bid_east > bid_west, f"r2 should stay in its own wing: east={bid_east:.3f} vs west={bid_west:.3f}"

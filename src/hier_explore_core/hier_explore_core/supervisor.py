@@ -20,22 +20,79 @@ class FailureBookkeeper:
         blacklist_radius: float = 0.9,
         residual_blacklist_radius: float = 1.0,
         residual_max_attempts: int = 2,
+        visit_blacklist_limit: int = 2,
+        visit_cooldown_sec: float = 35.0,
+        visit_radius: float = 1.2,
     ):
         self.blacklist_retry_limit = int(blacklist_retry_limit)
         self.blacklist_radius = float(blacklist_radius)
         self.residual_blacklist_radius = float(residual_blacklist_radius)
         self.residual_max_attempts = int(residual_max_attempts)
+        self.visit_blacklist_limit = int(visit_blacklist_limit)
+        self.visit_cooldown_sec = float(visit_cooldown_sec)
+        self.visit_radius = float(visit_radius)
 
         self.blacklisted_goals: List[Tuple[float, float]] = []
         self.global_failed_goals: Dict[Tuple[float, float], int] = {}
         self.residual_blacklist: List[Tuple[float, float]] = []
         self.residual_attempts: Dict[Tuple[float, float], int] = {}
+        self.visited_goals: Dict[Tuple[float, float], int] = {}
+        self.visit_cooldowns: List[Tuple[float, float, float]] = []
 
     def is_frontier_blacklisted(self, x: float, y: float) -> bool:
         return any(
             math.hypot(x - bx, y - by) < self.blacklist_radius
             for bx, by in self.blacklisted_goals
         )
+
+    def is_visit_cooled_down(self, x: float, y: float, now: float) -> bool:
+        self.visit_cooldowns = [
+            (vx, vy, exp) for vx, vy, exp in self.visit_cooldowns if now < exp
+        ]
+        return any(
+            math.hypot(x - vx, y - vy) < self.visit_radius
+            for vx, vy, _exp in self.visit_cooldowns
+        )
+
+    def has_active_visit_cooldowns(self, now: float) -> bool:
+        self.visit_cooldowns = [
+            (vx, vy, exp) for vx, vy, exp in self.visit_cooldowns if now < exp
+        ]
+        return bool(self.visit_cooldowns)
+
+    def record_visit(
+        self,
+        target: Optional[Tuple[float, float]],
+        now: float,
+    ) -> Optional[str]:
+        """Record arrival or lookahead handoff at a frontier pocket to break A<->B ping-pong."""
+        if target is None:
+            return None
+        tx, ty = float(target[0]), float(target[1])
+        self.visit_cooldowns = [
+            (vx, vy, exp) for vx, vy, exp in self.visit_cooldowns if now < exp
+        ]
+        found_key = None
+        for vx, vy in self.visited_goals:
+            if math.hypot(tx - vx, ty - vy) < self.visit_radius:
+                found_key = (vx, vy)
+                break
+        if found_key is None:
+            found_key = (round(tx, 2), round(ty, 2))
+            self.visited_goals[found_key] = 0
+
+        self.visited_goals[found_key] += 1
+        count = self.visited_goals[found_key]
+        self.visit_cooldowns.append((found_key[0], found_key[1], float(now) + self.visit_cooldown_sec))
+
+        if count >= self.visit_blacklist_limit:
+            added = self.blacklist_frontier_point(found_key[0], found_key[1])
+            if added:
+                return (
+                    f"Frontier pocket near {found_key} visited {count} times without clearing; "
+                    f"permanently blacklisted (radius {self.blacklist_radius}m)."
+                )
+        return None
 
     def is_residual_blacklisted(self, x: float, y: float) -> bool:
         return any(

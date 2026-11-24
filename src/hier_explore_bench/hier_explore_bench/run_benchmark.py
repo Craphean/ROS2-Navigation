@@ -100,6 +100,15 @@ ABLATION_PROFILES: Dict[str, Dict[str, str]] = {
             "-p teammate_deconfliction_enable:=true -p corridor_mutex_enable:=true"
         ),
     },
+    "no_phase_corr": {
+        "EXPLORATION_MODE": "auction",
+        "COORDINATOR_ARGS": (
+            "-p use_3d_gain:=true -p local_scheduling_enable:=true "
+            "-p residual_enable:=true -p convergence_enable:=true "
+            "-p use_geodesic_distance:=true -p use_los_fov_optimizer:=true "
+            "-p teammate_deconfliction_enable:=true -p corridor_mutex_enable:=true"
+        ),
+    },
     "no_degen_gate": {
         "EXPLORATION_MODE": "auction",
         "COORDINATOR_ARGS": (
@@ -149,6 +158,7 @@ def run_single_trial(
     launcher: str = "launch",
     lidar_v_samples: int = 16,
     voxel_resolution: float = 0.10,
+    init_pose_noise: str = "0.0,0.0,0.0",
 ) -> Dict[str, object]:
     """Launch headless simulation + bench_recorder, clean up, and evaluate."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -169,6 +179,7 @@ def run_single_trial(
             f"ablation_profile:={profile}",
             f"lidar_v_samples:={lidar_v_samples}",
             f"voxel_resolution:={voxel_resolution:.3f}",
+            f"init_pose_noise:={init_pose_noise}",
             "headless:=true",
             "use_rviz:=false",
             "enable_cameras:=false",
@@ -271,6 +282,7 @@ def main() -> None:
     ap.add_argument("--launcher", choices=["launch", "bash"], default="launch")
     ap.add_argument("--lidar-v-samples", type=int, default=16)
     ap.add_argument("--voxel-resolution", type=float, default=0.10)
+    ap.add_argument("--init-pose-noise", default="0.0,0.0,0.0")
     ap.add_argument("--max-sim-sec", type=float, default=240.0)
     ap.add_argument("--gt-root", default=str(REPO_ROOT / "maps" / "gt"))
     ap.add_argument(
@@ -310,6 +322,7 @@ def main() -> None:
                     launcher=args.launcher,
                     lidar_v_samples=args.lidar_v_samples,
                     voxel_resolution=args.voxel_resolution,
+                    init_pose_noise=args.init_pose_noise,
                 )
                 profile_runs.append(rep)
                 all_reports.append(rep)

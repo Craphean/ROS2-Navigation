@@ -27,11 +27,16 @@ struct Se2AlignParams
   double min_rot_eigenvalue{8.0};
 
   // Consistency & safety gates
-  double max_total_delta_xy_m{3.0};
+  double max_total_delta_xy_m{3.5};
   double max_total_delta_yaw_rad{0.35};  // ~20 deg
   double min_inlier_ratio{0.45};
   double max_rmse_m{0.18};
   double iou_tolerance{0.015};           // allow tiny discretization noise
+  // High-IoU deadband: prevents random-walk jitter on already-aligned small rooms
+  double deadband_iou_threshold{0.58};
+  double deadband_min_improve_iou{0.015};
+  double deadband_min_delta_xy_m{0.04};
+  double deadband_min_delta_yaw_rad{0.015};
 
   // Temporal SE(2) exponential smoothing
   double smoothing_alpha{0.25};

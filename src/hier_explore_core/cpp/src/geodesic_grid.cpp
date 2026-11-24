@@ -169,6 +169,31 @@ struct DialScratch
   }
 };
 
+struct AStarScratch
+{
+  std::vector<uint8_t> passable;
+  std::vector<float> g_score;
+  std::vector<int32_t> parent;
+  std::vector<uint32_t> open_stamp;
+  std::vector<uint32_t> closed_stamp;
+  std::vector<HeapNode> heap;
+  uint32_t gen{0};
+
+  void ensure_size(size_t n)
+  {
+    if (g_score.size() < n) {
+      g_score.assign(n, kInfF);
+      parent.assign(n, -1);
+      open_stamp.assign(n, 0);
+      closed_stamp.assign(n, 0);
+      gen = 0;
+    }
+    if (heap.capacity() < 4096) {
+      heap.reserve(4096);
+    }
+  }
+};
+
 }  // namespace
 
 std::vector<double> compute_geodesic_distances(
@@ -429,16 +454,17 @@ ShortestPathResult compute_geodesic_path(
     ? static_cast<float>(max_dist_m / resolution)
     : kInfF;
 
-  std::vector<uint8_t> passable;
-  fill_passable_mask(traversable, obstacle_dt, n_cells, min_clearance_cells, passable);
+  thread_local AStarScratch sc_a;
+  sc_a.ensure_size(static_cast<size_t>(n_cells));
+  fill_passable_mask(traversable, obstacle_dt, n_cells, min_clearance_cells, sc_a.passable);
 
   const int sr = world_to_cell_clamped(start_xy.y, origin_y, resolution, height);
   const int sc = world_to_cell_clamped(start_xy.x, origin_x, resolution, width);
   const int gr_in = world_to_cell_clamped(goal_xy.y, origin_y, resolution, height);
   const int gc_in = world_to_cell_clamped(goal_xy.x, origin_x, resolution, width);
 
-  const int s_cell = snap_to_passable(passable.data(), traversable, height, width, sr, sc, snap_cells);
-  const int g_cell = snap_to_passable(passable.data(), traversable, height, width, gr_in, gc_in, snap_cells);
+  const int s_cell = snap_to_passable(sc_a.passable.data(), traversable, height, width, sr, sc, snap_cells);
+  const int g_cell = snap_to_passable(sc_a.passable.data(), traversable, height, width, gr_in, gc_in, snap_cells);
   if (s_cell < 0 || g_cell < 0) {
     return res;
   }
@@ -455,16 +481,28 @@ ShortestPathResult compute_geodesic_path(
   const int gr = g_cell / width;
   const int gc = g_cell - gr * width;
 
-  passable[static_cast<size_t>(s_cell)] = 1;
-  passable[static_cast<size_t>(g_cell)] = 1;
+  sc_a.passable[static_cast<size_t>(s_cell)] = 1;
+  sc_a.passable[static_cast<size_t>(g_cell)] = 1;
 
-  std::vector<float> g_score(static_cast<size_t>(n_cells), kInfF);
-  std::vector<int32_t> parent(static_cast<size_t>(n_cells), -1);
-  std::vector<uint8_t> closed(static_cast<size_t>(n_cells), 0);
-  std::vector<HeapNode> heap;
-  heap.reserve(4096);
+  ++sc_a.gen;
+  if (sc_a.gen == 0) {
+    std::fill(sc_a.open_stamp.begin(), sc_a.open_stamp.begin() + n_cells, 0);
+    std::fill(sc_a.closed_stamp.begin(), sc_a.closed_stamp.begin() + n_cells, 0);
+    sc_a.gen = 1;
+  }
+  const uint32_t gen = sc_a.gen;
+  sc_a.heap.clear();
 
-  g_score[static_cast<size_t>(s_cell)] = 0.0f;
+  float * __restrict__ g_score = sc_a.g_score.data();
+  int32_t * __restrict__ parent = sc_a.parent.data();
+  uint32_t * __restrict__ open_stamp = sc_a.open_stamp.data();
+  uint32_t * __restrict__ closed_stamp = sc_a.closed_stamp.data();
+  const uint8_t * __restrict__ passable = sc_a.passable.data();
+  auto & heap = sc_a.heap;
+
+  g_score[s_cell] = 0.0f;
+  parent[s_cell] = -1;
+  open_stamp[s_cell] = gen;
   const int sr0 = s_cell / width;
   const int sc0 = s_cell - sr0 * width;
   heap.push_back({octile_heuristic(sr0, sc0, gr, gc), s_cell});
@@ -475,12 +513,12 @@ ShortestPathResult compute_geodesic_path(
     const HeapNode cur = heap.back();
     heap.pop_back();
 
-    if (closed[static_cast<size_t>(cur.idx)]) {
+    if (closed_stamp[cur.idx] == gen) {
       continue;
     }
-    closed[static_cast<size_t>(cur.idx)] = 1;
+    closed_stamp[cur.idx] = gen;
 
-    const float cg = g_score[static_cast<size_t>(cur.idx)];
+    const float cg = g_score[cur.idx];
     if (cg > max_dist_cells) {
       continue;
     }
@@ -498,7 +536,7 @@ ShortestPathResult compute_geodesic_path(
         continue;
       }
       const int nidx = nr * width + nc;
-      if (closed[static_cast<size_t>(nidx)] || !passable[static_cast<size_t>(nidx)]) {
+      if (closed_stamp[nidx] == gen || !passable[nidx]) {
         continue;
       }
       if (dir >= 4) {
@@ -512,9 +550,10 @@ ShortestPathResult compute_geodesic_path(
       if (ng > max_dist_cells) {
         continue;
       }
-      if (ng < g_score[static_cast<size_t>(nidx)]) {
-        g_score[static_cast<size_t>(nidx)] = ng;
-        parent[static_cast<size_t>(nidx)] = cur.idx;
+      if (open_stamp[nidx] != gen || ng < g_score[nidx]) {
+        open_stamp[nidx] = gen;
+        g_score[nidx] = ng;
+        parent[nidx] = cur.idx;
         const float f = ng + octile_heuristic(nr, nc, gr, gc);
         heap.push_back({f, nidx});
         std::push_heap(heap.begin(), heap.end(), std::greater<HeapNode>{});
@@ -527,10 +566,10 @@ ShortestPathResult compute_geodesic_path(
   }
 
   res.reachable = true;
-  res.distance_m = static_cast<double>(g_score[static_cast<size_t>(g_cell)]) * resolution;
+  res.distance_m = static_cast<double>(g_score[g_cell]) * resolution;
 
   std::vector<int32_t> chain;
-  for (int32_t cur = g_cell; cur >= 0; cur = parent[static_cast<size_t>(cur)]) {
+  for (int32_t cur = g_cell; cur >= 0; cur = parent[cur]) {
     chain.push_back(cur);
     if (cur == s_cell) {
       break;

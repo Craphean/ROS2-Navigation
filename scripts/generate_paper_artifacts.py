@@ -72,7 +72,7 @@ WORLDS_META: Sequence[Tuple[str, str, float]] = (
 )
 
 METHOD_LABELS = {
-    "legacy": "Legacy (E0)",
+    "legacy": "m-explore-ros2",
     "e1_2d": "2D-Frontier (E1)",
     "e2_3dgain": "+3D-Gain (E2)",
     "e3_hier": "+Hier (E3)",
@@ -80,9 +80,9 @@ METHOD_LABELS = {
     "e5_deconflict": "+Deconflict (E5)",
     "full": "Lite-HMRE (Ours)",
     "mtare": "CMU M-TARE",
-    "legacy_merge": "Legacy Merge + PyCloud",
     "no_se2": "No SE(2) Align",
-    "no_degen_gate": "SE(2) w/o Degen. Gate",
+    "no_phase_corr": "ICP Only (w/o FFT)",
+    "no_degen_gate": "FFT+ICP (w/o Degen. Gate)",
     "gt_odom": "GT-Odom (Oracle)",
 }
 
@@ -267,14 +267,14 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
     summary["suites"]["main"] = main_agg
 
     # ------------------------------------------------------------------
-    # Suite 2: 7-Step Component Ablation (Table II)
+    # Suite 2: 6-Step Component Ablation (Table II)
     # ------------------------------------------------------------------
-    ablation_keys = ("legacy", "e1_2d", "e2_3dgain", "e3_hier", "e4_geodesic", "e5_deconflict", "full")
+    ablation_keys = ("e1_2d", "e2_3dgain", "e3_hier", "e4_geodesic", "e5_deconflict", "full")
     ablation_agg: Dict[str, Dict[str, Dict[str, Dict[str, float]]]] = {}
     table2_rows: List[Tuple[str, Dict[str, Dict[str, float]]]] = []
     table2_breaks: List[int] = []
 
-    md_lines.extend(["", "## Suite 2: 7-Step Component Ablation (Table II)", ""])
+    md_lines.extend(["", "## Suite 2: 6-Step Component Ablation (Table II)", ""])
     md_lines.append(
         "| World | Config | N | Area (m²) | 3D Comp@15cm (%) | Chamfer-L1 (m) | CE (m²/m) | Overlap | Cyc P95 (ms) | Coll |"
     )
@@ -285,7 +285,7 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
         if w_idx > 0:
             table2_breaks.append(len(table2_rows))
         for mkey in ablation_keys:
-            # E0, E1, E3, E6 come from main/; E2, E4, E5 come from ablation/
+            # E1, E3, E6 come from main/; E2, E4, E5 come from ablation/
             if mkey in ("e2_3dgain", "e4_geodesic", "e5_deconflict"):
                 runs = load_runs(results_root / "ablation" / wkey / mkey)
             else:
@@ -319,7 +319,7 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
                 ("cycle_ms_p95", r"P95 (ms)", ".1f"),
                 ("inter_robot_collisions", r"Coll.", ".1f"),
             ],
-            caption="Seven-step incremental component ablation (E0--E6) on Mine and Hospital (5 seeds, 4-core).",
+            caption="Six-step incremental component ablation (E1--E6) on Mine and Hospital (5 seeds, 4-core).",
             label="tab:ablation",
             best_modes={
                 "final_area_m2": "max",
@@ -340,43 +340,52 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
     summary["suites"]["ablation"] = ablation_agg
 
     # ------------------------------------------------------------------
-    # Suite 3: Noisy Odometry Alignment & Degeneracy Gate Study (Fig. 2 & Table III)
+    # Suite 3: Initial-Pose Perturbation Stress Test of Online SE(2) Registration (Fig. 2 & Table III)
     # ------------------------------------------------------------------
-    align_variants = ("legacy_merge", "no_se2", "no_degen_gate", "full", "gt_odom")
-    align_agg: Dict[str, Dict[str, Dict[str, Dict[str, float]]]] = {}
+    align_variants = ("no_se2", "no_phase_corr", "no_degen_gate", "full")
+    align_tiers = (
+        ("p00", "0 m, 0°", r"0.0 m, $0^\circ$"),
+        ("p05", "0.5 m, 5°", r"0.5 m, $5^\circ$"),
+        ("p10", "1.0 m, 10°", r"1.0 m, $10^\circ$"),
+    )
+    align_agg: Dict[str, Dict[str, Dict[str, Dict[str, Dict[str, float]]]]] = {}
     table3_rows: List[Tuple[str, Dict[str, Dict[str, float]]]] = []
     table3_breaks: List[int] = []
 
-    md_lines.extend(["", "## Suite 3: Noisy Odometry SE(2) Alignment & Degeneracy Study (Fig. 2)", ""])
+    md_lines.extend(["", "## Suite 3: Initial-Pose Perturbation Stress Test of Online SE(2) Registration (Fig. 2 & Table III)", ""])
     md_lines.append(
-        "| World | Variant | N | Occ IoU | ATE RMSE (m) | Chamfer-L1 (m) | Prec@10cm (%) | Cloud CPU (%) | SE(2) Accepts | Degen Gates |"
+        "| World | Perturbation | Variant | N | ATE RMSE (m) | Occ IoU | Prec@10cm (%) | Chamfer-L1 (m) | SE(2) Accepts | Degen Gates |"
     )
-    md_lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    md_lines.append("|---|---|---|---:|---:|---:|---:|---:|---:|---:|")
 
-    for w_idx, wkey in enumerate(("mine", "warehouse")):
+    for wkey in ("mine", "warehouse"):
         align_agg[wkey] = {}
-        if w_idx > 0:
-            table3_breaks.append(len(table3_rows))
-        for vkey in align_variants:
-            if vkey == "full":
-                runs = main_runs.get(wkey, {}).get("full") or load_runs(results_root / "main" / wkey / "full")
-            else:
-                runs = load_runs(results_root / "alignment" / wkey / vkey)
-            if not runs:
-                continue
-            agg = aggregate_runs(runs, ALL_METRICS)
-            align_agg[wkey][vkey] = agg
-            table3_rows.append((f"{wkey} / {METHOD_LABELS.get(vkey, vkey)}", agg))
-            md_lines.append(
-                f"| {wkey} | {METHOD_LABELS.get(vkey, vkey)} | {len(runs)} | "
-                f"{fmt_ms(agg['occupied_iou_tol1'], '.3f')} | "
-                f"{fmt_ms(agg['ate_rmse_mean_m'], '.3f')} | "
-                f"{fmt_ms(agg['chamfer_l1_m'], '.3f')} | "
-                f"{fmt_ms(agg['precision_10cm'], '.1f', 100.0)} | "
-                f"{fmt_ms(agg['cloud_merger_cpu_mean_pct'], '.1f')} | "
-                f"{fmt_ms(agg['se2_accept_count'], '.1f')} | "
-                f"{fmt_ms(agg['se2_degenerate_count'], '.1f')} |"
-            )
+        for tkey, tlabel_md, tlabel_tex in align_tiers:
+            align_agg[wkey][tkey] = {}
+            if table3_rows:
+                table3_breaks.append(len(table3_rows))
+            for vkey in align_variants:
+                runs = load_runs(results_root / "alignment_stress" / wkey / tkey / vkey)
+                if not runs and tkey == "p00":
+                    if vkey == "full":
+                        runs = main_runs.get(wkey, {}).get("full") or load_runs(results_root / "main" / wkey / "full")
+                    else:
+                        runs = load_runs(results_root / "alignment" / wkey / vkey)
+                if not runs:
+                    continue
+                agg = aggregate_runs(runs, ALL_METRICS)
+                align_agg[wkey][tkey][vkey] = agg
+                vlabel = "Lite-HMRE (Full SE(2))" if vkey == "full" else METHOD_LABELS.get(vkey, vkey)
+                table3_rows.append((f"{wkey.capitalize()} ({tlabel_tex}) / {vlabel}", agg))
+                md_lines.append(
+                    f"| {wkey} | {tlabel_md} | {vlabel} | {len(runs)} | "
+                    f"{fmt_ms(agg['ate_rmse_mean_m'], '.3f')} | "
+                    f"{fmt_ms(agg['occupied_iou_tol1'], '.3f')} | "
+                    f"{fmt_ms(agg['precision_10cm'], '.1f', 100.0)} | "
+                    f"{fmt_ms(agg['chamfer_l1_m'], '.3f')} | "
+                    f"{fmt_ms(agg['se2_accept_count'], '.1f')} | "
+                    f"{fmt_ms(agg['se2_degenerate_count'], '.1f')} |"
+                )
 
     if any(align_agg.get(w) for w in ("mine", "warehouse")):
         plot_alignment_study(align_agg, out_dir / "fig2_alignment")
@@ -384,24 +393,26 @@ def generate_all(results_root: Path, out_dir: Path) -> Dict[str, object]:
         t3_tex = format_latex_table(
             table3_rows,
             columns=[
-                ("occupied_iou_tol1", r"Occ. IoU", ".3f"),
-                ("ate_rmse_mean_m", r"ATE (m)", ".3f"),
-                ("chamfer_l1_m", r"CD-$L_1$ (m)", ".3f"),
-                ("precision_10cm", r"Prec.$_{10}$ (\%)", ".1f"),
-                ("cloud_merger_cpu_mean_pct", r"Cloud CPU (\%)", ".1f"),
+                ("ate_rmse_mean_m", r"ATE (m) $\downarrow$", ".3f"),
+                ("occupied_iou_tol1", r"Occ. IoU $\uparrow$", ".3f"),
+                ("precision_10cm", r"Prec.$_{10}$ (\%) $\uparrow$", ".1f"),
+                ("chamfer_l1_m", r"CD-$L_1$ (m) $\downarrow$", ".3f"),
                 ("se2_accept_count", r"SE(2) Acc.", ".1f"),
+                ("se2_degenerate_count", r"Degen. Gates", ".1f"),
             ],
-            caption="Online SE(2) map alignment and degeneracy gate study under noisy EKF odometry (5 seeds).",
+            caption=(
+                "Initial-pose perturbation stress test of online SE(2) map registration under noisy EKF odometry "
+                "(5 seeds per setting on Mine and Warehouse; perturbation applied to robot2's initial frame prior)."
+            ),
             label="tab:alignment",
             best_modes={
-                "occupied_iou_tol1": "max",
                 "ate_rmse_mean_m": "min",
-                "chamfer_l1_m": "min",
+                "occupied_iou_tol1": "max",
                 "precision_10cm": "max",
-                "cloud_merger_cpu_mean_pct": "min",
+                "chamfer_l1_m": "min",
             },
             table_env="table*",
-            first_col_header="World / Variant",
+            first_col_header="World (Perturb.) / Variant",
             scales={"precision_10cm": 100.0},
             section_breaks=table3_breaks,
         )

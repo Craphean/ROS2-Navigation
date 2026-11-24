@@ -36,15 +36,16 @@ from .occupancy_view import OccupancyView
 
 @dataclass
 class TeammateCloudParams:
-    footprint_radius: float = 0.26
-    footprint_samples: int = 12
-    predict_horizon_s: float = 2.0
+    footprint_radius: float = 0.22
+    footprint_samples: int = 10
+    predict_horizon_s: float = 1.2
     nominal_speed_mps: float = 0.42
     predict_step_m: float = 0.16
-    predict_ring_radius: float = 0.18
+    predict_ring_radius: float = 0.11
     predict_ring_samples: int = 6
-    max_teammate_range: float = 3.5
-    ego_safe_radius: float = 0.36
+    max_teammate_range: float = 3.0
+    max_predict_range: float = 2.2
+    ego_safe_radius: float = 0.34
     cloud_z: float = 0.17
     # Sparse ring placed strictly between obstacle_max_range (2.5m) and
     # raytrace_max_range (3.0m) so Nav2 VoxelLayer raytrace-clears stale cells
@@ -133,9 +134,9 @@ def build_teammate_cloud_points(
                 if math.hypot(px - ex, py - ey) >= cfg.ego_safe_radius:
                     world_xy.append((px, py))
 
-        # 2. Future 2 s trajectory from Nav2 plan (or short heading extrapolation if active)
+        # 2. Future predicted trajectory from Nav2 plan (only when teammate is nearby)
         plan = robot_plans_world.get(ns) or ()
-        if plan:
+        if plan and dist_to_ego <= cfg.max_predict_range:
             traj_pts = sample_plan_horizon(plan, (rx, ry), horizon_m, cfg.predict_step_m)
         else:
             traj_pts = []
@@ -207,14 +208,18 @@ def pack_xyz32_cloud(points_xyz: np.ndarray, frame_id: str, stamp_msg):
 @dataclass
 class CorridorMutexParams:
     robot_radius: float = 0.22
-    narrow_margin_m: float = 0.35
+    narrow_margin_m: float = 0.20
     min_segment_cells: int = 4
+    min_segment_length_m: float = 0.75
     yield_search_radius_m: float = 3.0
     yield_min_separation_m: float = 1.0
-    proximity_radius_m: float = 0.45
-    head_on_detect_dist_m: float = 4.5
+    proximity_radius_m: float = 0.35
+    reserve_lookahead_m: float = 4.0
+    head_on_detect_dist_m: float = 3.5
     head_on_cos_threshold: float = -0.25
     reservation_ttl_s: float = 15.0
+    max_yield_duration_s: float = 6.0
+    yield_cooldown_s: float = 8.0
 
 
 @dataclass
@@ -249,6 +254,7 @@ class CorridorMutexManager:
             min_segment_cells=self.params.min_segment_cells,
             yield_search_radius_m=self.params.yield_search_radius_m,
             yield_min_separation_m=self.params.yield_min_separation_m,
+            min_segment_length_m=self.params.min_segment_length_m,
         )
         self.labels = np.asarray(raw["labels"], dtype=np.int32)
         self.segments = {}
@@ -285,10 +291,47 @@ class CorridorMutexManager:
         vals = np.unique(sub[sub > 0])
         return {int(v) for v in vals.tolist()}
 
-    def corridors_on_path(self, path_xy: Sequence[Tuple[float, float]]) -> List[int]:
+    @staticmethod
+    def _truncate_path(
+        path_xy: Sequence[Tuple[float, float]],
+        origin_xy: Optional[Tuple[float, float]] = None,
+        max_length_m: float = 0.0,
+    ) -> Sequence[Tuple[float, float]]:
+        """Slice `path_xy` starting near `origin_xy` up to `max_length_m` ahead."""
+        if len(path_xy) == 0 or max_length_m <= 0.0:
+            return path_xy
+        start_i = 0
+        if origin_xy is not None:
+            ox, oy = float(origin_xy[0]), float(origin_xy[1])
+            best_d2 = float("inf")
+            for i, pt in enumerate(path_xy):
+                d2 = (float(pt[0]) - ox) ** 2 + (float(pt[1]) - oy) ** 2
+                if d2 < best_d2:
+                    best_d2 = d2
+                    start_i = i
+        acc = 0.0
+        out = [path_xy[start_i]]
+        px, py = float(path_xy[start_i][0]), float(path_xy[start_i][1])
+        for i in range(start_i + 1, len(path_xy)):
+            cx, cy = float(path_xy[i][0]), float(path_xy[i][1])
+            acc += math.hypot(cx - px, cy - py)
+            out.append(path_xy[i])
+            px, py = cx, cy
+            if acc >= max_length_m:
+                break
+        return out
+
+    def corridors_on_path(
+        self,
+        path_xy: Sequence[Tuple[float, float]],
+        origin_xy: Optional[Tuple[float, float]] = None,
+        max_length_m: float = 0.0,
+    ) -> List[int]:
         """Return ordered unique bottleneck segment IDs traversed by `path_xy`."""
         if self.labels is None or self.occ is None or not self.segments or len(path_xy) == 0:
             return []
+        if max_length_m > 0.0:
+            path_xy = self._truncate_path(path_xy, origin_xy=origin_xy, max_length_m=max_length_m)
         seen: Set[int] = set()
         ordered: List[int] = []
         h, w = self.occ.height, self.occ.width
@@ -314,7 +357,7 @@ class CorridorMutexManager:
         Priority:
           1. A robot already physically inside a bottleneck always holds it.
           2. Otherwise, the navigating robot closer to the bottleneck centroid
-             (tie-broken lexicographically by namespace) acquires the mutex.
+             within `reserve_lookahead_m` acquires the mutex.
         """
         new_res: Dict[int, str] = {}
         if not self.segments:
@@ -327,13 +370,14 @@ class CorridorMutexManager:
             for cid in sorted(self.corridors_near_point(rx, ry)):
                 new_res.setdefault(cid, ns)
 
-        # Pass 2: Robots whose active path crosses an unclaimed bottleneck
+        # Pass 2: Robots whose active path crosses an unclaimed bottleneck within lookahead
         candidates: List[Tuple[float, str, int]] = []
+        lookahead = float(self.params.reserve_lookahead_m)
         for ns, path in active_paths.items():
             if not path or ns not in robot_poses:
                 continue
             rx, ry, _ = robot_poses[ns]
-            for cid in self.corridors_on_path(path):
+            for cid in self.corridors_on_path(path, origin_xy=(rx, ry), max_length_m=lookahead):
                 if cid in new_res:
                     continue
                 seg = self.segments.get(cid)
@@ -350,16 +394,21 @@ class CorridorMutexManager:
         return new_res
 
     def reserve_for_robot(self, robot_ns: str, path_xy: Sequence[Tuple[float, float]], now: float) -> None:
-        """Immediately reserve all currently unclaimed bottlenecks along a newly dispatched path."""
-        for cid in self.corridors_on_path(path_xy):
+        """Immediately reserve unclaimed bottlenecks within lookahead along a newly dispatched path."""
+        for cid in self.corridors_on_path(path_xy, max_length_m=float(self.params.reserve_lookahead_m)):
             if cid not in self.reservations:
                 self.reservations[cid] = (robot_ns, now)
 
     def blocking_corridor_for_path(
-        self, robot_ns: str, path_xy: Sequence[Tuple[float, float]]
+        self,
+        robot_ns: str,
+        path_xy: Sequence[Tuple[float, float]],
+        origin_xy: Optional[Tuple[float, float]] = None,
     ) -> Optional[Tuple[int, str]]:
         """Return (corridor_id, owner_ns) if `path_xy` enters a bottleneck held by another robot."""
-        for cid in self.corridors_on_path(path_xy):
+        for cid in self.corridors_on_path(
+            path_xy, origin_xy=origin_xy, max_length_m=float(self.params.reserve_lookahead_m)
+        ):
             holder = self.reservations.get(cid)
             if holder is not None and holder[0] != robot_ns:
                 return cid, holder[0]
@@ -402,6 +451,7 @@ class CorridorMutexManager:
         self,
         robot_poses: Dict[str, Tuple[float, float, float]],
         active_paths: Dict[str, Sequence[Tuple[float, float]]],
+        yielding_robots: Optional[Set[str]] = None,
     ) -> List[Tuple[str, int, str, Optional[Tuple[float, float, float]]]]:
         """Detect active navigating robots heading into a bottleneck reserved by another robot.
 
@@ -410,27 +460,32 @@ class CorridorMutexManager:
         yielders: List[Tuple[str, int, str, Optional[Tuple[float, float, float]]]] = []
         if not self.segments or not self.reservations:
             return yielders
+        yielding_set = yielding_robots or set()
 
         for ns, path in active_paths.items():
             if not path or ns not in robot_poses:
                 continue
-            conflict = self.blocking_corridor_for_path(ns, path)
+            rx, ry, _ = robot_poses[ns]
+            conflict = self.blocking_corridor_for_path(ns, path, origin_xy=(rx, ry))
             if conflict is None:
                 continue
             cid, owner_ns = conflict
             if owner_ns not in robot_poses:
                 continue
+            # Break AB-BA circular waits: never yield to a teammate that is already yielding
+            # or stationary with no active path through the bottleneck.
+            if owner_ns in yielding_set or owner_ns not in active_paths:
+                continue
 
-            rx, ry, _ = robot_poses[ns]
             ox, oy, _ = robot_poses[owner_ns]
             seg = self.segments.get(cid)
             if seg is None:
                 continue
 
-            # Only interrupt when robot is actually approaching the conflicted bottleneck
+            # Only interrupt when robot is genuinely close to both bottleneck and oncoming teammate
             dist_to_seg = math.hypot(rx - seg.centroid_x, ry - seg.centroid_y)
             dist_robots = math.hypot(rx - ox, ry - oy)
-            if dist_to_seg > self.params.head_on_detect_dist_m and dist_robots > self.params.head_on_detect_dist_m:
+            if dist_to_seg > self.params.head_on_detect_dist_m or dist_robots > self.params.head_on_detect_dist_m + 1.0:
                 continue
 
             # If robot is already physically inside the same corridor, do NOT stop it inside!

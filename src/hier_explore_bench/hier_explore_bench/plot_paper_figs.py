@@ -30,13 +30,13 @@ METHOD_STYLES: Dict[str, Dict[str, object]] = {
     "mtare": {"label": "CMU M-TARE (0.5 m/s, GT)", "color": "#D55E00", "ls": "--", "marker": "s", "lw": 1.5, "zorder": 4},
     "e3_hier": {"label": "Hier-Greedy (E3)", "color": "#009E73", "ls": "-.", "marker": "^", "lw": 1.4, "zorder": 3},
     "e1_2d": {"label": "2D-Frontier (E1)", "color": "#E69F00", "ls": ":", "marker": "D", "lw": 1.4, "zorder": 2},
-    "legacy": {"label": "Legacy explore_lite (E0)", "color": "#CC79A7", "ls": (0, (3, 1, 1, 1)), "marker": "v", "lw": 1.3, "zorder": 1},
+    "legacy": {"label": "m-explore-ros2", "color": "#CC79A7", "ls": (0, (3, 1, 1, 1)), "marker": "v", "lw": 1.3, "zorder": 1},
     "e2_3dgain": {"label": "2D+3D Gain (E2)", "color": "#56B4E9", "ls": "--", "marker": "P", "lw": 1.3, "zorder": 2},
     "e4_geodesic": {"label": "+Geodesic (E4)", "color": "#009E73", "ls": "-.", "marker": "^", "lw": 1.4, "zorder": 3},
     "e5_deconflict": {"label": "+Deconflict (E5)", "color": "#332288", "ls": "-", "marker": "X", "lw": 1.5, "zorder": 4},
-    "legacy_merge": {"label": "Legacy Merge + PyCloud", "color": "#CC79A7", "ls": ":", "marker": "v", "lw": 1.3, "zorder": 1},
     "no_se2": {"label": "No SE(2) Align", "color": "#E69F00", "ls": "--", "marker": "D", "lw": 1.3, "zorder": 2},
-    "no_degen_gate": {"label": "SE(2) w/o Degen. Gate", "color": "#D55E00", "ls": "-.", "marker": "s", "lw": 1.4, "zorder": 3},
+    "no_phase_corr": {"label": "ICP Only (w/o FFT)", "color": "#CC79A7", "ls": ":", "marker": "v", "lw": 1.3, "zorder": 2},
+    "no_degen_gate": {"label": "FFT+ICP (w/o Degen. Gate)", "color": "#D55E00", "ls": "-.", "marker": "s", "lw": 1.4, "zorder": 3},
     "gt_odom": {"label": "GT-Odom (Oracle)", "color": "#009E73", "ls": "--", "marker": "*", "lw": 1.4, "zorder": 4},
 }
 
@@ -235,85 +235,95 @@ def plot_multiworld_coverage_grid(
 
 
 def plot_alignment_study(
-    world_aggregates: Dict[str, Dict[str, Dict[str, Dict[str, float]]]],
+    stress_aggregates: Dict[str, Dict[str, Dict[str, Dict[str, Dict[str, float]]]]],
     out_stem: Path,
     worlds: Sequence[Tuple[str, str]] = (("mine", "Mine"), ("warehouse", "Warehouse")),
-    variants: Sequence[str] = ("legacy_merge", "no_se2", "no_degen_gate", "full", "gt_odom"),
+    tiers: Sequence[Tuple[str, str]] = (
+        ("p00", "0 m, 0°"),
+        ("p05", "0.5 m, 5°"),
+        ("p10", "1.0 m, 10°"),
+    ),
+    variants: Sequence[str] = ("no_se2", "no_phase_corr", "no_degen_gate", "full"),
 ) -> Path:
-    """Plot Fig. 2: Noisy Odometry Online SE(2) Alignment & Degeneracy Gate Study (1x4 panels)."""
+    """Plot Fig. 2: Initial-Pose Perturbation Stress Test of Online SE(2) Registration (2x3 panels).
+
+    ``stress_aggregates`` maps ``world -> tier -> variant -> metric -> {mean, std}``.
+    """
     configure_ieee_style()
     metrics = [
-        ("occupied_iou_tol1", "2D Map Occ. IoU ↑", 1.0),
-        ("ate_rmse_mean_m", "ATE RMSE (m) ↓", 1.0),
-        ("chamfer_l1_m", "3D Chamfer-L1 (m) ↓", 1.0),
-        ("cloud_merger_cpu_mean_pct", "Cloud Merger CPU (%) ↓", 1.0),
+        ("ate_rmse_mean_m", "ATE RMSE (m) ↓", 1.0, None),
+        ("occupied_iou_tol1", "2D Map Occ. IoU ↑", 1.0, (0.0, 1.0)),
+        ("precision_10cm", "3D Prec. @ 10 cm (%) ↑", 100.0, (0.0, 108.0)),
     ]
-    fig, axes = plt.subplots(1, 4, figsize=(7.16, 2.35), dpi=300)
-    x = np.arange(len(worlds))
+    n_rows = len(worlds)
+    n_cols = len(metrics)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(7.16, 1.90 * n_rows + 0.45), dpi=300)
+    axes_2d = np.atleast_2d(axes)
+    x = np.arange(len(tiers))
     n_var = len(variants)
     width = 0.78 / max(1, n_var)
+    panel_tags = "abcdefghi"
 
-    for ax, (mkey, ylabel, scale) in zip(axes, metrics):
-        for v_idx, vkey in enumerate(variants):
-            st = get_method_style(vkey, v_idx)
-            means = []
-            stds = []
-            for wkey, _ in worlds:
-                stat = world_aggregates.get(wkey, {}).get(vkey, {}).get(mkey, {})
-                m = float(stat.get("mean", float("nan"))) * scale
-                s = float(stat.get("std", 0.0)) * scale
-                means.append(0.0 if not math.isfinite(m) else m)
-                stds.append(0.0 if not math.isfinite(s) else s)
-            offset = (v_idx - (n_var - 1) / 2.0) * width
-            hatch = "//" if vkey == "gt_odom" else None
-            ax.bar(
-                x + offset,
-                means,
-                width=width * 0.92,
-                yerr=stds,
-                capsize=2.0,
-                error_kw={"elinewidth": 0.7, "capthick": 0.7},
-                color=str(st["color"]),
-                edgecolor="#222222",
-                linewidth=0.4,
-                hatch=hatch,
-                label=str(st["label"]),
-                zorder=3,
-            )
-        ax.set_xticks(x)
-        ax.set_xticklabels([wlabel for _, wlabel in worlds])
-        ax.set_ylabel(ylabel)
-        ax.set_ylim(bottom=0.0)
-        if mkey == "ate_rmse_mean_m":
-            gt_idx = list(variants).index("gt_odom") if "gt_odom" in variants else -1
-            if gt_idx >= 0:
-                gt_off = (gt_idx - (n_var - 1) / 2.0) * width
-                y_top = ax.get_ylim()[1]
-                for wi in range(len(worlds)):
-                    ax.text(
-                        wi + gt_off,
-                        y_top * 0.04,
-                        "0\n(GT)",
-                        ha="center",
-                        va="bottom",
-                        fontsize=5.5,
-                        color="#007A59",
-                        fontweight="bold",
-                    )
-        ax.grid(True, axis="y", linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
+    variant_labels = {
+        "no_se2": "No SE(2) Align",
+        "no_phase_corr": "ICP Only (w/o FFT)",
+        "no_degen_gate": "FFT+ICP (w/o Degen. Gate)",
+        "full": "Lite-HMRE (Full SE(2))",
+    }
 
-    handles, labels = axes[0].get_legend_handles_labels()
+    for r_idx, (wkey, wlabel) in enumerate(worlds):
+        for c_idx, (mkey, ylabel, scale, ylim) in enumerate(metrics):
+            ax = axes_2d[r_idx, c_idx]
+            for v_idx, vkey in enumerate(variants):
+                st = get_method_style(vkey, v_idx)
+                means, stds = [], []
+                for tkey, _ in tiers:
+                    stat = stress_aggregates.get(wkey, {}).get(tkey, {}).get(vkey, {}).get(mkey, {})
+                    m = float(stat.get("mean", float("nan"))) * scale
+                    s = float(stat.get("std", 0.0)) * scale
+                    means.append(0.0 if not math.isfinite(m) else m)
+                    stds.append(0.0 if not math.isfinite(s) else s)
+                offset = (v_idx - (n_var - 1) / 2.0) * width
+                ax.bar(
+                    x + offset,
+                    means,
+                    width=width * 0.90,
+                    yerr=stds,
+                    capsize=1.8,
+                    error_kw={"elinewidth": 0.65, "capthick": 0.65},
+                    color=str(st["color"]),
+                    edgecolor="#222222",
+                    linewidth=0.4,
+                    label=variant_labels.get(vkey, str(st["label"])),
+                    zorder=3,
+                )
+            tag = panel_tags[r_idx * n_cols + c_idx]
+            clean_title = ylabel.split(" (")[0].replace(" ↑", "").replace(" ↓", "")
+            ax.set_title(f"({tag}) {wlabel}: {clean_title}", fontweight="bold", pad=4)
+            ax.set_xticks(x)
+            ax.set_xticklabels([tlabel for _, tlabel in tiers], fontsize=6.8)
+            if r_idx == n_rows - 1:
+                ax.set_xlabel("Initial Pose Perturbation")
+            ax.set_ylabel(ylabel)
+            if ylim is not None:
+                ax.set_ylim(*ylim)
+            else:
+                ax.set_ylim(bottom=0.0)
+            ax.grid(True, axis="y", linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
+
+    handles, labels = axes_2d[0, 0].get_legend_handles_labels()
     fig.legend(
         handles,
         labels,
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.06),
-        ncol=min(len(labels), 5),
+        bbox_to_anchor=(0.5, 1.03),
+        ncol=min(len(labels), 4),
         frameon=True,
-        columnspacing=0.9,
-        handletextpad=0.4,
+        framealpha=0.95,
+        columnspacing=1.0,
+        handletextpad=0.45,
     )
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.90))
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.93), h_pad=1.0, w_pad=1.1)
     return _save_fig(fig, out_stem)
 
 
@@ -534,7 +544,6 @@ def plot_ablation_and_sensitivity(
     sensitivity_agg: Dict[str, Dict[str, Dict[str, float]]],
     out_stem: Path,
     ablation_order: Sequence[Tuple[str, str]] = (
-        ("legacy", "E0"),
         ("e1_2d", "E1"),
         ("e2_3dgain", "E2"),
         ("e3_hier", "E3"),
@@ -549,7 +558,7 @@ def plot_ablation_and_sensitivity(
         ("32beam_010", "32B\n0.10m"),
     ),
 ) -> Path:
-    """Plot Fig. 5: 3-panel Ablation (3D Comp + CE/Overlap) & Sensor/Voxel Sensitivity."""
+    """Plot Fig. 5: 3-panel 6-Step Ablation (3D Comp + CE/Overlap) & Sensor/Voxel Sensitivity."""
     configure_ieee_style()
     fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.45), dpi=300)
 
@@ -611,7 +620,7 @@ def plot_ablation_and_sensitivity(
     ax.set_ylabel("Coverage Eff. CE (m²/m) ↑")
     ax_ov.set_ylabel("Path Overlap (%) ↓", color="#444444")
     ax.set_ylim(0.0, 4.15)
-    ax_ov.set_ylim(0.0, 29.5)
+    ax_ov.set_ylim(0.0, 16.5)
     ax.set_title("(b) Ablation: CE & Overlap", fontweight="bold")
     ax.grid(True, linestyle="--", linewidth=0.35, alpha=0.45, zorder=0)
     h1, l1 = ax.get_legend_handles_labels()

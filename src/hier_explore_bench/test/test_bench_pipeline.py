@@ -176,24 +176,18 @@ def test_ieee_multiworld_alignment_scalability_and_ablation_plots(tmp_path: Path
         return {"mean": val, "std": 0.05 * abs(val), "median": val, "n": 3}
 
     align = {
-        "mine": {
-            v: {
-                "occupied_iou_tol1": _agg(0.7 + 0.05 * i),
-                "ate_rmse_mean_m": _agg(0.25 - 0.04 * i),
-                "chamfer_l1_m": _agg(0.30 - 0.03 * i),
-                "cloud_merger_cpu_mean_pct": _agg(40.0 - 7.0 * i),
+        w: {
+            tier: {
+                v: {
+                    "occupied_iou_tol1": _agg(0.45 + 0.12 * i),
+                    "ate_rmse_mean_m": _agg(0.85 - 0.22 * i),
+                    "precision_10cm": _agg(0.55 + 0.11 * i),
+                }
+                for i, v in enumerate(("no_se2", "no_phase_corr", "no_degen_gate", "full"))
             }
-            for i, v in enumerate(("legacy_merge", "no_se2", "no_degen_gate", "full", "gt_odom"))
-        },
-        "warehouse": {
-            v: {
-                "occupied_iou_tol1": _agg(0.65 + 0.06 * i),
-                "ate_rmse_mean_m": _agg(0.30 - 0.05 * i),
-                "chamfer_l1_m": _agg(0.32 - 0.03 * i),
-                "cloud_merger_cpu_mean_pct": _agg(45.0 - 8.0 * i),
-            }
-            for i, v in enumerate(("legacy_merge", "no_se2", "no_degen_gate", "full", "gt_odom"))
-        },
+            for tier in ("p00", "p05", "p10")
+        }
+        for w in ("mine", "warehouse")
     }
     p2 = plot_alignment_study(align, tmp_path / "fig2")
     assert p2.is_file() and (tmp_path / "fig2.png").is_file()
@@ -215,7 +209,7 @@ def test_ieee_multiworld_alignment_scalability_and_ablation_plots(tmp_path: Path
     assert p4.is_file() and (tmp_path / "fig4.png").is_file()
 
     ablation = {
-        w: {k: {"completeness_15cm": _agg(0.4 + 0.05 * i)} for i, k in enumerate(("legacy", "e1_2d", "e2_3dgain", "e3_hier", "e4_geodesic", "e5_deconflict", "full"))}
+        w: {k: {"completeness_15cm": _agg(0.4 + 0.05 * i)} for i, k in enumerate(("e1_2d", "e2_3dgain", "e3_hier", "e4_geodesic", "e5_deconflict", "full"))}
         for w in ("mine", "hospital")
     }
     sens = {

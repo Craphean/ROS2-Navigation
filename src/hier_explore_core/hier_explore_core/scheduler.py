@@ -172,19 +172,26 @@ def build_local_tour(
     start_xy,
     params: TourParams,
     distance_fn: DistanceFn = euclidean_distance,
+    start_yaw: Optional[float] = None,
+    orientation_weight: float = 0.5,
 ) -> List:
     """Select and order near-field candidates into a bounded open TSP tour."""
     if not candidates:
         return []
     sx, sy = float(start_xy[0]), float(start_xy[1])
 
+    def _cand_score(c) -> float:
+        d = distance_fn(sx, sy, float(c.x), float(c.y))
+        s = float(getattr(c, "total_gain", 0.0)) - params.score_dist_weight * d
+        if start_yaw is not None and orientation_weight > 0.0 and d > 0.25:
+            ang = abs(wrap_angle(math.atan2(float(c.y) - sy, float(c.x) - sx) - start_yaw))
+            s -= orientation_weight * ang
+        return s
+
     ranked = sorted(
         candidates,
         key=lambda c: (
-            -(
-                float(getattr(c, "total_gain", 0.0))
-                - params.score_dist_weight * distance_fn(sx, sy, float(c.x), float(c.y))
-            ),
+            -_cand_score(c),
             float(c.x),
             float(c.y),
         ),
@@ -290,8 +297,10 @@ def global_bid(
     candidate,
     params: RoiParams,
     distance_fn: DistanceFn = euclidean_distance,
+    other_agents: Sequence[AgentState] = (),
+    other_goals: Sequence[Tuple[float, float]] = (),
 ) -> Tuple[float, float, float]:
-    """Return (bid, roi, distance) for a Global candidate."""
+    """Return (bid, roi, distance) for a Global candidate with Voronoi wing preference."""
     dist = distance_fn(agent.x, agent.y, float(candidate.x), float(candidate.y))
     gain = float(
         getattr(candidate, "bid_gain", 0.0) or getattr(candidate, "total_gain", 0.0)
@@ -300,7 +309,32 @@ def global_bid(
     heading = abs(
         wrap_angle(math.atan2(candidate.y - agent.y, candidate.x - agent.x) - agent.yaw)
     )
-    bid = params.roi_scale * roi - params.orientation_scale * heading
+    # Spatial Voronoi division: discourage crossing into another robot's wing when
+    # a teammate is substantially closer to this global candidate, or chasing the
+    # same branch/direction as an already-dispatched teammate goal.
+    voronoi_penalty = 0.0
+    if other_agents and math.isfinite(dist):
+        min_other = min(
+            (
+                distance_fn(o.x, o.y, float(candidate.x), float(candidate.y))
+                for o in other_agents
+                if o.namespace != agent.namespace and math.isfinite(o.x) and math.isfinite(o.y)
+            ),
+            default=float("inf"),
+        )
+        if math.isfinite(min_other) and dist > min_other + 3.0:
+            voronoi_penalty += 0.60 * params.roi_scale * roi + 0.08 * (dist - min_other)
+    if other_goals and math.isfinite(dist):
+        min_gdist = min(
+            (
+                math.hypot(float(candidate.x) - gx, float(candidate.y) - gy)
+                for gx, gy in other_goals
+            ),
+            default=float("inf"),
+        )
+        if min_gdist < 8.0:
+            voronoi_penalty += 0.55 * params.roi_scale * roi * (1.0 - min_gdist / 8.0)
+    bid = params.roi_scale * roi - params.orientation_scale * heading - voronoi_penalty
     return bid, roi, dist
 
 
@@ -336,18 +370,36 @@ def filter_corridor_safe_candidates(
     reservations = getattr(corridor_mgr, "reservations", None)
     if corridor_mgr is None or not reservations:
         return list(candidates), None
-    if not any(holder[0] != robot_ns for holder in reservations.values()):
+    other_cids = [cid for cid, holder in reservations.items() if holder[0] != robot_ns]
+    if not other_cids:
+        return list(candidates), None
+
+    rx, ry = float(robot_xy[0]), float(robot_xy[1])
+    # Fast spatial skip: if every teammate-reserved bottleneck is far away, avoid running A*
+    segments = getattr(corridor_mgr, "segments", None) or {}
+    params = getattr(corridor_mgr, "params", None)
+    near_rad = max(6.0, 2.0 * float(getattr(params, "reserve_lookahead_m", 4.0)))
+    if segments and all(
+        (cid not in segments)
+        or math.hypot(rx - segments[cid].centroid_x, ry - segments[cid].centroid_y) > near_rad
+        for cid in other_cids
+    ):
         return list(candidates), None
 
     safe: List = []
     first_conflict: Optional[Tuple[int, str]] = None
-    rx, ry = float(robot_xy[0]), float(robot_xy[1])
-    for cand in candidates:
+    # Bound per-cycle A* path checks on large maps to the nearest 16 candidates
+    ordered = (
+        sorted(candidates, key=lambda c: math.hypot(float(c.x) - rx, float(c.y) - ry))[:16]
+        if len(candidates) > 16
+        else candidates
+    )
+    for cand in ordered:
         cx, cy = float(cand.x), float(cand.y)
         dist_m, path_xy = path_fn((rx, ry), (cx, cy))
         if not math.isfinite(dist_m) or len(path_xy) == 0:
             continue
-        conflict = corridor_mgr.blocking_corridor_for_path(robot_ns, path_xy)
+        conflict = corridor_mgr.blocking_corridor_for_path(robot_ns, path_xy, origin_xy=(rx, ry))
         if conflict is None:
             safe.append(cand)
         elif first_conflict is None:

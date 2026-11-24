@@ -153,6 +153,22 @@ ABLATION_PROFILES: Dict[str, AblationProfile] = {
         },
         se2_merge_params={"enable_online_alignment": False},
     ),
+    "no_phase_corr": AblationProfile(
+        name="no_phase_corr",
+        description="Alignment ablation: Full coordinator with 2D FFT coarse phase correlation disabled (ICP only).",
+        default_planner_backend="coordinator",
+        coordinator_params={
+            "use_3d_gain": True,
+            "local_scheduling_enable": True,
+            "residual_enable": True,
+            "convergence_enable": True,
+            "use_geodesic_distance": True,
+            "use_los_fov_optimizer": True,
+            "teammate_deconfliction_enable": True,
+            "corridor_mutex_enable": True,
+        },
+        se2_merge_params={"enable_phase_corr": False},
+    ),
     "no_degen_gate": AblationProfile(
         name="no_degen_gate",
         description="Alignment ablation: Full coordinator with Hessian corridor degeneracy gate disabled.",

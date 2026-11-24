@@ -18,4 +18,9 @@ console/run/
 extras/console/.venv/
 extras/console/bin/
 extras/console/run/
+docs/paper_draft.md
+docs/paper_draft_zh.md
+docs/paper_plan.md
+docs/paper_artifacts/
+docs/*.webm
 

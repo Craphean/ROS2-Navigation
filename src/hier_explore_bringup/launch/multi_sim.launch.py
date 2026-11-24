@@ -90,6 +90,14 @@ def _build_launch_actions(context, *args, **kwargs):
     explorer_delay_arg = LaunchConfiguration("explorer_start_delay_sec").perform(context).strip().lower()
     lidar_v_samples = LaunchConfiguration("lidar_v_samples").perform(context).strip()
     voxel_resolution = float(LaunchConfiguration("voxel_resolution").perform(context))
+    init_pose_noise_str = LaunchConfiguration("init_pose_noise").perform(context).strip()
+    noise_parts = [float(v) for v in init_pose_noise_str.split(",") if v.strip()]
+    if len(noise_parts) == 3:
+        noise_dx, noise_dy, noise_dyaw_deg = noise_parts
+    else:
+        noise_dx, noise_dy, noise_dyaw_deg = 0.0, 0.0, 0.0
+    import math
+    noise_dyaw_rad = math.radians(noise_dyaw_deg)
 
     resolved = resolve_profile(
         ablation_profile=ablation_profile,
@@ -202,10 +210,16 @@ def _build_launch_actions(context, *args, **kwargs):
             "use_sim_time": True,
             "robot_namespaces": namespaces,
         }
-        for ns, sp in zip(namespaces, spawns):
-            se2_dyn_params[f"{ns}_init_pose"] = (
-                [0.0, 0.0, 0.0] if use_gt_odom else sp.as_list()
-            )
+        for idx_sp, (ns, sp) in enumerate(zip(namespaces, spawns)):
+            base_pose = [0.0, 0.0, 0.0] if use_gt_odom else sp.as_list()
+            if idx_sp >= 1 and (abs(noise_dx) > 1e-9 or abs(noise_dy) > 1e-9 or abs(noise_dyaw_rad) > 1e-9):
+                sign = 1.0 if (idx_sp % 2 == 1) else -1.0
+                base_pose = [
+                    base_pose[0] + sign * noise_dx,
+                    base_pose[1] + sign * noise_dy,
+                    base_pose[2] + sign * noise_dyaw_rad,
+                ]
+            se2_dyn_params[f"{ns}_init_pose"] = base_pose
         se2_dyn_params.update(resolved["se2_merge_params"])
         actions.append(
             TimerAction(
@@ -394,8 +408,8 @@ def _build_launch_actions(context, *args, **kwargs):
                         "use_sim_time": True,
                         "robots": namespaces,
                         "world_frame": "world",
-                        "voxel_size": 0.02,
-                        "publish_rate": 2.0,
+                        "voxel_size": 0.04,
+                        "publish_rate": 1.0,
                     }
                 ],
             )
@@ -529,6 +543,11 @@ def generate_launch_description() -> LaunchDescription:
                 "voxel_resolution",
                 default_value="0.10",
                 description="OctoMap & 2.5D VoxelColumnIndex resolution in meters (0.05|0.10|0.15).",
+            ),
+            DeclareLaunchArgument(
+                "init_pose_noise",
+                default_value="0.0,0.0,0.0",
+                description="Perturbation dx_m,dy_m,dyaw_deg added to robot2..N map_merge init_pose prior.",
             ),
             OpaqueFunction(function=_build_launch_actions),
         ]

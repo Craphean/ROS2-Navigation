@@ -156,7 +156,10 @@ void test_corridor_degeneracy_solution_remapping()
   const auto diag = align_occupancy_grids_se2(ref, src, Pose2D{0.0, 0.0, 0.0}, params);
   const double err_y = std::abs(diag.smoothed_pose.y - true_pose.y);
   const double err_yaw_deg = std::abs(wrap_angle(diag.smoothed_pose.yaw - true_pose.yaw)) / kDeg2Rad;
-  const double longitudinal_drift_x = std::abs(diag.smoothed_pose.x);
+  // Measure physical longitudinal drift of the corridor centroid (not frame origin lever arm)
+  const Point2D corr_c_before = apply_se2(inverse_se2(true_pose), {0.0, 0.0});
+  const Point2D corr_c_after = apply_se2(diag.smoothed_pose, corr_c_before);
+  const double longitudinal_drift_x = std::abs(corr_c_after.x - corr_c_before.x);
 
   std::cout << "  accepted=" << diag.accepted
             << " degenerate_trans=" << diag.degenerate_trans
@@ -169,7 +172,7 @@ void test_corridor_degeneracy_solution_remapping()
 
   assert(diag.accepted);
   assert(diag.degenerate_trans);          // MUST detect parallel-wall degeneracy!
-  assert(longitudinal_drift_x < 0.01);    // X frozen (< 1 cm)
+  assert(longitudinal_drift_x < 0.01);    // Corridor centroid X frozen (< 1 cm)
   assert(err_y < 0.03);                   // lateral Y recovered accurately
   assert(err_yaw_deg < 0.5);              // yaw recovered accurately
 }
@@ -242,6 +245,56 @@ void test_cloud_filter_and_speed_benchmark()
   assert(ms_per_frame < 5.0);  // must be well under 5 ms/frame!
 }
 
+void test_large_coordinate_centroid_pivot_and_deadband()
+{
+  std::cout << "[TEST 5] Large-coordinate (15m, -12m) 10 deg recovery & high-IoU deadband..." << std::endl;
+  auto ref = make_structured_room(0.05);
+  // Shift ref far from world origin (mimicking a large warehouse wing)
+  ref.origin_x += 15.0;
+  ref.origin_y -= 12.0;
+
+  // Apply (1.0 m, 10 deg) perturbation about the room centroid
+  const double cx = ref.origin_x + 0.5 * ref.width * ref.resolution;
+  const double cy = ref.origin_y + 0.5 * ref.height * ref.resolution;
+  const double yaw_true = 10.0 * kDeg2Rad;
+  const double c = std::cos(yaw_true), s = std::sin(yaw_true);
+  const Pose2D true_pose{
+    (cx + 0.71) - (c * cx - s * cy),
+    (cy + 0.71) - (s * cx + c * cy),
+    yaw_true
+  };
+  const auto src = warp_grid_as_follower(ref, true_pose);
+
+  Se2AlignParams params;
+  params.smoothing_alpha = 1.0;
+  params.max_step_xy_m = 3.0;
+  params.max_step_yaw_rad = 0.5;
+  params.enable_phase_corr = true;
+  params.enable_degeneracy_gate = true;
+
+  const auto diag = align_occupancy_grids_se2(ref, src, Pose2D{0.0, 0.0, 0.0}, params);
+  const Point2D c_est = apply_se2(diag.smoothed_pose, {cx, cy});
+  const Point2D c_gt = apply_se2(true_pose, {cx, cy});
+  const double err_xy = std::hypot(c_est.x - c_gt.x, c_est.y - c_gt.y);
+  const double err_yaw_deg = std::abs(wrap_angle(diag.smoothed_pose.yaw - true_pose.yaw)) / kDeg2Rad;
+  std::cout << "  large-coord accepted=" << diag.accepted
+            << " phase_used=" << diag.phase_corr_used
+            << " iou=" << diag.iou_before << "->" << diag.iou_after
+            << " err_xy=" << err_xy * 100.0 << "cm err_yaw=" << err_yaw_deg << "deg" << std::endl;
+  assert(diag.accepted);
+  assert(err_xy < 0.05);
+  assert(err_yaw_deg < 0.5);
+
+  // Test 6: High-IoU deadband rejects tiny 1 cm noise on an already-aligned small room
+  const Pose2D tiny_noise{true_pose.x + 0.01, true_pose.y - 0.01, true_pose.yaw};
+  const auto db = align_occupancy_grids_se2(ref, src, tiny_noise, params);
+  std::cout << "  deadband accepted=" << db.accepted
+            << " iou_before=" << db.iou_before
+            << " reason=" << db.reject_reason << std::endl;
+  assert(!db.accepted);
+  assert(db.reject_reason == "high_iou_deadband" || db.reject_reason == "iou_degraded");
+}
+
 }  // namespace
 
 int main()
@@ -250,6 +303,7 @@ int main()
   test_corridor_degeneracy_solution_remapping();
   test_step_clamped_smoothing_and_merge();
   test_cloud_filter_and_speed_benchmark();
+  test_large_coordinate_centroid_pivot_and_deadband();
   std::cout << "ALL se2_map_merge C++ TESTS PASSED!" << std::endl;
   return 0;
 }

@@ -304,7 +304,8 @@ py::dict py_extract_corridor_bottlenecks(
   int min_segment_cells,
   double yield_search_radius_m,
   double yield_min_separation_m,
-  int max_yield_points)
+  int max_yield_points,
+  double min_segment_length_m)
 {
   auto f_buf = is_free.request();
   auto dt_buf = obstacle_dt.request();
@@ -321,6 +322,7 @@ py::dict py_extract_corridor_bottlenecks(
   cp.narrow_margin_m = narrow_margin_m;
   cp.min_passable_margin_m = min_passable_margin_m;
   cp.min_segment_cells = min_segment_cells;
+  cp.min_segment_length_m = min_segment_length_m;
   cp.yield_search_radius_m = yield_search_radius_m;
   cp.yield_min_separation_m = yield_min_separation_m;
   cp.max_yield_points = max_yield_points;
@@ -454,5 +456,6 @@ PYBIND11_MODULE(_geom_kernel, m)
     py::arg("min_segment_cells") = 4,
     py::arg("yield_search_radius_m") = 3.0,
     py::arg("yield_min_separation_m") = 1.0,
-    py::arg("max_yield_points") = 4);
+    py::arg("max_yield_points") = 4,
+    py::arg("min_segment_length_m") = 0.0);
 }

@@ -31,8 +31,9 @@ octomap_server:
     # than 12 m from the origin disappeared.  Verified with a synthetic cloud:
     # walls at x = 5/9/15/20 m keep 744 points at 12 m (xmax 9.05) versus 1488
     # points at 100 m (xmax 20.05).
-    # 500 m covers all 6 benchmark worlds (up to CMU tunnel ~250 x 330 m) with margin.
-    sensor_model.max_range: 500.0
+    # -1.0 disables max_range clipping (ROS 2 Lyrical rejects values > 100 m),
+    # covering all 6 benchmark worlds (up to CMU tunnel ~250 x 330 m) without clipping.
+    sensor_model.max_range: -1.0
     publish_free_space: false
     # Keep this false in the headless VM: with latch=true octomap_server
     # serializes octomap_binary/full on every cloud update even when nobody

@@ -122,6 +122,42 @@ inline Pose2D smooth_se2(
   };
 }
 
+/// Pivot-centered step-clamped SE(2) exponential smoothing (eliminates lever-arm shear
+/// when rotating maps whose occupied centroid sits far from the local frame origin).
+inline Pose2D smooth_se2_about_pivot(
+  const Pose2D & current,
+  const Pose2D & target,
+  const Point2D & pivot_local,
+  double alpha,
+  double max_step_xy = 0.05,
+  double max_step_yaw = 0.0174532925)
+{
+  alpha = std::clamp(alpha, 0.0, 1.0);
+  const Point2D c_cur = apply_se2(current, pivot_local);
+  const Point2D c_tgt = apply_se2(target, pivot_local);
+  double dx = alpha * (c_tgt.x - c_cur.x);
+  double dy = alpha * (c_tgt.y - c_cur.y);
+  double dyaw = alpha * wrap_angle(target.yaw - current.yaw);
+
+  const double d_norm = std::hypot(dx, dy);
+  if (max_step_xy > 0.0 && d_norm > max_step_xy) {
+    const double scale = max_step_xy / d_norm;
+    dx *= scale;
+    dy *= scale;
+  }
+  if (max_step_yaw > 0.0) {
+    dyaw = std::clamp(dyaw, -max_step_yaw, max_step_yaw);
+  }
+  const double yaw_next = wrap_angle(current.yaw + dyaw);
+  const double c = std::cos(yaw_next);
+  const double s = std::sin(yaw_next);
+  return {
+    (c_cur.x + dx) - (c * pivot_local.x - s * pivot_local.y),
+    (c_cur.y + dy) - (s * pivot_local.x + c * pivot_local.y),
+    yaw_next
+  };
+}
+
 struct OccupancyGrid2D
 {
   int width{0};

@@ -243,48 +243,59 @@ CorridorGraphResult extract_corridor_bottlenecks(
     if (static_cast<int>(cells.size()) < params.min_segment_cells) {
       continue;
     }
-    ++out_id;
-
-    CorridorSegment seg;
-    seg.id = out_id;
-    seg.cell_count = static_cast<int32_t>(cells.size());
     double min_dt = std::numeric_limits<double>::infinity();
     double max_dt = 0.0;
     double sum_x = 0.0;
     double sum_y = 0.0;
     int r_min = height, r_max = 0, c_min = width, c_max = 0;
 
-    ++stamp_gen;
-    std::queue<int32_t> yq;
-
     for (int32_t cid : cells) {
-      res.labels[static_cast<size_t>(cid)] = out_id;
       const int r = cid / width;
       const int c = cid - r * width;
       r_min = std::min(r_min, r);
       r_max = std::max(r_max, r);
       c_min = std::min(c_min, c);
       c_max = std::max(c_max, c);
-      const double wx = origin_x + (static_cast<double>(c) + 0.5) * resolution;
-      const double wy = origin_y + (static_cast<double>(r) + 0.5) * resolution;
-      sum_x += wx;
-      sum_y += wy;
+      sum_x += origin_x + (static_cast<double>(c) + 0.5) * resolution;
+      sum_y += origin_y + (static_cast<double>(r) + 0.5) * resolution;
       const double w_m = static_cast<double>(obstacle_dt[cid]) * resolution;
       min_dt = std::min(min_dt, w_m);
       max_dt = std::max(max_dt, w_m);
+    }
 
+    const double seg_min_half_w = std::isfinite(min_dt) ? min_dt : 0.0;
+    const double seg_length_m = std::hypot(
+      static_cast<double>(r_max - r_min + 1),
+      static_cast<double>(c_max - c_min + 1)) * resolution;
+
+    // Exempt short doorway frames / thin furniture gaps unless ultra-tight single-robot choke
+    if (params.min_segment_length_m > 0.0 &&
+        seg_length_m < params.min_segment_length_m &&
+        seg_min_half_w >= params.robot_radius + 0.14)
+    {
+      continue;
+    }
+
+    ++out_id;
+
+    CorridorSegment seg;
+    seg.id = out_id;
+    seg.cell_count = static_cast<int32_t>(cells.size());
+    seg.min_half_width_m = seg_min_half_w;
+    seg.max_half_width_m = max_dt;
+    seg.centroid_x = sum_x / static_cast<double>(cells.size());
+    seg.centroid_y = sum_y / static_cast<double>(cells.size());
+    seg.length_m = seg_length_m;
+
+    ++stamp_gen;
+    std::queue<int32_t> yq;
+
+    for (int32_t cid : cells) {
+      res.labels[static_cast<size_t>(cid)] = out_id;
       bfs_stamp[static_cast<size_t>(cid)] = stamp_gen;
       bfs_dist[static_cast<size_t>(cid)] = 0;
       yq.push(cid);
     }
-
-    seg.min_half_width_m = std::isfinite(min_dt) ? min_dt : 0.0;
-    seg.max_half_width_m = max_dt;
-    seg.centroid_x = sum_x / static_cast<double>(cells.size());
-    seg.centroid_y = sum_y / static_cast<double>(cells.size());
-    seg.length_m = std::hypot(
-      static_cast<double>(r_max - r_min + 1),
-      static_cast<double>(c_max - c_min + 1)) * resolution;
 
     struct YieldCand
     {

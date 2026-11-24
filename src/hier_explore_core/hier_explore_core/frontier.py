@@ -313,5 +313,8 @@ def score_frontiers(
             )
             g3d = stats.g3d
         c.gain_2d = min(c.size, gain_size_cap) * resolution
-        c.gain_3d = g3d
-        c.total_gain = gain_scale * c.gain_2d + gain_3d_scale * g3d
+        # Gate 3D structural bonus by 2D frontier extent so tiny occluded desk/wall cracks
+        # never outscore genuine open corridor doorways.
+        size_gate = min(1.0, c.gain_2d / 0.8) if c.gain_2d > 0.0 else 0.0
+        c.gain_3d = g3d * size_gate
+        c.total_gain = gain_scale * c.gain_2d + gain_3d_scale * c.gain_3d

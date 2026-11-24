@@ -38,6 +38,8 @@ class RobotTracker:
         self.latest_plan_time: float = -1e9
         self.yielding_corridor_id: Optional[int] = None
         self.yield_until_time: float = -1e9
+        self.yield_start_time: float = -1e9
+        self.yield_cooldown_until: float = -1e9
 
         # Out-of-bounds self recovery
         self.backup_active: bool = False
@@ -57,6 +59,9 @@ class RobotTracker:
         self.stall_distance_ref: float = float("inf")
         self.stall_ref_x: float = self.init_x
         self.stall_ref_y: float = self.init_y
+        self.stall_ref_yaw: float = self.init_yaw
+        self.consecutive_stalls: int = 0
+        self.goal_initial_dist: float = 0.0
         self.through_poses_failures: int = 0
         self.use_through_poses: bool = True
         self.tour_is_active: bool = False
@@ -67,6 +72,7 @@ class RobotTracker:
         # No-progress livelock breaker
         self.no_progress_key: Optional[Tuple[float, float]] = None
         self.no_progress_streak: int = 0
+        self.visit_recorded_token: int = -1
 
         # Relocalization jump detection
         self.prev_world_x: Optional[float] = None

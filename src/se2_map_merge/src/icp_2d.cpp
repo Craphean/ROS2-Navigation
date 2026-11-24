@@ -421,217 +421,309 @@ RegistrationDiagnostics align_occupancy_grids_se2(
 
   diag.iou_before = compute_overlap_occupied_iou(ref, src, current_pose, params.occupied_threshold);
 
-  // Stage 1: Coarse translation via Hanning-windowed 2D FFT phase correlation
-  Pose2D working_pose = current_pose;
-  if (params.enable_phase_corr) {
-    const auto pc = estimate_coarse_translation(ref, src, current_pose, params.phase_corr);
-    diag.phase_corr_response = pc.response;
-    if (pc.valid) {
-      const Pose2D coarse_candidate{
-        current_pose.x + pc.dx,
-        current_pose.y + pc.dy,
-        current_pose.yaw
-      };
-      // Only adopt coarse shift if it does not degrade overlap IoU significantly
-      const double coarse_iou =
-        compute_overlap_occupied_iou(ref, src, coarse_candidate, params.occupied_threshold);
-      if (coarse_iou >= diag.iou_before - 0.02) {
-        working_pose = coarse_candidate;
-        diag.coarse_delta = {pc.dx, pc.dy, 0.0};
-        diag.phase_corr_used = true;
-      }
-    }
-  }
-
   // Build KD-Tree & local surface normals on reference occupied edge points
   KdTree2D ref_tree(ref_pts);
   const auto ref_normals = estimate_normals(ref_pts, ref_tree, std::max(0.35, 5.0 * ref.resolution));
 
-  // Stage 2: Point-to-line Huber ICP with eigenvalue degeneracy gating (Solution Remapping)
-  const double max_d2 = params.max_correspondence_dist_m * params.max_correspondence_dist_m;
-  TransEigen2 last_trans_eig;
-  bool ever_degenerate_trans = false;
+  // Source occupied centroid (local & current world) for scale-invariant rotation pivoting
+  Point2D src_local_centroid{0.0, 0.0};
+  for (const auto & p : src_pts) {
+    src_local_centroid.x += p.x;
+    src_local_centroid.y += p.y;
+  }
+  src_local_centroid.x /= static_cast<double>(src_pts.size());
+  src_local_centroid.y /= static_cast<double>(src_pts.size());
+  const Point2D src_world_centroid_before = apply_se2(current_pose, src_local_centroid);
 
-  for (int iter = 0; iter < params.max_iterations; ++iter) {
-    diag.icp_iterations = iter + 1;
+  // Helper: run Stage-2 Huber point-to-line ICP + Solution Remapping from a candidate initial pose
+  auto run_icp_from = [&](const Pose2D & init_pose, bool used_pc, const Pose2D & coarse_delta) {
+    RegistrationDiagnostics cand;
+    cand.smoothed_pose = current_pose;
+    cand.overlap_ref_points = diag.overlap_ref_points;
+    cand.overlap_src_points = diag.overlap_src_points;
+    cand.iou_before = diag.iou_before;
+    cand.phase_corr_response = diag.phase_corr_response;
+    cand.phase_corr_used = used_pc;
+    cand.coarse_delta = coarse_delta;
 
-    struct Corr
-    {
-      Point2D p_w;
-      Point2D q_w;
-      Normal2D n;
-      double dist;
-    };
-    std::vector<Corr> corrs;
-    corrs.reserve(src_pts.size());
-    double mean_x = 0.0, mean_y = 0.0;
+    Pose2D working_pose = init_pose;
+    const double max_d2 = params.max_correspondence_dist_m * params.max_correspondence_dist_m;
+    TransEigen2 last_trans_eig;
+    bool last_is_deg = false;
 
-    for (const auto & p_local : src_pts) {
-      const Point2D p_w = apply_se2(working_pose, p_local);
-      double d2 = 0.0;
-      const int idx = ref_tree.nearest(p_w, d2);
-      if (idx >= 0 && d2 <= max_d2) {
-        corrs.push_back({p_w, ref_pts[static_cast<size_t>(idx)], ref_normals[static_cast<size_t>(idx)], std::sqrt(d2)});
-        mean_x += p_w.x;
-        mean_y += p_w.y;
-      }
-    }
+    for (int iter = 0; iter < params.max_iterations; ++iter) {
+      cand.icp_iterations = iter + 1;
 
-    diag.icp_inliers = static_cast<int>(corrs.size());
-    diag.inlier_ratio = static_cast<double>(corrs.size()) / static_cast<double>(src_pts.size());
-    if (static_cast<int>(corrs.size()) < params.min_overlap_points) {
-      diag.reject_reason = "too_few_icp_inliers";
-      return diag;
-    }
+      struct Corr
+      {
+        Point2D p_w;
+        Point2D q_w;
+        Normal2D n;
+        double dist;
+      };
+      std::vector<Corr> corrs;
+      corrs.reserve(src_pts.size());
+      double mean_x = 0.0, mean_y = 0.0;
+      int overlap_region_src = 0;
 
-    mean_x /= static_cast<double>(corrs.size());
-    mean_y /= static_cast<double>(corrs.size());
-
-    std::array<std::array<double, 3>, 3> H = {{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}};
-    std::array<double, 3> b = {0.0, 0.0, 0.0};
-    double sq_err_sum = 0.0;
-
-    auto add_obs = [&](double j0, double j1, double j2, double residual, double weight) {
-      const double w = weight;
-      H[0][0] += w * j0 * j0; H[0][1] += w * j0 * j1; H[0][2] += w * j0 * j2;
-      H[1][0] += w * j1 * j0; H[1][1] += w * j1 * j1; H[1][2] += w * j1 * j2;
-      H[2][0] += w * j2 * j0; H[2][1] += w * j2 * j1; H[2][2] += w * j2 * j2;
-      b[0] -= w * j0 * residual;
-      b[1] -= w * j1 * residual;
-      b[2] -= w * j2 * residual;
-    };
-
-    for (const auto & c : corrs) {
-      const double tx = c.p_w.x - mean_x;
-      const double ty = c.p_w.y - mean_y;
-      const double ex = c.p_w.x - c.q_w.x;
-      const double ey = c.p_w.y - c.q_w.y;
-      sq_err_sum += ex * ex + ey * ey;
-
-      if (c.n.planar) {
-        const double r = c.n.nx * ex + c.n.ny * ey;
-        const double abs_r = std::abs(r);
-        const double w = (abs_r <= params.huber_delta_m) ? 1.0 : (params.huber_delta_m / abs_r);
-        const double j_yaw = -c.n.nx * ty + c.n.ny * tx;
-        add_obs(c.n.nx, c.n.ny, j_yaw, r, w);
-      } else {
-        // Point-to-point anchor for isolated corners / pillars
-        const double w_pt = 0.5 * (
-          c.dist <= params.huber_delta_m ? 1.0 : (params.huber_delta_m / std::max(c.dist, 1e-9)));
-        add_obs(1.0, 0.0, -ty, ex, w_pt);
-        add_obs(0.0, 1.0, tx, ey, w_pt);
-      }
-    }
-
-    diag.icp_rmse_m = std::sqrt(sq_err_sum / static_cast<double>(corrs.size()));
-
-    // Inspect 2x2 translational block for parallel-wall corridor degeneracy
-    last_trans_eig = eigen_2x2_sym(H[0][0], H[0][1], H[1][1]);
-    diag.eig_min_trans = last_trans_eig.eig_min;
-    diag.eig_max_trans = last_trans_eig.eig_max;
-    diag.cond_trans = last_trans_eig.cond;
-
-    const bool is_deg =
-      (last_trans_eig.eig_min < params.min_trans_eigenvalue) ||
-      (last_trans_eig.cond > params.max_trans_cond_number);
-    if (is_deg) {
-      ever_degenerate_trans = true;
-    }
-
-    // Solve via 3x3 symmetric Jacobi eigendecomposition + Solution Remapping
-    const Eigen3 eig3 = jacobi_eigen_3x3(H);
-    std::array<double, 3> delta = {0.0, 0.0, 0.0};
-    for (int m = 0; m < 3; ++m) {
-      const double lam = eig3.values[m];
-      const auto & v = eig3.vectors[m];
-      if (lam <= 1e-9) {
-        continue;
-      }
-      const double trans_frac = v[0] * v[0] + v[1] * v[1];
-      bool keep = true;
-      if (params.enable_degeneracy_gate) {
-        if (trans_frac >= 0.5) {
-          if (lam < params.min_trans_eigenvalue ||
-              (last_trans_eig.eig_max / lam) > params.max_trans_cond_number)
-          {
-            keep = false;
-          }
+      for (const auto & p_local : src_pts) {
+        const Point2D p_w = apply_se2(working_pose, p_local);
+        double d2 = 0.0;
+        const int idx = ref_tree.nearest(p_w, d2);
+        if (idx >= 0 && d2 <= max_d2) {
+          corrs.push_back(
+            {p_w, ref_pts[static_cast<size_t>(idx)], ref_normals[static_cast<size_t>(idx)], std::sqrt(d2)});
+          mean_x += p_w.x;
+          mean_y += p_w.y;
+          ++overlap_region_src;
         } else {
-          if (lam < params.min_rot_eigenvalue) {
-            keep = false;
+          const int rc = static_cast<int>(std::floor((p_w.x - ref.origin_x) / ref.resolution));
+          const int rr = static_cast<int>(std::floor((p_w.y - ref.origin_y) / ref.resolution));
+          if (rc >= 0 && rc < ref.width && rr >= 0 && rr < ref.height && ref.at(rr, rc) >= 0) {
+            ++overlap_region_src;
           }
         }
       }
-      if (!keep) {
-        continue;
+
+      cand.icp_inliers = static_cast<int>(corrs.size());
+      cand.inlier_ratio = static_cast<double>(corrs.size()) /
+        static_cast<double>(std::max(1, overlap_region_src));
+      if (static_cast<int>(corrs.size()) < params.min_overlap_points) {
+        cand.reject_reason = "too_few_icp_inliers";
+        return cand;
       }
-      const double coeff = (v[0] * b[0] + v[1] * b[1] + v[2] * b[2]) / lam;
-      delta[0] += coeff * v[0];
-      delta[1] += coeff * v[1];
-      delta[2] += coeff * v[2];
+
+      mean_x /= static_cast<double>(corrs.size());
+      mean_y /= static_cast<double>(corrs.size());
+
+      std::array<std::array<double, 3>, 3> H = {{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}};
+      std::array<double, 3> b = {0.0, 0.0, 0.0};
+      double sq_err_sum = 0.0;
+
+      auto add_obs = [&](double j0, double j1, double j2, double residual, double weight) {
+        const double w = weight;
+        H[0][0] += w * j0 * j0; H[0][1] += w * j0 * j1; H[0][2] += w * j0 * j2;
+        H[1][0] += w * j1 * j0; H[1][1] += w * j1 * j1; H[1][2] += w * j1 * j2;
+        H[2][0] += w * j2 * j0; H[2][1] += w * j2 * j1; H[2][2] += w * j2 * j2;
+        b[0] -= w * j0 * residual;
+        b[1] -= w * j1 * residual;
+        b[2] -= w * j2 * residual;
+      };
+
+      for (const auto & c : corrs) {
+        const double tx = c.p_w.x - mean_x;
+        const double ty = c.p_w.y - mean_y;
+        const double ex = c.p_w.x - c.q_w.x;
+        const double ey = c.p_w.y - c.q_w.y;
+        sq_err_sum += ex * ex + ey * ey;
+
+        if (c.n.planar) {
+          const double r = c.n.nx * ex + c.n.ny * ey;
+          const double abs_r = std::abs(r);
+          const double w = (abs_r <= params.huber_delta_m) ? 1.0 : (params.huber_delta_m / abs_r);
+          const double j_yaw = -c.n.nx * ty + c.n.ny * tx;
+          add_obs(c.n.nx, c.n.ny, j_yaw, r, w);
+        } else {
+          const double w_pt = 0.5 * (
+            c.dist <= params.huber_delta_m ? 1.0 : (params.huber_delta_m / std::max(c.dist, 1e-9)));
+          add_obs(1.0, 0.0, -ty, ex, w_pt);
+          add_obs(0.0, 1.0, tx, ey, w_pt);
+        }
+      }
+
+      cand.icp_rmse_m = std::sqrt(sq_err_sum / static_cast<double>(corrs.size()));
+
+      last_trans_eig = eigen_2x2_sym(H[0][0], H[0][1], H[1][1]);
+      cand.eig_min_trans = last_trans_eig.eig_min;
+      cand.eig_max_trans = last_trans_eig.eig_max;
+      cand.cond_trans = last_trans_eig.cond;
+
+      const bool is_deg =
+        (last_trans_eig.eig_min < params.min_trans_eigenvalue) ||
+        (last_trans_eig.cond > params.max_trans_cond_number);
+      last_is_deg = is_deg;
+
+      const Eigen3 eig3 = jacobi_eigen_3x3(H);
+      std::array<double, 3> delta = {0.0, 0.0, 0.0};
+      for (int m = 0; m < 3; ++m) {
+        const double lam = eig3.values[m];
+        const auto & v = eig3.vectors[m];
+        if (lam <= 1e-9) {
+          continue;
+        }
+        const double trans_frac = v[0] * v[0] + v[1] * v[1];
+        bool keep = true;
+        if (params.enable_degeneracy_gate) {
+          if (trans_frac >= 0.5) {
+            if (lam < params.min_trans_eigenvalue ||
+                (last_trans_eig.eig_max / lam) > params.max_trans_cond_number)
+            {
+              keep = false;
+            }
+          } else {
+            if (lam < params.min_rot_eigenvalue) {
+              keep = false;
+            }
+          }
+        }
+        if (!keep) {
+          continue;
+        }
+        const double coeff = (v[0] * b[0] + v[1] * b[1] + v[2] * b[2]) / lam;
+        delta[0] += coeff * v[0];
+        delta[1] += coeff * v[1];
+        delta[2] += coeff * v[2];
+      }
+
+      const double dtheta = std::clamp(delta[2], -0.25, 0.25);
+      const double c = std::cos(dtheta);
+      const double s = std::sin(dtheta);
+      const Pose2D inc{
+        mean_x - (c * mean_x - s * mean_y) + delta[0],
+        mean_y - (s * mean_x + c * mean_y) + delta[1],
+        dtheta
+      };
+      working_pose = compose_se2(inc, working_pose);
+
+      if (std::hypot(delta[0], delta[1]) < params.convergence_trans_m &&
+          std::abs(dtheta) < params.convergence_rot_rad)
+      {
+        break;
+      }
     }
 
-    // Convert centroid-centered perturbation to world-frame left SE(2) increment
-    const double dtheta = std::clamp(delta[2], -0.25, 0.25);
-    const double c = std::cos(dtheta);
-    const double s = std::sin(dtheta);
-    const Pose2D inc{
-      mean_x - (c * mean_x - s * mean_y) + delta[0],
-      mean_y - (s * mean_x + c * mean_y) + delta[1],
-      dtheta
+    cand.degenerate_trans = last_is_deg;
+
+    if (params.enable_degeneracy_gate && last_is_deg) {
+      // Project centroid translation onto the well-constrained wall-normal eigenvector
+      const Point2D c_after = apply_se2(working_pose, src_local_centroid);
+      const double cdx = c_after.x - src_world_centroid_before.x;
+      const double cdy = c_after.y - src_world_centroid_before.y;
+      const double proj = cdx * last_trans_eig.vec_max.x + cdy * last_trans_eig.vec_max.y;
+      const double target_cx = src_world_centroid_before.x + proj * last_trans_eig.vec_max.x;
+      const double target_cy = src_world_centroid_before.y + proj * last_trans_eig.vec_max.y;
+      const double cw = std::cos(working_pose.yaw);
+      const double sw = std::sin(working_pose.yaw);
+      working_pose.x = target_cx - (cw * src_local_centroid.x - sw * src_local_centroid.y);
+      working_pose.y = target_cy - (sw * src_local_centroid.x + cw * src_local_centroid.y);
+    }
+
+    const Point2D c_final = apply_se2(working_pose, src_local_centroid);
+    const double centroid_shift = std::hypot(
+      c_final.x - src_world_centroid_before.x,
+      c_final.y - src_world_centroid_before.y);
+
+    cand.refined_delta = {
+      c_final.x - src_world_centroid_before.x,
+      c_final.y - src_world_centroid_before.y,
+      wrap_angle(working_pose.yaw - current_pose.yaw)
     };
-    working_pose = compose_se2(inc, working_pose);
 
-    if (std::hypot(delta[0], delta[1]) < params.convergence_trans_m &&
-        std::abs(dtheta) < params.convergence_rot_rad)
+    if (centroid_shift > params.max_total_delta_xy_m ||
+        std::abs(cand.refined_delta.yaw) > params.max_total_delta_yaw_rad)
     {
-      break;
+      cand.reject_reason = "delta_exceeds_bounds";
+    } else if (cand.inlier_ratio < params.min_inlier_ratio) {
+      cand.reject_reason = "low_inlier_ratio";
+    } else {
+      cand.iou_after = compute_overlap_occupied_iou(ref, src, working_pose, params.occupied_threshold);
+      // Allow a relaxed transient RMSE ceiling ONLY on well-conditioned (cond <= 5.0),
+      // low-initial-overlap (iou_before < 0.25) large-slip acquisitions where occupied IoU
+      // jumps substantially with strong inlier support. Conditioning gate prevents parallel
+      // warehouse aisles (cond ~ 10-20) from false-snapping onto an adjacent rack.
+      const bool well_conditioned = (cand.cond_trans > 0.0 && cand.cond_trans <= 5.0);
+      const bool huge_acquisition =
+        well_conditioned && (cand.iou_before < 0.25) &&
+        (cand.iou_after >= cand.iou_before + 0.25) && (cand.inlier_ratio >= 0.65);
+      const bool big_acquisition =
+        well_conditioned && (cand.iou_before < 0.25) &&
+        (cand.iou_after >= cand.iou_before + 0.14) && (cand.inlier_ratio >= 0.65);
+      const double eff_max_rmse = huge_acquisition
+        ? std::max(params.max_rmse_m, 0.38)
+        : (big_acquisition ? std::max(params.max_rmse_m, 0.34) : params.max_rmse_m);
+
+      if (cand.icp_rmse_m > eff_max_rmse) {
+        cand.reject_reason = "high_icp_rmse";
+      } else if (cand.iou_after + params.iou_tolerance < cand.iou_before) {
+        cand.reject_reason = "iou_degraded";
+      } else if (
+        cand.iou_before >= params.deadband_iou_threshold &&
+        (cand.iou_after < cand.iou_before + params.deadband_min_improve_iou ||
+          (centroid_shift < params.deadband_min_delta_xy_m &&
+            std::abs(cand.refined_delta.yaw) < params.deadband_min_delta_yaw_rad)))
+      {
+        cand.reject_reason = "high_iou_deadband";
+      } else {
+        cand.accepted = true;
+        cand.smoothed_pose = smooth_se2_about_pivot(
+          current_pose, working_pose, src_local_centroid,
+          params.smoothing_alpha, params.max_step_xy_m, params.max_step_yaw_rad);
+      }
     }
-  }
-
-  diag.degenerate_trans = ever_degenerate_trans;
-
-  // If translational degeneracy fired (e.g., straight mine corridor), project
-  // total translational delta onto the well-constrained eigenvector so neither
-  // coarse phase-corr nor numerical noise can inject longitudinal slip.
-  if (params.enable_degeneracy_gate && ever_degenerate_trans) {
-    const double total_dx = working_pose.x - current_pose.x;
-    const double total_dy = working_pose.y - current_pose.y;
-    const double proj = total_dx * last_trans_eig.vec_max.x + total_dy * last_trans_eig.vec_max.y;
-    working_pose.x = current_pose.x + proj * last_trans_eig.vec_max.x;
-    working_pose.y = current_pose.y + proj * last_trans_eig.vec_max.y;
-  }
-
-  diag.refined_delta = {
-    working_pose.x - current_pose.x,
-    working_pose.y - current_pose.y,
-    wrap_angle(working_pose.yaw - current_pose.yaw)
+    return cand;
   };
 
-  // Stage 3: Safety, RMSE, and monotonic overlap IoU consistency gates
-  if (std::hypot(diag.refined_delta.x, diag.refined_delta.y) > params.max_total_delta_xy_m ||
-      std::abs(diag.refined_delta.yaw) > params.max_total_delta_yaw_rad)
-  {
-    diag.reject_reason = "delta_exceeds_bounds";
-  } else if (diag.inlier_ratio < params.min_inlier_ratio) {
-    diag.reject_reason = "low_inlier_ratio";
-  } else if (diag.icp_rmse_m > params.max_rmse_m) {
-    diag.reject_reason = "high_icp_rmse";
-  } else {
-    diag.iou_after = compute_overlap_occupied_iou(ref, src, working_pose, params.occupied_threshold);
-    if (diag.iou_after + params.iou_tolerance < diag.iou_before) {
-      diag.reject_reason = "iou_degraded";
-    } else {
-      diag.accepted = true;
-      diag.smoothed_pose = smooth_se2(
-        current_pose, working_pose,
-        params.smoothing_alpha, params.max_step_xy_m, params.max_step_yaw_rad);
+  // Stage 1 + 2: Always evaluate direct ICP from current_pose; when phase correlation is enabled,
+  // run centroid-pivoted multi-angle 2D FFT phase correlation (skipping yaw bank when tightly aligned)
+  // and keep the strictly higher-IoU (lower-RMSE tie-break) hypothesis.
+  RegistrationDiagnostics best = run_icp_from(current_pose, false, Pose2D{});
+
+  if (params.enable_phase_corr) {
+    const bool already_tight =
+      (diag.iou_before >= params.deadband_iou_threshold) ||
+      (best.accepted && best.iou_after >= 0.72 && best.icp_rmse_m <= 0.06);
+    const double yaw_bank[5] = {0.0, -0.09, 0.09, -0.18, 0.18};
+    const int n_angles = already_tight ? 1 : 5;
+
+    PhaseCorrResult best_pc;
+    Pose2D best_probe = current_pose;
+    double best_yaw_off = 0.0;
+    for (int ai = 0; ai < n_angles; ++ai) {
+      const double dyaw = yaw_bank[ai];
+      // Rotate about src_world_centroid_before so large-coordinate worlds incur zero lever-arm shift
+      const double c = std::cos(dyaw);
+      const double s = std::sin(dyaw);
+      const Pose2D rot_about_centroid{
+        src_world_centroid_before.x - (c * src_world_centroid_before.x - s * src_world_centroid_before.y),
+        src_world_centroid_before.y - (s * src_world_centroid_before.x + c * src_world_centroid_before.y),
+        dyaw
+      };
+      const Pose2D probe = compose_se2(rot_about_centroid, current_pose);
+      const auto pc = estimate_coarse_translation(ref, src, probe, params.phase_corr);
+      if (pc.response > best_pc.response) {
+        best_pc = pc;
+        best_probe = probe;
+        best_yaw_off = dyaw;
+      }
+    }
+
+    best.phase_corr_response = best_pc.response;
+    diag.phase_corr_response = best_pc.response;
+    if (best_pc.valid &&
+        (std::hypot(best_pc.dx, best_pc.dy) > 0.05 || std::abs(best_yaw_off) > 0.02))
+    {
+      const Pose2D coarse_candidate{
+        best_probe.x + best_pc.dx,
+        best_probe.y + best_pc.dy,
+        best_probe.yaw
+      };
+      auto pc_cand = run_icp_from(
+        coarse_candidate, true, Pose2D{best_pc.dx, best_pc.dy, best_yaw_off});
+      const bool take_pc =
+        (pc_cand.accepted && !best.accepted) ||
+        (pc_cand.accepted && best.accepted &&
+          (pc_cand.iou_after > best.iou_after + 0.005 ||
+            (std::abs(pc_cand.iou_after - best.iou_after) <= 0.005 &&
+              pc_cand.icp_rmse_m < best.icp_rmse_m)));
+      if (take_pc) {
+        best = std::move(pc_cand);
+      }
     }
   }
 
   const auto t_end = std::chrono::steady_clock::now();
-  diag.elapsed_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
-  return diag;
+  best.elapsed_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+  return best;
 }
 
 OccupancyGrid2D merge_occupancy_grids(

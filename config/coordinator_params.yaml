@@ -8,7 +8,7 @@ multi_robot_coordinator:
 
     # --- Legacy frontier / auction parameters ---
     # Frequency of the coordination cycle (Hz)
-    rate_hz: 0.5
+    rate_hz: 1.0
     # Minimum number of frontier cells to form a valid cluster
     min_frontier_size: 5
     # Utility weights: Utility = gain_scale * size - potential_scale * dist - orientation_scale * angle
@@ -46,9 +46,9 @@ multi_robot_coordinator:
     voxel_max_z: 2.0
     voxel_min_points_per_column: 3
     voxel_max_points: 400000
-    voxel_update_period: 2.0
+    voxel_update_period: 5.0
     gain_3d_window_radius: 1.5
-    gain_3d_scale: 6.0
+    gain_3d_scale: 1.8
     gain_3d_density_weight: 0.30
     gain_3d_unknown_weight: 0.35
     gain_3d_floating_weight: 0.15
@@ -68,7 +68,7 @@ multi_robot_coordinator:
     local_max_waypoints: 3
     local_min_spacing: 2.5
     local_max_tour_length: 12.0
-    local_tour_score_dist_weight: 1.5
+    local_tour_score_dist_weight: 1.2
     local_release_unselected: false
     local_release_cooldown: 5.0
     local_release_score_penalty: 0.7
@@ -78,7 +78,7 @@ multi_robot_coordinator:
     global_roi_min: 0.05
     global_roi_scale: 5.0
     global_max_distance: 0.0
-    global_max_candidates: 8
+    global_max_candidates: 48
 
     # --- Tour dispatch / supervision ---
     # Receding-horizon open-TSP dispatch via NavigateToPose prevents driving
@@ -88,11 +88,13 @@ multi_robot_coordinator:
     action_wait_sec: 2.0
     tf_wait_sec: 0.1
     tour_timeout_per_waypoint: 25.0
-    tour_stall_window: 10.0
-    tour_stall_min_translation: 0.28
+    tour_stall_window: 7.0
+    tour_stall_min_translation: 0.25
     tour_stall_min_progress: 0.25
     tour_rewrite_on_invalidation: true
     tour_max_rewrites: 2
+    lookahead_handoff_dist: 0.90
+    invalidation_grace_sec: 3.0
 
     # --- Out-of-bounds self recovery ---
     # The global costmap is exactly as large as a robot's SLAM map, so a robot
@@ -103,8 +105,8 @@ multi_robot_coordinator:
     # uses the rolling local costmap) so it can plan again.
     backup_recovery_enable: true
     backup_distance: 0.40
-    backup_speed: 0.06
-    backup_cooldown: 20.0
+    backup_speed: 0.15
+    backup_cooldown: 15.0
 
     # --- Residual blind-spot cleanup ---
     residual_enable: true
@@ -164,7 +166,11 @@ multi_robot_coordinator:
     # Layer 1: /<ns>/teammates_cloud (5 Hz) -> local_costmap.voxel_layer.
     teammate_deconfliction_enable: true
     teammate_cloud_rate_hz: 5.0
-    # Layer 2: corridor mutex reservation on doorway / corridor bottlenecks.
+    teammate_footprint_radius: 0.22
+    teammate_predict_horizon_s: 1.2
+    # Layer 2: corridor mutex reservation on narrow single-lane corridor bottlenecks.
     corridor_mutex_enable: true
-    corridor_narrow_margin: 0.35
+    corridor_narrow_margin: 0.20
     corridor_robot_radius: 0.22
+    corridor_min_segment_length: 0.75
+    corridor_max_yield_duration: 6.0

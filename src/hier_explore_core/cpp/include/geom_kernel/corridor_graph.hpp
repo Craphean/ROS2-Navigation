@@ -39,6 +39,7 @@ struct CorridorParams
   double narrow_margin_m{0.35};       // bottleneck half-width threshold: 2*r + margin
   double min_passable_margin_m{0.02}; // ignore slivers narrower than robot_radius + margin
   int min_segment_cells{4};
+  double min_segment_length_m{0.0};
   double yield_search_radius_m{3.0};
   double yield_min_separation_m{1.0};
   int max_yield_points{4};

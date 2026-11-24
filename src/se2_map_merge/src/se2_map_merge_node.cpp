@@ -435,25 +435,69 @@ private:
 
     // Per-robot local-frame reprojected shared map (TODO #12): each robot's
     // global_costmap.static_layer subscribes /<ns>/shared_map (frame "map").
-    // Snapshot (pose, publisher) under the lock, then reproject WITHOUT holding
+    // Snapshot (pose, own_grid, publisher) under the lock, then reproject WITHOUT holding
     // it so the 20 Hz world->robotX/map TF broadcaster never stalls.
+    // CRITICAL: Preserve ego robot's own explicitly FREE (0) observations in local_shared
+    // so a teammate's laser scan hitting the ego robot's moving chassis (or minor residual
+    // SE(2) alignment offset) can NEVER paint a permanent lethal cage around the ego robot
+    // in its own global_costmap (which otherwise triggers Nav2 error_code:208 indefinitely).
     if (publish_shared_maps_) {
-      std::vector<std::pair<Pose2D, rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr>> targets;
+      struct SharedTarget {
+        Pose2D pose;
+        OccupancyGrid2D own_grid;
+        bool has_own{false};
+        rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pub;
+      };
+      std::vector<SharedTarget> targets;
       {
         std::lock_guard<std::mutex> lock(mutex_);
         targets.reserve(robots_.size());
         for (const auto & slot : robots_) {
           if (slot.shared_map_pub) {
-            targets.emplace_back(slot.pose, slot.shared_map_pub);
+            SharedTarget t;
+            t.pose = slot.pose;
+            t.has_own = slot.has_grid && !slot.grid.empty();
+            if (t.has_own) {
+              t.own_grid = slot.grid;
+            }
+            t.pub = slot.shared_map_pub;
+            targets.push_back(std::move(t));
           }
         }
       }
-      for (const auto & [pose, pub] : targets) {
-        const Pose2D inv_pose = inverse_se2(pose);
-        const auto local_shared = merge_occupancy_grids({{&merged, inv_pose}}, output_resolution_);
-        if (!local_shared.empty()) {
-          pub->publish(to_ros_grid(local_shared, "map", stamp));
+      for (const auto & t : targets) {
+        const Pose2D inv_pose = inverse_se2(t.pose);
+        auto local_shared = merge_occupancy_grids({{&merged, inv_pose}}, output_resolution_);
+        if (local_shared.empty()) {
+          continue;
         }
+        if (t.has_own && t.own_grid.resolution > 0.0) {
+          const double res_s = local_shared.resolution;
+          const double res_o = t.own_grid.resolution;
+          for (int y = 0; y < local_shared.height; ++y) {
+            const double wy = local_shared.origin_y + (y + 0.5) * res_s;
+            const int oy = static_cast<int>(std::floor((wy - t.own_grid.origin_y) / res_o));
+            if (oy < 0 || oy >= t.own_grid.height) {
+              continue;
+            }
+            const int row_s = y * local_shared.width;
+            const int row_o = oy * t.own_grid.width;
+            for (int x = 0; x < local_shared.width; ++x) {
+              const double wx = local_shared.origin_x + (x + 0.5) * res_s;
+              const int ox = static_cast<int>(std::floor((wx - t.own_grid.origin_x) / res_o));
+              if (ox < 0 || ox >= t.own_grid.width) {
+                continue;
+              }
+              const int8_t own_v = t.own_grid.data[static_cast<size_t>(row_o + ox)];
+              if (own_v >= 0 && own_v < 50) {
+                // Ego robot's own laser explicitly observed this cell as FREE: never let
+                // a teammate's transient scan of ego's chassis overwrite it to lethal!
+                local_shared.data[static_cast<size_t>(row_s + x)] = own_v;
+              }
+            }
+          }
+        }
+        t.pub->publish(to_ros_grid(local_shared, "map", stamp));
       }
     }
   }

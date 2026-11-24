@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -52,7 +52,12 @@ class OccupancyView:
     height: int
 
     @classmethod
-    def from_grid(cls, grid_msg) -> "OccupancyView":
+    def from_grid(
+        cls,
+        grid_msg,
+        clear_robot_xy: Sequence[Tuple[float, float]] = (),
+        clear_radius_m: float = 0.28,
+    ) -> "OccupancyView":
         """Build from a nav_msgs/OccupancyGrid (duck-typed, no ROS import)."""
         width = int(grid_msg.info.width)
         height = int(grid_msg.info.height)
@@ -61,12 +66,35 @@ class OccupancyView:
             data = np.frombuffer(raw, dtype=np.int8).reshape((height, width))
         except (TypeError, BufferError, ValueError):
             data = np.asarray(raw, dtype=np.int8).reshape((height, width))
-        return cls.from_numpy(
-            data,
-            float(grid_msg.info.origin.position.x),
-            float(grid_msg.info.origin.position.y),
-            float(grid_msg.info.resolution),
-        )
+        ox = float(grid_msg.info.origin.position.x)
+        oy = float(grid_msg.info.origin.position.y)
+        res = float(grid_msg.info.resolution)
+        if clear_robot_xy and res > 0.0 and clear_radius_m > 0.0:
+            rad_cells = max(1, int(math.ceil(clear_radius_m / res)))
+            r2_max = (clear_radius_m / res) ** 2
+            copied = False
+            for rx, ry in clear_robot_xy:
+                if not (math.isfinite(rx) and math.isfinite(ry)):
+                    continue
+                rc = int(math.floor((ry - oy) / res))
+                cc = int(math.floor((rx - ox) / res))
+                r0 = max(0, rc - rad_cells)
+                r1 = min(height, rc + rad_cells + 1)
+                c0 = max(0, cc - rad_cells)
+                c1 = min(width, cc + rad_cells + 1)
+                if r0 >= r1 or c0 >= c1:
+                    continue
+                sub = data[r0:r1, c0:c1]
+                if not (sub > 50).any():
+                    continue
+                if not copied:
+                    data = data.copy()
+                    copied = True
+                    sub = data[r0:r1, c0:c1]
+                yy, xx = np.ogrid[r0:r1, c0:c1]
+                disk = ((yy - rc) ** 2 + (xx - cc) ** 2) <= r2_max
+                sub[disk & (sub > 50)] = 0
+        return cls.from_numpy(data, ox, oy, res)
 
     @classmethod
     def from_numpy(

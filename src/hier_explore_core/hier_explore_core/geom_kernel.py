@@ -72,6 +72,7 @@ class GeodesicCache:
         self.min_clearance_cells = max(0.0, eff_clr_m / max(occ.resolution, 1e-6))
         self.max_dist_m = float(max_dist_m)
         self.snap_radius_m = max(float(snap_radius_m), 0.90)
+        self.allow_on_demand_astar: bool = True
         self._pair_cache: Dict[Tuple[int, int, int, int], float] = {}
         self._path_cache: Dict[Tuple[int, int, int, int], Tuple[float, np.ndarray]] = {}
 
@@ -238,6 +239,14 @@ class GeodesicCache:
         cached = self._pair_cache.get(ck)
         if cached is not None:
             return cached
+        if not self.allow_on_demand_astar:
+            dist_m = (
+                1.35 * math.hypot(x2 - x1, y2 - y1)
+                if self._same_or_snapped_component(x1, y1, x2, y2)
+                else float("inf")
+            )
+            self._pair_cache[ck] = dist_m
+            return dist_m
         dist_m, _ = self.shortest_path((x1, y1), (x2, y2))
         if not math.isfinite(dist_m) and self._same_or_snapped_component(x1, y1, x2, y2):
             dist_m = 1.35 * math.hypot(x2 - x1, y2 - y1)
@@ -340,6 +349,7 @@ def extract_corridor_bottlenecks_cpp(
     yield_search_radius_m: float = 3.0,
     yield_min_separation_m: float = 1.0,
     max_yield_points: int = 4,
+    min_segment_length_m: float = 0.0,
 ) -> dict:
     """Extract narrow-passage bottlenecks E_narrow and yield points via C++ kernel."""
     if _cpp is None:
@@ -358,5 +368,6 @@ def extract_corridor_bottlenecks_cpp(
             float(yield_search_radius_m),
             float(yield_min_separation_m),
             int(max_yield_points),
+            float(min_segment_length_m),
         )
     )
