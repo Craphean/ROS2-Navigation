@@ -132,10 +132,11 @@ def _build_launch_actions(context, *args, **kwargs):
     else:
         world_sdf = world_src
 
+    use_shared_map = use_se2_merge and bool(resolved["se2_merge_params"].get("publish_per_robot_shared_map", True))
     nav2_params = _prepare_nav2_params(
         repo_root / "config" / "nav2_multirobot_slam_params.yaml",
         tmp_dir,
-        use_se2_merge=use_se2_merge,
+        use_se2_merge=use_shared_map,
     )
     ekf_params = repo_root / "config" / "ekf_odom.yaml"
     se2_merge_params = repo_root / "config" / "se2_map_merge_params.yaml"

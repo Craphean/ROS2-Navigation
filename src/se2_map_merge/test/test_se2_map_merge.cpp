@@ -295,6 +295,55 @@ void test_large_coordinate_centroid_pivot_and_deadband()
   assert(db.reject_reason == "high_iou_deadband" || db.reject_reason == "iou_degraded");
 }
 
+void test_thick_wall_corridor_degeneracy_and_large_slip_20deg()
+{
+  std::cout << "[TEST 6] Thick 3-cell corridor degeneracy & (1.5 m, 18 deg) multi-angle FFT recovery..." << std::endl;
+  // 1) Thick 3-cell parallel corridor (mimics real SLAM Toolbox wall thickness)
+  OccupancyGrid2D ref = make_straight_corridor(0.05);
+  auto thicken = [](OccupancyGrid2D & g) {
+    auto copy = g.data;
+    for (int r = 1; r < g.height - 1; ++r) {
+      for (int c = 1; c < g.width - 1; ++c) {
+        if (copy[static_cast<size_t>(r) * g.width + c] > 65) {
+          g.data[static_cast<size_t>(r - 1) * g.width + c] = 100;
+          g.data[static_cast<size_t>(r + 1) * g.width + c] = 100;
+        }
+      }
+    }
+  };
+  thicken(ref);
+  const Pose2D corr_true{0.0, 0.30, 4.0 * kDeg2Rad};
+  const auto corr_src = warp_grid_as_follower(ref, corr_true);
+  Se2AlignParams cp;
+  cp.smoothing_alpha = 1.0;
+  cp.max_step_xy_m = 3.0;
+  cp.max_step_yaw_rad = 0.5;
+  cp.max_trans_cond_number = 10.0;
+  cp.enable_degeneracy_gate = true;
+  const auto cdiag = align_occupancy_grids_se2(ref, corr_src, Pose2D{0.0, 0.0, 0.0}, cp);
+  assert(cdiag.accepted);
+  assert(cdiag.degenerate_trans);  // MUST detect degeneracy even on 3-cell thick SLAM walls!
+
+  // 2) Large-slip (2.0 m, 20 deg) recovery on structured room via 7-angle FFT bank
+  const auto room_ref = make_structured_room(0.05);
+  const Pose2D big_true{1.41, -1.41, 20.0 * kDeg2Rad};
+  const auto room_src = warp_grid_as_follower(room_ref, big_true);
+  Se2AlignParams bp;
+  bp.smoothing_alpha = 1.0;
+  bp.max_step_xy_m = 3.5;
+  bp.max_step_yaw_rad = 0.5;
+  bp.enable_phase_corr = true;
+  const auto bdiag = align_occupancy_grids_se2(room_ref, room_src, Pose2D{0.0, 0.0, 0.0}, bp);
+  const double err_xy = std::hypot(bdiag.smoothed_pose.x - big_true.x, bdiag.smoothed_pose.y - big_true.y);
+  const double err_yaw = std::abs(wrap_angle(bdiag.smoothed_pose.yaw - big_true.yaw)) / kDeg2Rad;
+  std::cout << "  thick-corridor deg=" << cdiag.degenerate_trans
+            << " | 20deg-FFT phase_used=" << bdiag.phase_corr_used
+            << " err_xy=" << err_xy * 100.0 << "cm err_yaw=" << err_yaw << "deg" << std::endl;
+  assert(bdiag.accepted);
+  assert(err_xy < 0.05);
+  assert(err_yaw < 0.8);
+}
+
 }  // namespace
 
 int main()
@@ -304,6 +353,7 @@ int main()
   test_step_clamped_smoothing_and_merge();
   test_cloud_filter_and_speed_benchmark();
   test_large_coordinate_centroid_pivot_and_deadband();
+  test_thick_wall_corridor_degeneracy_and_large_slip_20deg();
   std::cout << "ALL se2_map_merge C++ TESTS PASSED!" << std::endl;
   return 0;
 }

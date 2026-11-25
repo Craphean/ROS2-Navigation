@@ -185,6 +185,22 @@ ABLATION_PROFILES: Dict[str, AblationProfile] = {
         },
         se2_merge_params={"enable_degeneracy_gate": False},
     ),
+    "no_shared_map": AblationProfile(
+        name="no_shared_map",
+        description="Ablation: Full coordinator without per-robot reprojected /<ns>/shared_map (Nav2 uses local map only).",
+        default_planner_backend="coordinator",
+        coordinator_params={
+            "use_3d_gain": True,
+            "local_scheduling_enable": True,
+            "residual_enable": True,
+            "convergence_enable": True,
+            "use_geodesic_distance": True,
+            "use_los_fov_optimizer": True,
+            "teammate_deconfliction_enable": True,
+            "corridor_mutex_enable": True,
+        },
+        se2_merge_params={"publish_per_robot_shared_map": False},
+    ),
 }
 
 

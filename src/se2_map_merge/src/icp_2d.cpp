@@ -277,7 +277,9 @@ std::vector<Normal2D> estimate_normals(
   std::vector<std::pair<double, int>> knn;
   const double r2 = max_radius * max_radius;
   for (size_t i = 0; i < pts.size(); ++i) {
-    tree.k_nearest(pts[i], 7, knn);
+    // Use 25-NN within max_radius (~0.45 m) so 2-3 cell thick SLAM Toolbox walls
+    // still exhibit a clear longitudinal-to-thickness PCA aspect ratio (> 3:1).
+    tree.k_nearest(pts[i], 25, knn);
     double mx = 0.0, my = 0.0;
     int cnt = 0;
     for (const auto & item : knn) {
@@ -423,7 +425,7 @@ RegistrationDiagnostics align_occupancy_grids_se2(
 
   // Build KD-Tree & local surface normals on reference occupied edge points
   KdTree2D ref_tree(ref_pts);
-  const auto ref_normals = estimate_normals(ref_pts, ref_tree, std::max(0.35, 5.0 * ref.resolution));
+  const auto ref_normals = estimate_normals(ref_pts, ref_tree, std::max(0.45, 9.0 * ref.resolution));
 
   // Source occupied centroid (local & current world) for scale-invariant rotation pivoting
   Point2D src_local_centroid{0.0, 0.0};
@@ -633,10 +635,10 @@ RegistrationDiagnostics align_occupancy_grids_se2(
       // warehouse aisles (cond ~ 10-20) from false-snapping onto an adjacent rack.
       const bool well_conditioned = (cand.cond_trans > 0.0 && cand.cond_trans <= 5.0);
       const bool huge_acquisition =
-        well_conditioned && (cand.iou_before < 0.25) &&
+        params.allow_large_slip_acquisition && well_conditioned && (cand.iou_before < 0.25) &&
         (cand.iou_after >= cand.iou_before + 0.25) && (cand.inlier_ratio >= 0.65);
       const bool big_acquisition =
-        well_conditioned && (cand.iou_before < 0.25) &&
+        params.allow_large_slip_acquisition && well_conditioned && (cand.iou_before < 0.25) &&
         (cand.iou_after >= cand.iou_before + 0.14) && (cand.inlier_ratio >= 0.65);
       const double eff_max_rmse = huge_acquisition
         ? std::max(params.max_rmse_m, 0.38)
@@ -672,8 +674,8 @@ RegistrationDiagnostics align_occupancy_grids_se2(
     const bool already_tight =
       (diag.iou_before >= params.deadband_iou_threshold) ||
       (best.accepted && best.iou_after >= 0.72 && best.icp_rmse_m <= 0.06);
-    const double yaw_bank[5] = {0.0, -0.09, 0.09, -0.18, 0.18};
-    const int n_angles = already_tight ? 1 : 5;
+    const double yaw_bank[7] = {0.0, -0.11, 0.11, -0.22, 0.22, -0.33, 0.33};
+    const int n_angles = already_tight ? 1 : 7;
 
     PhaseCorrResult best_pc;
     Pose2D best_probe = current_pose;

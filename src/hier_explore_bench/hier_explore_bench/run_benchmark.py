@@ -118,6 +118,15 @@ ABLATION_PROFILES: Dict[str, Dict[str, str]] = {
             "-p teammate_deconfliction_enable:=true -p corridor_mutex_enable:=true"
         ),
     },
+    "no_shared_map": {
+        "EXPLORATION_MODE": "auction",
+        "COORDINATOR_ARGS": (
+            "-p use_3d_gain:=true -p local_scheduling_enable:=true "
+            "-p residual_enable:=true -p convergence_enable:=true "
+            "-p use_geodesic_distance:=true -p use_los_fov_optimizer:=true "
+            "-p teammate_deconfliction_enable:=true -p corridor_mutex_enable:=true"
+        ),
+    },
 }
 
 DEFAULT_SUMMARY_METRICS = [

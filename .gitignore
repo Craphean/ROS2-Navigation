@@ -23,4 +23,6 @@ docs/paper_draft_zh.md
 docs/paper_plan.md
 docs/paper_artifacts/
 docs/*.webm
+scripts/generate_paper_artifacts.py
+src/hier_explore_bench/hier_explore_bench/plot_paper_figs.py
 

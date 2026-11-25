@@ -1840,11 +1840,20 @@ class MultiRobotCoordinator(Node):
                 if now - robot.last_progress_time < self.tour_stall_window:
                     continue
                 target, key = robot.current_goal_world, robot.current_residual_key
+                dist_to_target = (
+                    math.hypot(target[0] - robot.world_x, target[1] - robot.world_y)
+                    if target is not None
+                    else float("inf")
+                )
                 robot.consecutive_stalls += 1
                 self._increment_through_failure(robot)
                 self._cancel_robot_goal(robot)
                 self._record_failure(target, key)
-                if target is not None:
+                # Only blacklist immediately on a 1st stall when the robot is already
+                # right at the frontier pocket (<= 2.0 m); mid-transit stalls far from
+                # the goal respect blacklist_retry_limit so a single detour/snag never
+                # permanently seals off an entire unexplored wing.
+                if target is not None and dist_to_target <= 2.0:
                     self.bookkeeper.blacklist_frontier_point(target[0], target[1])
                 # Only trigger blind backup when actually pinned near an obstacle or stuck
                 # across consecutive goals; on a 1st stall in open clearance, immediately re-plan!

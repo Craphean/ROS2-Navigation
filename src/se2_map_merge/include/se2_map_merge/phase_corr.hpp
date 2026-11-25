@@ -12,7 +12,7 @@ struct PhaseCorrParams
   int max_fft_dim{256};          // caps FFT grid size for <3 ms latency
   double max_shift_m{3.5};
   double min_response{0.08};
-  double overlap_margin_m{2.0};
+  double overlap_margin_m{3.5};
 };
 
 struct PhaseCorrResult

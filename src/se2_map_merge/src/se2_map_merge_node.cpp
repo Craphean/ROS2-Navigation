@@ -288,6 +288,7 @@ private:
     Pose2D pose{};
     OccupancyGrid2D grid{};
     bool has_grid{false};
+    bool ever_well_aligned{false};
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub;
     rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf_sub;
     rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf_static_sub;
@@ -325,6 +326,7 @@ private:
       OccupancyGrid2D grid;
       Pose2D pose;
       bool has_grid;
+      bool ever_well_aligned;
     };
 
     std::vector<Snapshot> snaps;
@@ -336,7 +338,8 @@ private:
       snaps.reserve(robots_.size());
       for (size_t i = 0; i < robots_.size(); ++i) {
         snaps.push_back(
-          {i, robots_[i].ns, robots_[i].grid, robots_[i].pose, robots_[i].has_grid});
+          {i, robots_[i].ns, robots_[i].grid, robots_[i].pose, robots_[i].has_grid,
+            robots_[i].ever_well_aligned});
       }
     }
 
@@ -362,12 +365,24 @@ private:
         continue;
       }
 
+      auto robot_params = align_params_;
+      robot_params.allow_large_slip_acquisition = !snaps[i].ever_well_aligned;
       const auto diag = align_occupancy_grids_se2(
-        ref_grid, snaps[i].grid, snaps[i].pose, align_params_);
-      if (diag.accepted) {
-        snaps[i].pose = diag.smoothed_pose;
+        ref_grid, snaps[i].grid, snaps[i].pose, robot_params);
+      const bool now_well_aligned =
+        snaps[i].ever_well_aligned ||
+        (diag.iou_before >= 0.55) ||
+        (diag.accepted && diag.iou_after >= 0.65);
+      if (diag.accepted || now_well_aligned != snaps[i].ever_well_aligned) {
+        if (diag.accepted) {
+          snaps[i].pose = diag.smoothed_pose;
+        }
+        snaps[i].ever_well_aligned = now_well_aligned;
         std::lock_guard<std::mutex> lock(mutex_);
-        robots_[snaps[i].idx].pose = diag.smoothed_pose;
+        if (diag.accepted) {
+          robots_[snaps[i].idx].pose = diag.smoothed_pose;
+        }
+        robots_[snaps[i].idx].ever_well_aligned = now_well_aligned;
       }
 
       std::ostringstream oss;
